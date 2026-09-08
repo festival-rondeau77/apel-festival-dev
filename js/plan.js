@@ -1,35 +1,47 @@
-// Logique du plan : disposition des Zones et des Salles (coordonnées 0 à 100),
-// recherche depuis le plan, phrase de guidage, contenu d'une Zone. Pure.
-import { normaliser, contient } from './donnees.js';
+// Logique du plan : disposition des Villages et des Salles (coordonnées 0 à 100),
+// étage par étage, recherche depuis le plan, phrase de guidage, contenu d'une
+// Zone. Pure.
+import { normaliser, contient, ETAGES, ETAGE_PAR_DEFAUT } from './donnees.js';
 
-// Disposition stylisée d'après les vues extérieures du lycée : l'entrée et
-// l'accueil en bas, l'auditorium (Conférences) à gauche, les bâtiments de
-// salles au-dessus. Coordonnées et tailles en pour cent du plan.
-const DISPOSITION_PAR_DEFAUT = {
-  1: { x: 36, y: 78, w: 28, h: 16 },
-  2: { x: 4, y: 44, w: 28, h: 28 },
-  3: { x: 36, y: 44, w: 28, h: 28 },
-  4: { x: 68, y: 44, w: 28, h: 28 },
-  5: { x: 4, y: 10, w: 44, h: 28 },
-  6: { x: 52, y: 10, w: 44, h: 28 },
-  7: { x: 4, y: 78, w: 28, h: 16 },
-};
-const GRILLE = { colonnes: 3, marge: 4, ecart: 4 };
+// Tant que l'établissement ne nous a pas donné ses plans du rez-de-chaussée et
+// du premier étage, la disposition est une grille : deux colonnes de villages,
+// et une bande basse pour les deux fonctions (Accueil, Conférences). C'est faux
+// géométriquement et juste topologiquement — on ne prétend pas placer un couloir
+// qu'on n'a pas vu. Quand les plans arriveront, seules ces constantes bougent.
+const GRILLE = { colonnes: 2, marge: 4, ecart: 4, hauteur: 26, bande: 15 };
 
-// Chaque Zone reçoit un rectangle ; les Zones hors disposition par défaut sont
-// rangées en grille sous les autres.
+// Les Villages d'un étage reçoivent chacun un rectangle ; l'Accueil et les
+// Conférences sont rangés en bande basse, du côté de l'entrée.
 export function disposerZones(zones) {
-  const rects = [];
-  let libres = 0;
-  for (const z of zones) {
-    const d = z.numero !== null ? DISPOSITION_PAR_DEFAUT[z.numero] : null;
-    if (d) { rects.push({ zone: z, ...d }); continue; }
-    const col = libres % GRILLE.colonnes, ligne = Math.floor(libres / GRILLE.colonnes);
-    const w = (100 - 2 * GRILLE.marge - (GRILLE.colonnes - 1) * GRILLE.ecart) / GRILLE.colonnes;
-    rects.push({ zone: z, x: GRILLE.marge + col * (w + GRILLE.ecart), y: 100 + GRILLE.ecart + ligne * 20, w, h: 16 });
-    libres++;
-  }
+  const { marge, ecart, colonnes, hauteur, bande } = GRILLE;
+  const villages = zones.filter((z) => !z.fonction);
+  const fonctions = zones.filter((z) => z.fonction);
+  const w = (100 - 2 * marge - (colonnes - 1) * ecart) / colonnes;
+  const rects = villages.map((z, i) => ({
+    zone: z,
+    x: marge + (i % colonnes) * (w + ecart),
+    y: marge + Math.floor(i / colonnes) * (hauteur + ecart),
+    w, h: hauteur,
+  }));
+  if (!fonctions.length) return rects;
+  const y = marge + Math.ceil(villages.length / colonnes) * (hauteur + ecart);
+  const wf = (100 - 2 * marge - (fonctions.length - 1) * ecart) / fonctions.length;
+  fonctions.forEach((z, i) => rects.push({ zone: z, x: marge + i * (wf + ecart), y, w: wf, h: bande }));
   return rects;
+}
+
+// Les étages où quelque chose se passe, dans l'ordre du bâtiment. Un étage sans
+// une seule salle n'a pas d'onglet : on ne fait pas cliquer sur du vide.
+export function etagesPresents(modele) {
+  const presents = ETAGES.filter((e) => modele.salles.some((s) => s.etage === e));
+  return presents.length ? presents : [ETAGE_PAR_DEFAUT];
+}
+
+// Le plan d'un étage : ses salles, et les villages qui en ont au moins une.
+export function planDeLEtage(modele, etage) {
+  const salles = modele.salles.filter((s) => s.etage === etage);
+  const zones = modele.zones.filter((z) => z.salles.some((s) => s.etage === etage));
+  return { salles, zones };
 }
 
 // Les Salles avec X, Y sont posées telles quelles ; les autres sont réparties dans
@@ -50,7 +62,9 @@ export function placerSalles(salles, rects) {
     const lignes = Math.ceil(n / colonnes);
     const col = i % colonnes, ligne = Math.floor(i / colonnes);
     const x = r.x + ((col + 0.5) / colonnes) * r.w;
-    const y = r.y + 6.5 + ((ligne + 0.5) / lignes) * (r.h - 7);
+    // 9 et non 6,5 : le nom d'un village tient sur deux lignes (« Commerce,
+    // Marketing & Management »), et les salles passaient dessous.
+    const y = r.y + 9 + ((ligne + 0.5) / lignes) * (r.h - 10);
     return { salle: s, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, estimee: true };
   });
 }
@@ -87,13 +101,16 @@ export function salleParNom(modele, nom) {
   return modele.salles.find((s) => s.cle === n) || null;
 }
 
-// La phrase pour s'y rendre : Zone puis notes de la Salle.
+// La phrase pour s'y rendre : Village, étage, puis notes de la Salle. L'étage
+// vient en deuxième parce que c'est la première décision du visiteur qui marche.
 export function phraseGuidage(salle, nomSalle = '') {
   if (!salle) return nomSalle ? `${nomSalle} : salle à localiser, demandez à l'accueil` : "Salle à venir : demandez à l'accueil";
   const morceaux = [];
-  if (salle.zone) morceaux.push(`Zone ${salle.zone.numero ?? ''} ${salle.zone.nom}`.replace(/\s+/g, ' ').trim());
+  if (salle.zone) morceaux.push(`Village ${salle.zone.numero ?? ''} ${salle.zone.nom}`.replace(/\s+/g, ' ').trim());
+  if (salle.etage && (salle.zone || salle.notes)) morceaux.push(salle.etage.toLowerCase());
   if (salle.notes) morceaux.push(salle.notes);
-  if (!morceaux.length) morceaux.push(`${salle.nom} : demandez à l'accueil`);
+  // Ni village ni note : l'étage seul ne suffit pas à trouver, on renvoie à l'accueil.
+  if (!morceaux.length) return `${salle.nom} : ${salle.etage ? `${salle.etage.toLowerCase()}, ` : ''}demandez à l'accueil`;
   return morceaux.join(', ');
 }
 

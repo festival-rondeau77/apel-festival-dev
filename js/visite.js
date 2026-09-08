@@ -106,8 +106,8 @@ export function matinee(etat, modele) {
 
 // ---------------------------------------------------------------- préparation
 
-export function basculerInteret(etat, secteur) {
-  const interets = etat.interets.includes(secteur) ? etat.interets.filter((s) => s !== secteur) : [...etat.interets, secteur];
+export function basculerInteret(etat, domaine) {
+  const interets = etat.interets.includes(domaine) ? etat.interets.filter((s) => s !== domaine) : [...etat.interets, domaine];
   return { ...etat, interets };
 }
 
@@ -120,13 +120,15 @@ export function basculerQuestion(etat, cleQuestion) {
   return { ...etat, questionsCochees: q };
 }
 
-// Exposants et Événements dont le Secteur est dans les centres d'intérêt et dont
-// le public inclut le niveau. Sans centre d'intérêt : tous les Secteurs.
+// Exposants et Événements dont AU MOINS UN Domaine est dans les centres
+// d'intérêt, et dont le public inclut le niveau. Sans centre d'intérêt : tout.
+// Un exposant multi-domaines (une université, un lycée polyvalent) remonte donc
+// pour chacun de ses domaines — c'est tout l'intérêt d'en porter plusieurs.
 export function suggestions(etat, modele) {
-  const parSecteur = (o) => etat.interets.length === 0 || etat.interets.includes(o.secteur);
+  const parDomaine = (o) => etat.interets.length === 0 || (o.domaines || []).some((d) => etat.interets.includes(d));
   return {
-    exposants: modele.exposants.filter(parSecteur),
-    evenements: modele.evenements.filter((e) => !e.synthetique && parSecteur(e) && publicInclut(e.public, etat.niveau)),
+    exposants: modele.exposants.filter(parDomaine),
+    evenements: modele.evenements.filter((e) => !e.synthetique && parDomaine(e) && publicInclut(e.public, etat.niveau)),
   };
 }
 

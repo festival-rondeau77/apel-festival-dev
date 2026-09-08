@@ -9,6 +9,7 @@ import { tablesDepuisGviz, tablesDepuisSnapshot, versionDe } from './donnees.js'
 export const CLE_CACHE = 'festival.donnees';
 export const ONGLETS_GVIZ = { exposants: 'Exposants', evenements: 'Événements', salles: 'Salles', preparation: 'Préparation', infos: 'Infos' };
 const DELAI_MAX = 8000; // ms avant de considérer une source comme trop lente
+const SEUIL_CHUTE = 0.5; // une source qui perd plus de la moitié de son volume est refusée
 
 function attendreParDefaut(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
@@ -16,6 +17,37 @@ function attendreParDefaut(ms) { return new Promise((r) => setTimeout(r, ms)); }
 export function bandeauDe(tables) {
   for (const ligne of (tables && tables.infos || []).slice(1)) if (String(ligne[0] ?? '').trim().toLowerCase() === 'bandeau') return String(ligne[1] ?? '').trim();
   return '';
+}
+
+// Le nombre de lignes de DONNÉES de chaque table (la première ligne porte les en-têtes).
+export function volumes(tables) {
+  const v = {};
+  for (const [nom, t] of Object.entries(tables || {})) v[nom] = Math.max(0, (Array.isArray(t) ? t.length : 0) - 1);
+  return v;
+}
+
+// La barrière de complétude : un repli ne doit jamais rendre l'appli MOINS complète
+// qu'elle ne l'était. Une panne du script fait basculer sur le classeur public ; si
+// celui-ci répond « techniquement valide mais vide », l'ancien code l'acceptait, le
+// mettait en cache, et tous les téléphones affichaient un programme vide (chaîne C de
+// l'audit du 2026-09-08 — le seul scénario qui se déclenche sans adversaire).
+// On compare donc le candidat à ce que l'appli tient déjà pour vrai.
+// Renvoie null si le candidat est acceptable, sinon le motif du refus.
+// Limite connue et assumée : la référence avance à chaque acceptation, donc une
+// érosion lente (sous le seuil à chaque fois) passe. C'est la disparition BRUTALE
+// qu'on bloque, parce que c'est celle qu'on a mesurée.
+export function motifDeRefus(candidat, reference, { seuilChute = SEUIL_CHUTE } = {}) {
+  if (!reference) return null; // premier démarrage : rien à protéger
+  const vc = volumes(candidat);
+  const vr = volumes(reference);
+  for (const [nom, n] of Object.entries(vr)) {
+    if (n > 0 && !(vc[nom] > 0)) return `table « ${nom} » vidée (${n} → ${vc[nom] ?? 0})`;
+  }
+  const total = (v) => Object.values(v).reduce((a, b) => a + b, 0);
+  const tc = total(vc);
+  const tr = total(vr);
+  if (tr > 0 && tc < tr * (1 - seuilChute)) return `volume en chute : ${tc} lignes contre ${tr}`;
+  return null;
 }
 
 // L'URL d'un point d'entrée du script (le scriptUrl peut déjà porter une requête).
@@ -28,7 +60,7 @@ export function urlGviz(sheetId, onglet) {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(onglet)}`;
 }
 
-export function creerSources({ config = {}, fetch, stockage, horloge = () => Date.now(), snapshot = null, attendre = attendreParDefaut, delaiMax = DELAI_MAX, journal = () => {} } = {}) {
+export function creerSources({ config = {}, fetch, stockage, horloge = () => Date.now(), snapshot = null, attendre = attendreParDefaut, delaiMax = DELAI_MAX, seuilChute = SEUIL_CHUTE, journal = () => {} } = {}) {
   const lire = () => { try { return stockage ? stockage.getItem(CLE_CACHE) : null; } catch { return null; } };
   const ecrire = (v) => { try { if (stockage) stockage.setItem(CLE_CACHE, v); } catch { /* quota ou navigation privée */ } };
 
@@ -93,22 +125,42 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     return heure;
   }
 
-  // Un rafraîchissement : renvoie { change, bandeau, source, tables?, version? } ou jette si aucune source ne répond.
+  // Un rafraîchissement : renvoie { change, bandeau, source, tables?, version? },
+  // ou { change: false, refus } si les sources joignables sont incomplètes,
+  // ou jette si aucune source ne répond.
   async function rafraichir(versionActuelle) {
     const erreurs = [];
+    const refus = [];
+    const initial = chargerInitial();
+    const reference = initial ? initial.tables : null;
+    // Un candidat n'entre dans le cache que s'il ne fait pas reculer l'appli.
+    const acceptable = (d) => {
+      const motif = motifDeRefus(d.tables, reference, { seuilChute });
+      if (!motif) return true;
+      refus.push({ source: d.source, motif });
+      journal('source refusée, données conservées', d.source, motif);
+      return false;
+    };
     try {
       const etat = await etatScript();
       if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, source: 'script', version: etat.version };
       const d = await donneesScript();
-      memoriser(d);
-      return { change: true, bandeau: d.bandeau ?? etat.bandeau, source: 'script', tables: d.tables, version: d.version };
+      if (acceptable(d)) {
+        memoriser(d);
+        return { change: true, bandeau: d.bandeau ?? etat.bandeau, source: 'script', tables: d.tables, version: d.version };
+      }
     } catch (e) { erreurs.push(e); journal('script indisponible', e); }
     try {
       const d = await donneesGviz();
       if (d.version === versionActuelle) return { change: false, bandeau: d.bandeau, source: 'gviz', version: d.version };
-      memoriser(d);
-      return { change: true, bandeau: d.bandeau, source: 'gviz', tables: d.tables, version: d.version };
+      if (acceptable(d)) {
+        memoriser(d);
+        return { change: true, bandeau: d.bandeau, source: 'gviz', tables: d.tables, version: d.version };
+      }
     } catch (e) { erreurs.push(e); journal('gviz indisponible', e); }
+    // Refusée n'est pas muette : on garde la version courante et on le dit au pied de page.
+    // On ne prend pas non plus le bandeau d'une source qu'on vient de juger douteuse.
+    if (refus.length) return { change: false, source: refus[0].source, version: versionActuelle, refus };
     const err = new Error(`aucune source vivante : ${erreurs.map((x) => x.message).join(' ; ')}`);
     err.erreurs = erreurs;
     throw err;

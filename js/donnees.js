@@ -3,30 +3,55 @@
 // ni DOM, ni réseau, ni horloge. Importable tel quel par Node pour les tests.
 import { empreinte } from './empreinte.js';
 
-export const SECTEURS = [
-  'Commerce & Management',
-  'Ingénieurs, Sciences & Numérique',
-  'Santé',
-  'Communication & Médias',
-  'Art, Design & Architecture',
-  'Universités & prépas',
-  'Métiers & alternance',
-  'International',
+// Les Villages : le festival est découpé par DOMAINE D'ACTIVITÉ, pas par type de
+// formation. Un lycéen qui veut soigner va au village Santé & Soin, où il trouve
+// côte à côte une prépa PASS, un CFA, une infirmière et un hôpital — au lieu de
+// courir de « Écoles d'ingénieurs » à « Métiers ». Deux villages sont des
+// fonctions et non des domaines : l'Accueil et les Conférences.
+// Le numéro sert au repérage physique (« village 5 ») et à l'ordre du plan.
+export const VILLAGES = [
+  { numero: 1, nom: 'Accueil', court: 'Accueil', fonction: true },
+  { numero: 2, nom: 'Santé & Soin', court: 'Santé' },
+  { numero: 3, nom: 'Commerce, Marketing & Management', court: 'Commerce' },
+  { numero: 4, nom: 'Banque, Finance & Droit', court: 'Finance & Droit' },
+  { numero: 5, nom: 'Ingénierie, Industrie & Sciences', court: 'Ingénierie' },
+  { numero: 6, nom: 'Numérique & Cybersécurité', court: 'Numérique' },
+  { numero: 7, nom: 'Communication, Médias & Création', court: 'Médias & Création' },
+  { numero: 8, nom: 'Formations professionnelles', court: 'Formations pro' },
+  { numero: 9, nom: 'Services, Éducation & Sécurité', court: 'Services' },
+  { numero: 10, nom: 'Orientation générale', court: 'Orientation' },
+  { numero: 11, nom: 'Conférences', court: 'Conférences', fonction: true },
 ];
+
+// Le vocabulaire des Domaines est celui des Villages, moins les deux fonctions :
+// une seule liste à tenir dans le tableur, et « Ingénierie » veut dire la même
+// chose sur le plan, dans un filtre et dans « ce qui m'intéresse ».
+export const DOMAINES = VILLAGES.filter((v) => !v.fonction).map((v) => v.nom);
+
+// Les huit Secteurs de septembre mélangeaient domaine et type de formation
+// (« Ingénieurs » à côté de « Universités & prépas »), ce que la relecture APEL
+// du 2026-09-08 a renvoyé. On garde leur traduction pour qu'un tableur pas encore
+// migré continue de s'afficher : la valeur ancienne entre, la nouvelle sort.
+export const DOMAINES_ANCIENS = {
+  'commerce-management': 'Commerce, Marketing & Management',
+  'ingenieurs-sciences-numerique': 'Ingénierie, Industrie & Sciences',
+  'sante': 'Santé & Soin',
+  'communication-medias': 'Communication, Médias & Création',
+  'art-design-architecture': 'Communication, Médias & Création',
+  'universites-prepas': 'Orientation générale',
+  'metiers-alternance': 'Formations professionnelles',
+  'international': 'Orientation générale',
+};
 
 export const TYPES_EXPOSANT = ['École', 'Pro', 'Entreprise', 'Ancien élève'];
 export const FORMATS = ['Conférence', 'Table ronde', 'Atelier'];
 export const PUBLICS = ['Tous', 'Collégiens', 'Lycéens', 'Étudiants', 'Parents'];
 export const NIVEAUX = ['3e', '2nde', '1re', 'Terminale', 'étudiant', 'parent'];
-export const ZONES_PAR_DEFAUT = [
-  { numero: 1, nom: 'Accueil' },
-  { numero: 2, nom: 'Écoles de commerce' },
-  { numero: 3, nom: 'Universités' },
-  { numero: 4, nom: "Écoles d'ingénieurs" },
-  { numero: 5, nom: 'International' },
-  { numero: 6, nom: 'Métiers' },
-  { numero: 7, nom: 'Conférences' },
-];
+// Le lycée tient sur deux niveaux ; une Salle sans niveau est au rez-de-chaussée,
+// pour qu'une saisie incomplète ne fasse disparaître personne du plan.
+export const ETAGES = ['Rez-de-chaussée', '1er étage'];
+export const ETAGE_PAR_DEFAUT = ETAGES[0];
+export const ZONES_PAR_DEFAUT = VILLAGES.map((v) => ({ numero: v.numero, nom: v.nom }));
 
 const NIVEAU_VERS_PUBLIC = {
   '3e': 'Collégiens', '2nde': 'Lycéens', '1re': 'Lycéens', 'Terminale': 'Lycéens',
@@ -126,15 +151,58 @@ export function cleEvenement(titre, debut) {
   return `${normaliser(titre)}@${debut === null || debut === undefined ? '' : debut}`;
 }
 
-// ---------------------------------------------------------------- secteurs, formats, publics
+// ---------------------------------------------------------------- villages, domaines, formats, publics
 
-function secteurCanonique(valeur, avertissements, ou) {
+// Une valeur du tableur vers un Domaine du festival : le libellé exact d'abord,
+// puis la traduction d'un ancien Secteur, sinon on garde la valeur telle quelle
+// et on le signale. Ne jamais faire disparaître ce qu'un Organisateur a écrit.
+function domaineCanonique(valeur, avertissements, ou) {
   const v = texte(valeur);
-  if (!v) return { secteur: '', connu: false };
+  if (!v) return { domaine: '', connu: false };
   const n = normaliser(v);
-  for (const s of SECTEURS) if (normaliser(s) === n) return { secteur: s, connu: true };
-  avertissements.push({ type: 'secteur-inconnu', valeur: v, ou });
-  return { secteur: v, connu: false };
+  for (const d of DOMAINES) if (normaliser(d) === n) return { domaine: d, connu: true };
+  for (const v2 of VILLAGES) if (normaliser(v2.nom) === n) return { domaine: v2.nom, connu: true };
+  const ancien = DOMAINES_ANCIENS[n];
+  if (ancien) return { domaine: ancien, connu: true };
+  if (avertissements) avertissements.push({ type: 'domaine-inconnu', valeur: v, ou });
+  return { domaine: v, connu: false };
+}
+
+// « Santé & Soin ; Numérique & Cybersécurité » → deux Domaines. Le point-virgule
+// sépare, pas la virgule : les noms de villages en contiennent.
+export function domainesDepuis(valeur, avertissements, ou) {
+  const bruts = texte(valeur).split(/[;|]/).map((d) => d.trim()).filter(Boolean);
+  const domaines = [];
+  let tousConnus = true;
+  for (const b of bruts) {
+    const { domaine, connu } = domaineCanonique(b, avertissements, ou);
+    if (!connu) tousConnus = false;
+    if (domaine && !domaines.includes(domaine)) domaines.push(domaine);
+  }
+  return { domaines, connus: tousConnus };
+}
+
+// Le Village d'un Exposant : là où est son stand. Unique par construction — un
+// stand n'est qu'à un endroit. Vide tant que l'Organisateur ne l'a pas affecté.
+function villageCanonique(valeur, avertissements, ou) {
+  const v = texte(valeur);
+  if (!v) return { village: '', connu: false };
+  const n = normaliser(v);
+  for (const x of VILLAGES) if (normaliser(x.nom) === n || normaliser(x.court) === n) return { village: x.nom, connu: true };
+  const ancien = DOMAINES_ANCIENS[n];
+  if (ancien) return { village: ancien, connu: true };
+  if (avertissements) avertissements.push({ type: 'village-inconnu', valeur: v, ou });
+  return { village: v, connu: false };
+}
+
+// « RDC », « rez de chaussée », « 0 » → Rez-de-chaussée ; « 1 », « 1er », « étage 1 » → 1er étage.
+export function etageCanonique(valeur) {
+  const n = normaliser(valeur);
+  if (!n) return ETAGE_PAR_DEFAUT;
+  if (/^(rdc|rez|0)/.test(n) || n.includes('rez-de-chaussee')) return ETAGES[0];
+  if (/1/.test(n)) return ETAGES[1];
+  for (const e of ETAGES) if (normaliser(e) === n) return e;
+  return ETAGE_PAR_DEFAUT;
 }
 
 function formatCanonique(valeur) {
@@ -170,17 +238,38 @@ function zoneDepuisLibelle(libelle) {
   return { numero: null, nom: t };
 }
 
+// Une Zone du plan EST un Village : même numéro, même nom. La liste par défaut
+// donne les onze villages ; le tableur fait foi sur le nom, et peut en ajouter.
+const VILLAGE_PAR_NUMERO = new Map(VILLAGES.map((v) => [v.numero, v]));
+
 function construireZones(sallesBrutes) {
   const zones = new Map();
-  for (const z of ZONES_PAR_DEFAUT) zones.set(z.numero, { numero: z.numero, nom: z.nom, libelle: `${z.numero} · ${z.nom}`, salles: [] });
+  const neuve = (numero, nom) => {
+    const v = numero === null ? null : VILLAGE_PAR_NUMERO.get(numero);
+    return {
+      numero, nom, libelle: numero === null ? nom : `${numero} · ${nom}`, salles: [],
+      court: v && normaliser(v.nom) === normaliser(nom) ? v.court : nom,
+      fonction: Boolean(v && v.fonction),
+    };
+  };
+  for (const v of VILLAGES) zones.set(v.numero, neuve(v.numero, v.nom));
   for (const s of sallesBrutes) {
     const z = zoneDepuisLibelle(s.zone);
     if (!z) continue;
     const id = z.numero === null ? z.nom : z.numero;
-    if (!zones.has(id)) zones.set(id, { numero: z.numero, nom: z.nom, libelle: z.numero === null ? z.nom : `${z.numero} · ${z.nom}`, salles: [] });
+    if (!zones.has(id)) zones.set(id, neuve(z.numero, z.nom));
     else if (z.numero !== null && z.nom) zones.get(id).nom = z.nom; // le tableur fait foi sur le nom
   }
   return zones;
+}
+
+// L'étage d'un Village est celui de ses Salles. Un village dont les salles sont
+// réparties sur les deux niveaux apparaît sur les deux plans, avec les seules
+// salles de l'étage affiché : c'est le cas d'un gros village qui déborde.
+export function etagesDeZone(zone) {
+  const etages = [];
+  for (const s of zone.salles) if (!etages.includes(s.etage)) etages.push(s.etage);
+  return etages.length ? etages : [ETAGE_PAR_DEFAUT];
 }
 
 // ---------------------------------------------------------------- modèle
@@ -209,7 +298,7 @@ export function construireModele(tables) {
     const z = zoneDepuisLibelle(s.zone);
     const zone = z ? zonesParId.get(z.numero === null ? z.nom : z.numero) || null : null;
     const salle = {
-      nom, cle: normaliser(nom), zone, zoneLibelle: texte(s.zone),
+      nom, cle: normaliser(nom), zone, zoneLibelle: texte(s.zone), etage: etageCanonique(s.niveau ?? s.etage),
       typePoint: texte(s.type_point) || 'Salle', capacite: nombre(s.capacite),
       x: nombre(s.x), y: nombre(s.y), notes: texte(s.notes),
     };
@@ -228,14 +317,26 @@ export function construireModele(tables) {
     const nom = texte(e.nom);
     if (!nom) continue;
     const type = typeExposantCanonique(e.type);
-    const { secteur, connu } = secteurCanonique(e.secteur, avertissements, `exposant ${nom}`);
+    const ou = `exposant ${nom}`;
+    // Village et Domaines sont deux questions différentes : « où est son stand »
+    // et « de quoi il parle ». Un tableur d'avant la relecture n'a ni l'un ni
+    // l'autre : sa colonne Secteur répond alors approximativement aux deux.
+    const { village, connu: villageConnu } = villageCanonique(e.village || e.secteur, avertissements, ou);
+    const { domaines, connus } = domainesDepuis(e.domaines || e.village || e.secteur, avertissements, ou);
     const salle = texte(e.salle);
+    const zone = zoneDeSalle(salle);
+    // La salle fait foi sur le village : c'est elle qui dit où le Visiteur ira.
+    // Un désaccord est une erreur de saisie, qu'on signale sans rien casser.
+    if (village && zone && normaliser(zone.nom) !== normaliser(village)) {
+      avertissements.push({ type: 'village-en-desaccord', valeur: `${village} ≠ ${zone.nom} (${salle})`, ou });
+    }
     exposants.push({
       cle: cleExposant(type, nom), type, typeSlug: slugType(type), nom,
-      organisation: texte(e.organisation), secteur, secteurConnu: connu,
+      organisation: texte(e.organisation), village: zone ? zone.nom : village, villageConnu,
+      domaines, domainesConnus: connus,
       sousTitre: texte(e.sous_titre), description: texte(e.description), niveau: texte(e.niveau),
       site: texte(e.site), ville: texte(e.ville), salle, salleAVenir: salle === '',
-      stand: texte(e.stand), presence: texte(e.presence), zone: zoneDeSalle(salle), evenements: [],
+      stand: texte(e.stand), presence: texte(e.presence), zone, evenements: [],
     });
   }
   const exposantsParNom = new Map(exposants.map((e) => [normaliser(e.nom), e]));
@@ -246,13 +347,15 @@ export function construireModele(tables) {
     if (!titre) continue;
     const debut = heureEnMinutes(ev.debut);
     const fin = heureEnMinutes(ev.fin);
-    const { secteur, connu } = secteurCanonique(ev.secteur, avertissements, `événement ${titre}`);
+    // Un Événement n'a pas de Village (il se tient aux Conférences), seulement
+    // des Domaines : une table ronde sur l'alternance parle santé ET bâtiment.
+    const { domaines, connus } = domainesDepuis(ev.domaines || ev.secteur, avertissements, `événement ${titre}`);
     const intervenantsTexte = texte(ev.intervenants);
     const intervenants = intervenantsTexte.split(/[,;/&+]|\bet\b/).map((t) => normaliser(t)).filter(Boolean)
       .map((n) => exposantsParNom.get(n)).filter(Boolean).map((e) => e.cle);
     const salle = texte(ev.salle);
     evenements.push({
-      cle: cleEvenement(titre, debut), format: formatCanonique(ev.format), titre, secteur, secteurConnu: connu,
+      cle: cleEvenement(titre, debut), format: formatCanonique(ev.format), titre, domaines, domainesConnus: connus,
       public: publicsDepuis(ev.public), debut, fin, salle, salleAVenir: salle === '',
       description: texte(ev.description), intervenantsTexte, intervenants, zone: zoneDeSalle(salle), synthetique: false,
     });
@@ -261,7 +364,7 @@ export function construireModele(tables) {
   if (debutFestival !== null && !evenements.some((e) => normaliser(e.titre).startsWith('ouverture'))) {
     evenements.push({
       cle: cleEvenement('Ouverture du festival', debutFestival), format: 'Ouverture', titre: 'Ouverture du festival',
-      secteur: '', secteurConnu: true, public: ['Tous'], debut: debutFestival, fin: null, salle: 'Accueil', salleAVenir: false,
+      domaines: [], domainesConnus: true, public: ['Tous'], debut: debutFestival, fin: null, salle: 'Accueil', salleAVenir: false,
       description: infos.slogan || '', intervenantsTexte: '', intervenants: [], zone: zoneDeSalle('Accueil'), synthetique: true,
     });
   }

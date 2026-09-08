@@ -1,28 +1,44 @@
 /* Festival de l'Orientation — appli visiteur.
-   Parti pris : un bleu d'encre profond porte le texte et la marque, un bleu
-   électrique porte les actions, et l'orange ne dit qu'une seule chose, « où ».
-   La charte officielle n'étant pas arrêtée, toutes les couleurs vivent dans les
-   variables ci-dessous : en changer six suffit à rhabiller l'appli entière. */
+   Charte : celle de l'affiche officielle du 14 novembre 2026, relevée au pixel
+   sur le fichier fourni le 2026-09-08 — framboise #C90151 (le mot FESTIVAL),
+   turquoise #01A1A7 (L'ORIENTATION et le logo APEL), ambre #ED9800, bleu marine
+   #003473 (le bandeau du bas), sur un blanc cassé #F8F8F8.
+   Répartition des rôles, une couleur = une idée :
+     marine    → l'encre et le bandeau de marque, comme le bas de l'affiche
+     turquoise → les actions et les liens
+     framboise → la marque et ce qui est à soi (Ma visite, l'étoile)
+     ambre     → « où », et rien d'autre : salles, plan, repères
+   L'affiche porte aussi quatre verbes en quatre couleurs (s'informer, échanger,
+   explorer, construire son avenir) : les boutons de l'accueil les reprennent,
+   c'est ce qui fait que l'appli et l'affiche se reconnaissent. */
 
 :root {
   color-scheme: light dark;
 
-  --bleu: #2B24E8;
-  --marque: #2B24E8;      /* fond de l'en-tête d'accueil : porte toujours du texte blanc */
-  --bleu-clair: #6C66FF;
-  --bleu-pale: #E7E5FF;
-  --orange: #FF6A00;
-  --orange-pale: #FFE4D0;
-  --encre: #150F4A;
-  --encre-2: #5B5686;
-  --fond: #F4F3FF;
-  --carte: #FFFFFF;
-  --trait: #DEDBF5;
-  --alerte: #C11B4B;
-  --alerte-pale: #FFE1E9;
+  --framboise: #C90151;
+  --turquoise: #01A1A7;
+  --ambre: #ED9800;
+  --marine: #003473;
 
-  /* Les sept zones du plan, du bleu vers l'orange. */
-  --z1: #FFD9BF; --z2: #FFE9B8; --z3: #C7DBFF; --z4: #C4EBDC; --z5: #DED3FF; --z6: #FFE0CE; --z7: #FFC9C2;
+  --bleu: #007A80;        /* turquoise assombri pour tenir 4,5:1 sur le blanc cassé */
+  --marque: #003473;      /* fond de l'en-tête d'accueil : porte toujours du texte blanc */
+  --bleu-clair: #01A1A7;
+  --bleu-pale: #DFF3F4;
+  --orange: #B36F00;      /* ambre assombri : lisible en texte, l'ambre pur reste aux aplats */
+  --orange-pale: #FDF0D8;
+  --encre: #0A2647;
+  --encre-2: #55627A;
+  --fond: #F8F8F8;
+  --carte: #FFFFFF;
+  --trait: #DFE3EA;
+  --alerte: #C90151;
+  --alerte-pale: #FCE4EC;
+
+  /* Les onze villages du plan : la palette de l'affiche, déclinée en aplats
+     clairs pour que le texte reste noir dessus. 1 et 11 sont des fonctions
+     (accueil, conférences) et prennent le gris-bleu neutre. */
+  --z1: #D6E0EE; --z2: #FBDDE8; --z3: #FDE7C0; --z4: #D9E7F7; --z5: #CFEAEB;
+  --z6: #A9DCDF; --z7: #F6C9D9; --z8: #F5D093; --z9: #FDE7C0; --z10: #CFEAEB; --z11: #E7ECF3;
 
   --display: 'Bricolage', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --texte: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -34,20 +50,26 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bleu: #8A85FF;
-    --marque: #2E27B4;
-    --bleu-clair: #A9A5FF;
-    --bleu-pale: #241F5C;
-    --orange: #FF8B3D;
-    --orange-pale: #46260F;
-    --encre: #ECEAFF;
-    --encre-2: #A29DD0;
-    --fond: #0D0A28;
-    --carte: #171238;
-    --trait: #2C2660;
-    --alerte: #FF7A9C;
-    --alerte-pale: #4A1226;
-    --z1: #6A4028; --z2: #6A5524; --z3: #253E6B; --z4: #23503F; --z5: #3E2F6B; --z6: #6A4530; --z7: #6B3129;
+    --framboise: #FF6E9F;
+    --turquoise: #35C6CC;
+    --ambre: #FFB13D;
+    --marine: #7FA6D4;
+
+    --bleu: #35C6CC;
+    --marque: #002A5E;
+    --bleu-clair: #6FDCE1;
+    --bleu-pale: #0B3B44;
+    --orange: #FFB13D;
+    --orange-pale: #4A3208;
+    --encre: #E9EFF7;
+    --encre-2: #9AACC4;
+    --fond: #06182C;
+    --carte: #0D2440;
+    --trait: #1E3A5C;
+    --alerte: #FF6E9F;
+    --alerte-pale: #4A1026;
+    --z1: #17304F; --z2: #4E1F35; --z3: #4B3717; --z4: #1F3557; --z5: #10424A;
+    --z6: #175A63; --z7: #5E2440; --z8: #5C441C; --z9: #4B3717; --z10: #10424A; --z11: #1E3A5C;
     --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu-clair);
   }
 }
@@ -77,7 +99,7 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 
 .appli { max-width: 560px; margin: 0 auto; padding: 0 var(--marge); }
 .bandeau {
-  background: var(--orange); color: #1C0A00; font-weight: 650; padding: 11px var(--marge); text-align: center;
+  background: var(--ambre); color: #2B1A00; font-weight: 650; padding: 11px var(--marge); text-align: center;
   position: sticky; top: 0; z-index: 5; font-size: 0.94rem;
 }
 .bandeau[hidden] { display: none; }
@@ -127,17 +149,34 @@ main { min-height: 60vh; }
 
 /* ------------------------------------------------------------ l'accueil, comme l'affiche */
 
+/* L'accueil rejoue l'affiche : fond clair, logos en haut, le titre coupé en deux
+   couleurs, le slogan en turquoise, et « entrée libre » en pastille ambre. */
 .affiche {
-  margin: 0 calc(var(--marge) * -1); padding: 30px var(--marge) 32px;
-  background: var(--marque); color: #fff; position: relative; overflow: hidden;
+  margin: 0 calc(var(--marge) * -1); padding: 18px var(--marge) 26px;
+  background: var(--carte); color: var(--encre); position: relative;
+  border-bottom: 3px solid var(--marine);
 }
-.affiche .etoile-marque { position: absolute; top: -54px; right: -54px; width: 210px; height: 210px; color: rgba(255, 255, 255, 0.16); }
-.affiche h1 { font-size: clamp(2.4rem, 12vw, 3.4rem); max-width: 9ch; }
-.affiche .quand { margin: 18px 0 0; font-weight: 650; font-size: 1.02rem; line-height: 1.45; }
-.affiche .quand span { display: block; color: rgba(255, 255, 255, 0.72); font-weight: 500; }
+/* Les logos vivent sur une plaque blanche dans les deux thèmes : celui de l'UFA
+   a un fond blanc opaque, et un logo ne se retouche pas. */
+.affiche .logos {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 8px 12px; margin: 0 0 18px;
+  border: 1px solid var(--trait);
+}
+.affiche .logos img { height: 34px; width: auto; display: block; }
+.affiche .logos img:last-child { height: 30px; }
+.affiche h1 { font-size: clamp(2.2rem, 11.5vw, 3.2rem); text-transform: uppercase; }
+.affiche h1 .t1 { color: var(--framboise); }
+.affiche h1 .t2 { color: var(--turquoise); display: block; }
+.affiche .quand { margin: 16px 0 0; font-weight: 650; font-size: 1.02rem; line-height: 1.45; color: var(--framboise); }
+.affiche .quand span { display: block; color: var(--encre-2); font-weight: 500; }
 .affiche .slogan {
-  margin: 20px 0 0; font-family: var(--display); font-weight: 800; font-size: 1.15rem;
-  line-height: 1.15; color: var(--orange); max-width: 18ch;
+  margin: 16px 0 0; font-family: var(--display); font-weight: 800; font-size: 1.12rem;
+  line-height: 1.15; color: var(--turquoise); max-width: 20ch; font-style: italic;
+}
+.affiche .entree-libre {
+  display: inline-block; margin: 16px 0 0; padding: 5px 12px; border-radius: 999px;
+  background: var(--ambre); color: #2B1A00; font-weight: 700; font-size: 0.86rem;
 }
 
 .grille-boutons { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 22px 0 0; }
@@ -147,8 +186,20 @@ main { min-height: 60vh; }
   text-decoration: none; color: var(--encre); font-family: var(--display); font-weight: 800; font-size: 1.02rem; letter-spacing: -0.015em;
 }
 .grille-boutons a svg { width: 22px; height: 22px; color: var(--bleu); }
+/* Les quatre verbes de l'affiche, dans leurs couleurs : explorer (ambre) pour le
+   plan, échanger (turquoise) pour les exposants, s'informer (framboise) pour le
+   programme, construire (marine) pour la visite et sa préparation. Une barre
+   colorée suffit : remplir six boutons de six couleurs ferait sapin de Noël. */
+.grille-boutons a[data-ton] { border-left: 4px solid var(--ton, var(--trait)); }
+.grille-boutons a[data-ton] svg { color: var(--ton); }
+.grille-boutons a[data-ton="explorer"] { --ton: var(--ambre); }
+.grille-boutons a[data-ton="echanger"] { --ton: var(--turquoise); }
+.grille-boutons a[data-ton="informer"] { --ton: var(--framboise); }
+.grille-boutons a[data-ton="construire"] { --ton: var(--marine); }
 .grille-boutons a.principal { background: var(--marque); border-color: var(--marque); color: #fff; grid-column: span 2; min-height: 76px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
 .grille-boutons a.principal svg { color: #fff; width: 26px; height: 26px; }
+.grille-boutons a.principal[data-ton] { border-left: 4px solid var(--ambre); }
+.grille-boutons a.principal[data-ton] svg { color: #fff; }
 .grille-boutons a .compte { display: block; font-family: var(--texte); font-weight: 600; font-size: 0.8rem; color: var(--encre-2); margin-top: 3px; }
 .grille-boutons a:last-child:nth-child(odd) { grid-column: span 2; min-height: 76px; flex-direction: row; align-items: center; gap: 14px; }
 
@@ -161,8 +212,8 @@ main { min-height: 60vh; }
 
 .commencer { margin: 30px 0 0; }
 .commencer p { margin: 0 0 12px; color: var(--encre-2); }
-.secteurs-accueil { display: flex; flex-wrap: wrap; gap: 7px; }
-.secteurs-accueil a { text-decoration: none; }
+.domaines-accueil { display: flex; flex-wrap: wrap; gap: 7px; }
+.domaines-accueil a { text-decoration: none; }
 
 /* ------------------------------------------------------------ pièces communes */
 
@@ -221,6 +272,28 @@ main { min-height: 60vh; }
   color: var(--encre-2); border-bottom: 3px solid transparent;
 }
 .onglet[aria-selected="true"] { color: var(--encre); border-bottom-color: var(--orange); }
+/* Les étages du plan : deux boutons segmentés, pas des onglets discrets — c'est
+   un choix qu'on prend en marchant, il doit se voir et se toucher facilement. */
+.onglets.etages { gap: 6px; border-bottom: 0; margin: 10px 0 4px; }
+.onglets.etages .onglet {
+  flex: 1; padding: 10px 12px; margin: 0; border: 1.5px solid var(--trait); border-radius: 999px;
+  font-size: 0.95rem; text-align: center; background: var(--carte);
+}
+.onglets.etages .onglet[aria-selected="true"] { background: var(--marine); border-color: var(--marine); color: #fff; }
+
+/* Le titre d'un village, dans la liste des exposants : son numéro, son nom, et
+   le compte. Cliquable, il mène au village sur le plan. */
+.titre-village {
+  display: flex; align-items: center; gap: 10px; margin: 26px 0 8px;
+  font-family: var(--display); font-weight: 800; font-size: 1.08rem; letter-spacing: -0.02em; color: var(--encre);
+}
+.titre-village a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.titre-village a:hover { text-decoration: underline; }
+.titre-village .num {
+  flex: none; width: 25px; height: 25px; border-radius: 50%; background: var(--marine); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; font-variant-numeric: tabular-nums;
+}
+.titre-village .compte { margin-left: auto; font-family: var(--texte); font-weight: 600; font-size: 0.82rem; color: var(--encre-2); }
 /* Le compte n'apparaît que lorsqu'un Secteur est filtré : il dit où sont les
    autres Exposants du Secteur, au lieu de laisser un onglet vide sans explication. */
 .onglet .compte { font-size: 0.78rem; font-weight: 700; opacity: 0.7; font-variant-numeric: tabular-nums; }
@@ -403,7 +476,7 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
   box-shadow: 0 6px 24px rgba(21, 15, 74, 0.22); font-weight: 650; pointer-events: auto; display: flex; gap: 11px; align-items: center; font-size: 0.94rem;
 }
 .message.alerte { background: var(--alerte); color: #fff; }
-.message.orange { background: var(--orange); color: #1C0A00; }
+.message.orange { background: var(--ambre); color: #2B1A00; }
 .message > svg { width: 19px; height: 19px; flex: none; }
 .message button { margin-left: auto; background: rgba(255, 255, 255, 0.2); border: 0; color: inherit; border-radius: 6px; min-height: 34px; padding: 5px 11px; cursor: pointer; font-weight: 700; display: grid; place-items: center; }
 .message button svg { width: 15px; height: 15px; }

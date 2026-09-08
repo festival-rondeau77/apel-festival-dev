@@ -1,13 +1,13 @@
 {
   "name": "Festival de l'Orientation",
   "short_name": "Festival",
-  "description": "Programme, plan, exposants et visite personnelle du Festival de l'Orientation, lycée Maurice Rondeau.",
+  "description": "Programme, plan, exposants et visite personnelle du Festival de l'Orientation, Ensemble Scolaire Maurice Rondeau.",
   "lang": "fr",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#FAF8F4",
-  "theme_color": "#2B24E8",
+  "background_color": "#F8F8F8",
+  "theme_color": "#003473",
   "icons": [
     { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png" },

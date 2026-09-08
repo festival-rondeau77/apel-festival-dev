@@ -1,13 +1,14 @@
 // Service worker : l'appli entière en cache à l'installation (cache d'abord,
 // réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
 // secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.09.08-6c3c5a6';
+const VERSION = '2026.09.08-929c165';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
   './js/app.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js',
   './icones/icone.svg', './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png', './icones/icone-180.png',
+  './logos/apel.svg', './logos/ufa-maurice-rondeau.png', './logos/saint-colomban.png',
   './polices/polices.css', './polices/bricolage-700.woff2', './polices/bricolage-800.woff2',
 ];
 const DONNEES = ['./data/snapshot.json'];

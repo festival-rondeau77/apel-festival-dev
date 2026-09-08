@@ -4,9 +4,9 @@ export const CONFIG = {
   // URL du script Apps Script (web app « exécuter en tant que moi, accès anonyme »).
   // Vide tant que bin/wizard-apps-script.sh n'a pas été joué : l'appli passe alors
   // directement au classeur Export public puis au snapshot.
-  scriptUrl: 'https://script.google.com/macros/s/AKfycbwSZkZMUmp63P8wU40x8mJXXqYQHJeHEwV4vUT92_OcoosJ46F9PcFUZN-IWzQsVl_x/exec',
+  scriptUrl: '',
   // Classeur « Festival — Export public (lu par l'appli) », lu via gviz (ADR-0003).
-  sheetId: '1-1TURF3X40DQ1NvMUavUbyc7ZNsOl4rGTLqMgRsQFqc',
+  sheetId: '',
   // Hébergement GitHub Pages, deux plateformes (ADR-domaine 0007) : la prod sert le
   // domaine de l'association, le dev garde une URL github.io laide pour qu'elle ne soit
   // ni transmise ni imprimée. bin/deploy.sh choisit par --cible ; l'appli ne lit jamais
@@ -20,7 +20,7 @@ export const CONFIG = {
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.08-6c3c5a6',
+  version: '2026.09.08-929c165',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le

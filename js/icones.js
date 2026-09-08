@@ -48,12 +48,3 @@ export function icone(nom, taille = 24) {
   return `<svg viewBox="0 0 24 24" width="${taille}" height="${taille}" aria-hidden="true" focusable="false">${d}</svg>`;
 }
 
-// La marque de l'appli : une étoile à huit branches, tracée, qui sert de motif
-// dans l'en-tête d'accueil et de repère sur le plan.
-export function marque(taille = 200) {
-  return `<svg viewBox="0 0 100 100" width="${taille}" height="${taille}" aria-hidden="true" focusable="false">
-    <g stroke="currentColor" stroke-width="9" stroke-linecap="round" fill="none">
-      <path d="M50 12v76M12 50h76M23.2 23.2l53.6 53.6M76.8 23.2 23.2 76.8"/>
-    </g>
-  </svg>`;
-}

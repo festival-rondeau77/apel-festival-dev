@@ -1,9 +1,9 @@
 // Rendu : une fonction de l'état (route, données, visite, réseau) vers du HTML.
 // Aucun état caché dans le DOM ; les gestes modifient l'état puis re-rendent.
-import { SECTEURS, TYPES_EXPOSANT, FORMATS, NIVEAUX, minutesEnHeure, heureEnMinutes, contient, normaliser, publicInclut } from './donnees.js';
+import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, minutesEnHeure, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone } from './donnees.js';
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe } from './visite.js';
-import { disposerZones, placerSalles, etendue, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage } from './plan.js';
-import { icone, marque } from './icones.js';
+import { disposerZones, placerSalles, etendue, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage } from './plan.js';
+import { icone } from './icones.js';
 
 // ---------------------------------------------------------------- utilitaires
 
@@ -18,14 +18,18 @@ const lienPlanSalle = (salle) => `#/plan?salle=${encodeURIComponent(salle)}`;
 
 const PLURIEL_TYPE = { 'École': 'Écoles', 'Pro': 'Pros', 'Entreprise': 'Entreprises', 'Ancien élève': 'Anciens élèves' };
 const PLURIEL_FORMAT = { 'Conférence': 'Conférences', 'Table ronde': 'Tables rondes', 'Atelier': 'Ateliers' };
-const NOM_SECTEUR_COURT = {
-  'Commerce & Management': 'Commerce', 'Ingénieurs, Sciences & Numérique': 'Ingénieurs', 'Santé': 'Santé', 'Communication & Médias': 'Communication',
-  'Art, Design & Architecture': 'Art & Design', 'Universités & prépas': 'Universités', 'Métiers & alternance': 'Métiers', 'International': 'International',
-};
+const NOM_COURT = new Map(VILLAGES.map((v) => [v.nom, v.court]));
 // Sur le plan, les points d'intérêt portent un mot, pas un pictogramme : c'est
 // ce qui reste lisible sur un écran de six centimètres.
 const MOT_POINT = { Accueil: 'Accueil', Toilettes: 'WC', Foodtruck: 'Café', Auditorium: 'Confs' };
-export const secteurCourt = (s) => NOM_SECTEUR_COURT[s] || s;
+export const nomCourt = (s) => NOM_COURT.get(s) || s;
+// Les Domaines d'un objet, en une puce lisible : le premier, puis « +2 ».
+// Tout écrire mangerait la ligne sur un téléphone, et le premier suffit à situer.
+function pucesDomaines(domaines) {
+  if (!domaines || !domaines.length) return '';
+  const reste = domaines.length - 1;
+  return `<span class="puce neutre">${h(nomCourt(domaines[0]))}${reste ? ` +${reste}` : ''}</span>`;
+}
 
 function etoile(etat, objet, libelle) {
   const dans = visiteContient(etat.visite, objet.cle);
@@ -77,7 +81,7 @@ function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche 
     ${chrono ? `${colonneHeure(ev)}${pointChrono(entree)}`
     : avecHeure ? `<div class="heure">${h(minutesEnHeure(ev.debut) || '—')}</div>` : (entree ? coche(entree) : '<div class="marque"></div>')}
     <div class="corps"><a href="${lienEvenement(ev.cle)}">${h(ev.titre)}</a>
-      <div class="meta">${salleHtml(ev.salle, ev.salleAVenir)}<span>${meta.join(', ')}</span>${ev.secteur ? `<span class="puce neutre">${h(secteurCourt(ev.secteur))}</span>` : ''}${alerte}</div></div>
+      <div class="meta">${salleHtml(ev.salle, ev.salleAVenir)}<span>${meta.join(', ')}</span>${pucesDomaines(ev.domaines)}${alerte}</div></div>
     ${entree ? boutonRetirer(ev.cle, ev.titre) : etoile(etat, ev, ev.titre)}
   </li>`;
 }
@@ -104,12 +108,18 @@ function champRecherche(nom, valeur, placeholder) {
     ${valeur ? `<button class="effacer" type="button" data-action="effacer" data-champ="${nom}" aria-label="Effacer la recherche">${icone('fermer', 17)}</button>` : ''}</div>`;
 }
 
-function filtresSecteur(nom, actif, secteursPresents) {
-  const liste = SECTEURS.filter((s) => secteursPresents.has(s)).concat([...secteursPresents].filter((s) => !SECTEURS.includes(s)));
+// Les Domaines dans l'ordre du festival, puis ceux que le tableur a inventés :
+// une valeur inconnue reste cliquable au lieu de disparaître silencieusement.
+function ordonner(presents, reference) {
+  return reference.filter((s) => presents.has(s)).concat([...presents].filter((s) => !reference.includes(s)));
+}
+
+function filtresDomaine(nom, actif, presents, { libelleTous = 'Tous les domaines', aria = 'Filtrer par domaine' } = {}) {
+  const liste = ordonner(presents, DOMAINES);
   if (!liste.length) return '';
-  return `<div class="filtres" role="group" aria-label="Filtrer par secteur">
-    <button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="" aria-pressed="${!actif}">Tous les secteurs</button>
-    ${liste.map((s) => `<button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="${attr(s)}" aria-pressed="${actif === s}">${h(secteurCourt(s))}</button>`).join('')}
+  return `<div class="filtres" role="group" aria-label="${attr(aria)}">
+    <button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="" aria-pressed="${!actif}">${h(libelleTous)}</button>
+    ${liste.map((s) => `<button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="${attr(s)}" aria-pressed="${actif === s}">${h(nomCourt(s))}</button>`).join('')}
   </div>`;
 }
 
@@ -119,27 +129,50 @@ export function entete(titre, sous = '', retour = null) {
 
 // ---------------------------------------------------------------- accueil
 
+// L'affiche coupe le titre en deux couleurs : FESTIVAL DE en framboise,
+// L'ORIENTATION en turquoise. On reproduit la coupure quand le nom s'y prête, et
+// on affiche le nom d'un seul tenant sinon — le tableur reste libre de le changer.
+export function titreAffiche(nom) {
+  const m = String(nom).match(/^(.*?)\s*(l['’]orientation)\s*$/i);
+  if (!m) return h(nom);
+  return `<span class="t1">${h(m[1])}</span> <span class="t2">${h(m[2])}</span>`;
+}
+
+// Les trois logos de l'affiche. L'Ensemble Scolaire réunit quatre entités
+// (collège, lycée général et technologique, lycée professionnel, UFA) et une
+// seule a un logo : l'UFA. Les trois autres sont donc nommées en toutes lettres.
+function bandeauLogos() {
+  return `<div class="logos">
+    <img src="./logos/apel.svg" alt="APEL, le souffle de la liberté" width="88" height="60">
+    <img src="./logos/ufa-maurice-rondeau.png" alt="UFA Maurice Rondeau Saint-Colomban" width="80" height="59">
+    <img src="./logos/saint-colomban.png" alt="Saint Colomban" width="46" height="46">
+  </div>`;
+}
+
 export function ecranAccueil(etat) {
   const { modele, maintenant } = etat;
   const infos = modele.infos;
   const prochain = prochainEvenement(modele, maintenant);
-  const secteurs = new Set(modele.exposants.map((e) => e.secteur).filter(Boolean));
+  const domaines = new Set(modele.exposants.flatMap((e) => e.domaines).filter(Boolean));
   const nb = compte(etat.visite);
   const horaires = infos.heure_debut && infos.heure_fin ? `${heureTexte(infos.heure_debut)} à ${heureTexte(infos.heure_fin)}` : '';
-  const bouton = (href, ico, libelle, extra = '', classe = '') =>
-    `<a href="${href}" class="${classe}">${icone(ico, 22)}<span>${h(libelle)}${extra}</span></a>`;
+  // Les quatre verbes de l'affiche portent chacun une couleur ; les six boutons
+  // s'y rangent, de sorte que l'appli et l'affiche se reconnaissent.
+  const bouton = (href, ico, libelle, { extra = '', classe = '', ton = '' } = {}) =>
+    `<a href="${href}" class="${classe}"${ton ? ` data-ton="${attr(ton)}"` : ''}>${icone(ico, 22)}<span>${h(libelle)}${extra}</span></a>`;
   return `<section class="affiche">
-    <div class="etoile-marque">${marque(210)}</div>
-    <h1>${h(infos.nom || "Festival de l'Orientation")}</h1>
+    ${bandeauLogos()}
+    <h1>${titreAffiche(infos.nom || "Festival de l'Orientation")}</h1>
     <p class="quand">${h(dateLongue(infos.date) || 'Date à confirmer')}${horaires ? `<span>${h(horaires)}</span>` : ''}${infos.lieu ? `<span>${h(infos.lieu)}</span>` : ''}</p>
     ${infos.slogan ? `<p class="slogan">${h(infos.slogan)}</p>` : ''}
+    ${infos.entree ? `<p class="entree-libre">${h(infos.entree)}</p>` : ''}
   </section>
   <nav class="grille-boutons" aria-label="Aller à l'essentiel">
-    ${bouton('#/plan', 'plan', 'Plan du festival', '', 'principal')}
-    ${bouton('#/exposants', 'exposants', 'Les exposants')}
-    ${bouton('#/programme', 'programme', 'Le programme')}
-    ${bouton('#/visite', 'visite', 'Ma visite', nb ? `<span class="compte">${nb} élément${nb > 1 ? 's' : ''}</span>` : '')}
-    ${bouton('#/preparer', 'preparer', 'Préparer ma visite')}
+    ${bouton('#/plan', 'plan', 'Plan du festival', { classe: 'principal', ton: 'explorer' })}
+    ${bouton('#/exposants', 'exposants', 'Les exposants', { ton: 'echanger' })}
+    ${bouton('#/programme', 'programme', 'Le programme', { ton: 'informer' })}
+    ${bouton('#/visite', 'visite', 'Ma visite', { ton: 'construire', extra: nb ? `<span class="compte">${nb} élément${nb > 1 ? 's' : ''}</span>` : '' })}
+    ${bouton('#/preparer', 'preparer', 'Préparer ma visite', { ton: 'construire' })}
     ${bouton('#/aide', 'aide', "Besoin d'aide ?")}
   </nav>
   ${prochain ? `<section class="prochain" aria-labelledby="prochain-titre">
@@ -148,10 +181,10 @@ export function ecranAccueil(etat) {
     <h2 id="prochain-titre"><a href="${lienEvenement(prochain.cle)}">${h(prochain.titre)}</a></h2>
     <div class="meta">${salleHtml(prochain.salle, prochain.salleAVenir)}<span>${h(prochain.format)}${prochain.intervenantsTexte ? `, ${h(prochain.intervenantsTexte)}` : ''}</span></div>
   </section>` : ''}
-  ${secteurs.size ? `<section class="commencer">
+  ${domaines.size ? `<section class="commencer">
     <h2 class="titre-section">Par où commencer ?</h2>
-    <p>Choisis un secteur, on te montre qui le représente.</p>
-    <div class="secteurs-accueil">${SECTEURS.filter((s) => secteurs.has(s)).map((s) => `<a class="puce" href="#/exposants?secteur=${encodeURIComponent(s)}">${h(s)}</a>`).join('')}</div>
+    <p>Choisis un domaine, on te montre son village et qui l'anime.</p>
+    <div class="domaines-accueil">${ordonner(domaines, DOMAINES).map((s) => `<a class="puce" href="#/exposants?domaine=${encodeURIComponent(s)}">${h(s)}</a>`).join('')}</div>
   </section>` : ''}`;
 }
 
@@ -171,12 +204,12 @@ export function prochainEvenement(modele, maintenant) {
 
 export function filtrerEvenements(modele, ui) {
   return modele.evenements.filter((e) => {
-    if (ui.filtreSecteurProgramme && e.secteur !== ui.filtreSecteurProgramme && !e.synthetique) return false;
+    if (ui.filtreDomaineProgramme && !e.domaines.includes(ui.filtreDomaineProgramme) && !e.synthetique) return false;
     if (ui.filtreFormat && e.format !== ui.filtreFormat) return false;
     if (ui.filtrePublic && !publicInclut(e.public, ui.filtrePublic)) return false;
     if (ui.rechercheProgramme) {
       const q = ui.rechercheProgramme;
-      if (![e.titre, e.description, e.intervenantsTexte, e.salle, e.secteur, e.format].some((t) => t && contient(t, q))) return false;
+      if (![e.titre, e.description, e.intervenantsTexte, e.salle, ...e.domaines, e.format].some((t) => t && contient(t, q))) return false;
     }
     return true;
   });
@@ -185,13 +218,13 @@ export function filtrerEvenements(modele, ui) {
 export function ecranProgramme(etat) {
   const { modele, ui } = etat;
   const liste = filtrerEvenements(modele, ui);
-  const secteurs = new Set(modele.evenements.map((e) => e.secteur).filter(Boolean));
+  const domaines = new Set(modele.evenements.flatMap((e) => e.domaines).filter(Boolean));
   const formats = FORMATS.filter((f) => modele.evenements.some((e) => e.format === f));
   const publics = [['', 'Tout public'], ['3e', 'Collégiens'], ['Terminale', 'Lycéens'], ['étudiant', 'Étudiants'], ['parent', 'Parents']];
   const nb = liste.filter((e) => !e.synthetique).length;
   return `${entete('Le programme', nb ? `${nb} rendez-vous dans la matinée` : '')}
-  ${champRecherche('rechercheProgramme', ui.rechercheProgramme, 'Un secteur, une école, un intervenant')}
-  ${filtresSecteur('filtreSecteurProgramme', ui.filtreSecteurProgramme, secteurs)}
+  ${champRecherche('rechercheProgramme', ui.rechercheProgramme, 'Un domaine, une école, un intervenant')}
+  ${filtresDomaine('filtreDomaineProgramme', ui.filtreDomaineProgramme, domaines)}
   ${formats.length > 1 || ui.filtreFormat ? `<div class="filtres" role="group" aria-label="Filtrer par format">
     <button class="filtre" type="button" data-action="filtre" data-filtre="filtreFormat" data-valeur="" aria-pressed="${!ui.filtreFormat}">Tous les formats</button>
     ${formats.map((f) => `<button class="filtre" type="button" data-action="filtre" data-filtre="filtreFormat" data-valeur="${attr(ui.filtreFormat === f ? '' : f)}" aria-pressed="${ui.filtreFormat === f}">${h(PLURIEL_FORMAT[f] || f)}</button>`).join('')}
@@ -217,11 +250,11 @@ export function ecranEvenement(etat, cle) {
   const entree = etat.visite.entrees.find((e) => e.cle === ev.cle);
   return `<article class="fiche">
     ${entete(ev.titre, '', { href: '#/programme', libelle: 'Le programme' })}
-    <div class="puces"><span class="puce">${h(ev.format)}</span>${ev.secteur ? `<span class="puce neutre">${h(ev.secteur)}</span>` : ''}${ev.public.length ? `<span class="puce neutre">${h(ev.public.join(', '))}</span>` : ''}</div>
+    <div class="puces"><span class="puce">${h(ev.format)}</span>${ev.domaines.map((d) => `<span class="puce neutre">${h(d)}</span>`).join('')}${ev.public.length ? `<span class="puce neutre">${h(ev.public.join(', '))}</span>` : ''}</div>
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>Changement : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       <dt>Quand</dt><dd>${h(minutesEnHeure(ev.debut) || 'heure à venir')}${ev.fin !== null ? ` à ${h(minutesEnHeure(ev.fin))}` : ''}</dd>
-      <dt>Où</dt><dd>${salleHtml(ev.salle, ev.salleAVenir)}${ev.zone ? `, zone ${h(ev.zone.numero ?? '')} ${h(ev.zone.nom)}` : ''}</dd>
+      <dt>Où</dt><dd>${salleHtml(ev.salle, ev.salleAVenir)}${ev.zone ? `, village ${h(ev.zone.numero ?? '')} ${h(ev.zone.nom)}` : ''}</dd>
       ${ev.intervenantsTexte ? `<dt>Avec</dt><dd>${h(ev.intervenantsTexte)}</dd>` : ''}
     </dl>
     ${ev.description ? `<p class="description">${h(ev.description)}</p>` : ''}
@@ -244,13 +277,29 @@ export function typesPresents(modele) {
 export function filtrerExposants(modele, ui, type) {
   return modele.exposants.filter((e) => {
     if (type && e.type !== type) return false;
-    if (ui.filtreSecteurExposants && e.secteur !== ui.filtreSecteurExposants) return false;
+    if (ui.filtreDomaineExposants && !e.domaines.includes(ui.filtreDomaineExposants)) return false;
     if (ui.rechercheExposants) {
       const q = ui.rechercheExposants;
-      if (![e.nom, e.sousTitre, e.organisation, e.ville, e.salle, e.secteur, e.description].some((t) => t && contient(t, q))) return false;
+      if (![e.nom, e.sousTitre, e.organisation, e.ville, e.salle, e.village, ...e.domaines, e.description].some((t) => t && contient(t, q))) return false;
     }
     return true;
   }).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+
+// Les Exposants rangés par Village, dans l'ordre du plan. Ceux dont le stand
+// n'est pas encore affecté ferment la marche plutôt que de disparaître.
+export function grouperParVillage(liste) {
+  const rang = new Map(VILLAGES.map((v, i) => [v.nom, i]));
+  const groupes = new Map();
+  for (const e of liste) {
+    const cle = e.village || '';
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle).push(e);
+  }
+  return [...groupes.entries()]
+    .map(([village, exposants]) => ({ village, exposants }))
+    .sort((a, b) => (a.village ? rang.get(a.village) ?? 97 : 99) - (b.village ? rang.get(b.village) ?? 97 : 99)
+      || a.village.localeCompare(b.village, 'fr'));
 }
 
 export function ecranExposants(etat) {
@@ -263,22 +312,33 @@ export function ecranExposants(etat) {
   // que par des Pros ou des Entreprises.
   const demande = types.includes(ui.ongletExposants) ? ui.ongletExposants : types[0] || null;
   const compte = (t) => filtrerExposants(modele, ui, t).length;
-  const type = ui.filtreSecteurExposants && demande && compte(demande) === 0
+  const type = ui.filtreDomaineExposants && demande && compte(demande) === 0
     ? (types.find((t) => compte(t) > 0) || demande)
     : demande;
   const liste = filtrerExposants(modele, ui, type);
-  // Les Secteurs proposés viennent de TOUS les Exposants, pas du seul onglet :
+  // Les Domaines proposés viennent de TOUS les Exposants, pas du seul onglet :
   // autrement le filtre actif disparaît de l'écran et devient impossible à annuler.
-  const secteurs = new Set(modele.exposants.map((e) => e.secteur).filter(Boolean));
+  const domaines = new Set(modele.exposants.flatMap((e) => e.domaines).filter(Boolean));
   const total = modele.exposants.length;
-  return `${entete('Les exposants', total ? `${total} à rencontrer, répartis dans le lycée` : '')}
+  const numeroDe = (nom) => { const z = modele.zones.find((x) => x.nom === nom); return z ? z.numero : null; };
+  // Groupé par Village : c'est la question du Visiteur (« où vais-je trouver la
+  // santé ? »), et c'est ce que le plan lui montrera. Une liste alphabétique de
+  // cent trente noms ne répond à aucune question.
+  const groupes = grouperParVillage(liste);
+  return `${entete('Les exposants', total ? `${total} à rencontrer, dans ${modele.zones.filter((z) => !z.fonction && z.salles.length).length} villages` : '')}
   ${types.length > 1 ? `<div class="onglets" role="tablist" aria-label="Type d'exposant">
-    ${types.map((t) => { const n = ui.filtreSecteurExposants ? compte(t) : null; return `<button class="onglet" type="button" role="tab" id="onglet-${attr(normaliser(t))}" aria-selected="${t === type}" data-action="onglet" data-valeur="${attr(t)}">${h(PLURIEL_TYPE[t])}${n === null ? '' : ` <span class="compte">${n}</span>`}</button>`; }).join('')}
+    ${types.map((t) => { const n = ui.filtreDomaineExposants ? compte(t) : null; return `<button class="onglet" type="button" role="tab" id="onglet-${attr(normaliser(t))}" aria-selected="${t === type}" data-action="onglet" data-valeur="${attr(t)}">${h(PLURIEL_TYPE[t])}${n === null ? '' : ` <span class="compte">${n}</span>`}</button>`; }).join('')}
   </div>` : ''}
   ${champRecherche('rechercheExposants', ui.rechercheExposants, type === 'Pro' ? 'Un métier, un nom, une entreprise' : 'Une école, une formation, une ville')}
-  ${filtresSecteur('filtreSecteurExposants', ui.filtreSecteurExposants, secteurs)}
+  ${filtresDomaine('filtreDomaineExposants', ui.filtreDomaineExposants, domaines)}
   <div role="tabpanel" ${type ? `aria-labelledby="onglet-${attr(normaliser(type))}"` : ''}>
-  ${liste.length ? `<ul class="liste">${liste.map((e) => ligneExposant(etat, e)).join('')}</ul>`
+  ${groupes.length ? groupes.map(({ village, exposants }) => {
+    const num = village ? numeroDe(village) : null;
+    return `<h2 class="titre-village">${village
+      ? `<a href="#/plan?village=${encodeURIComponent(num ?? village)}">${num !== null && num !== undefined ? `<span class="num">${h(num)}</span>` : ''}${h(village)}</a>`
+      : 'Village à venir'}<span class="compte">${exposants.length}</span></h2>
+    <ul class="liste">${exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>`;
+  }).join('')
     : `<p class="vide">${modele.exposants.length ? 'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.' : 'La liste des exposants arrive bientôt.'}</p>`}
   </div>`;
 }
@@ -301,14 +361,15 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
   return `<article class="fiche">
     ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>Vous venez de scanner le QR code du stand${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, stand ${h(ex.stand)}` : ''}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] || 'Les exposants' })}
-    <div class="puces"><span class="puce">${h(ex.type)}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(ex.organisation)}</span>` : ''}${ex.secteur ? `<span class="puce neutre">${h(ex.secteur)}</span>` : ''}</div>
+    <div class="puces"><span class="puce">${h(ex.type)}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(ex.organisation)}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(d)}</span>`).join('')}</div>
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>Changement : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       ${ex.type === 'Pro' && ex.organisation ? `<dt>Entreprise</dt><dd>${h(ex.organisation)}</dd>` : ''}
       ${ex.type !== 'École' && ex.sousTitre ? `<dt>${libSousTitre}</dt><dd>${h(ex.sousTitre)}</dd>` : ''}
       ${ex.niveau ? `<dt>Niveau</dt><dd>${h(ex.niveau)}</dd>` : ''}
       ${ex.ville ? `<dt>Ville</dt><dd>${h(ex.ville)}</dd>` : ''}
-      <dt>Salle</dt><dd>${salleHtml(ex.salle, ex.salleAVenir)}${salleObj && salleObj.zone ? `, zone ${h(salleObj.zone.numero ?? '')} ${h(salleObj.zone.nom)}` : ''}${ex.stand ? `, stand ${h(ex.stand)}` : ''}</dd>
+      ${ex.village ? `<dt>Village</dt><dd>${h(ex.village)}${salleObj && salleObj.zone && salleObj.zone.numero !== null ? ` (village ${h(salleObj.zone.numero)})` : ''}</dd>` : ''}
+      <dt>Salle</dt><dd>${salleHtml(ex.salle, ex.salleAVenir)}${salleObj ? `, ${h(salleObj.etage.toLowerCase())}` : ''}${ex.stand ? `, stand ${h(ex.stand)}` : ''}</dd>
       ${ex.presence ? `<dt>Présent</dt><dd>${h(ex.presence)}</dd>` : ''}
     </dl>
     ${ex.description ? `<p class="description">${h(ex.description)}</p>` : ''}
@@ -325,7 +386,7 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
 
 // ---------------------------------------------------------------- plan
 
-const COULEUR_ZONE = (numero) => `var(--z${((numero ?? 1) - 1) % 7 + 1})`;
+const COULEUR_ZONE = (numero) => `var(--z${((numero ?? 1) - 1) % 11 + 1})`;
 const co = (n) => Math.round(n * 100) / 100;
 
 // Le nom d'une Zone sur au plus deux lignes qui tiennent dans son rectangle.
@@ -340,19 +401,33 @@ export function couperNomZone(nom, maxCaracteres) {
   return lignes.map((l) => (l.length > maxCaracteres ? `${l.slice(0, Math.max(1, Math.floor(maxCaracteres) - 1))}…` : l));
 }
 
-export function calculerPlan(modele) {
-  const rects = disposerZones(modele.zones);
-  const placements = placerSalles(modele.salles, rects);
+export function calculerPlan(modele, etage = null) {
+  const { salles, zones } = etage ? planDeLEtage(modele, etage) : { salles: modele.salles, zones: modele.zones };
+  const rects = disposerZones(zones);
+  const placements = placerSalles(salles, rects);
   return { rects, placements, etendue: etendue(rects, placements) };
+}
+
+// L'étage affiché : celui de la salle qu'on cherche ou qu'on vient de toucher,
+// sinon celui du village ouvert, sinon celui que le Visiteur a choisi. Chercher
+// « Salle 43 » depuis le rez-de-chaussée doit monter d'un étage tout seul —
+// sans quoi la recherche répond « rien trouvé » alors qu'elle a trouvé.
+export function etageAffiche(modele, ui, cible) {
+  const etages = etagesPresents(modele);
+  if (cible && cible.etage && etages.includes(cible.etage)) return cible.etage;
+  if (ui.etagePlan && etages.includes(ui.etagePlan)) return ui.etagePlan;
+  return etages[0];
 }
 
 export function ecranPlan(etat) {
   const { modele, ui } = etat;
-  const { rects, placements, etendue: dim } = calculerPlan(modele);
   const sallesVisite = sallesDeVisite(etat.visite, modele);
   const resultat = ui.recherchePlan ? rechercherSurPlan(modele, ui.recherchePlan) : null;
   const allumee = resultat && resultat.salle ? resultat.salle.cle : (ui.salleAllumee ? normaliser(ui.salleAllumee) : null);
   const salleAllumeeObj = allumee ? modele.salles.find((s) => s.cle === allumee) : null;
+  const etages = etagesPresents(modele);
+  const etage = etageAffiche(modele, ui, salleAllumeeObj);
+  const { rects, placements, etendue: dim } = calculerPlan(modele, etage);
   // Une Zone explicitement touchée ouvre le panneau de la Zone ; une Salle
   // touchée ouvre le panneau de cette Salle seule, et non de toute sa Zone.
   const zoneOuverte = ui.zoneOuverte !== null && ui.zoneOuverte !== undefined
@@ -361,10 +436,13 @@ export function ecranPlan(etat) {
   const salleDemandee = ui.salleAllumee && !salleAllumeeObj ? ui.salleAllumee : null;
 
   const svgZones = rects.map((r) => {
-    const x0 = r.x + (r.zone.numero !== null ? 6 : 2);
+    // Le nom démarre après le numéro : deux chiffres prennent plus de place qu'un,
+    // sans quoi « 10 » et « Orientation générale » se chevauchent.
+    const chiffres = r.zone.numero === null ? 0 : String(r.zone.numero).length;
+    const x0 = r.x + (chiffres ? 3.4 + chiffres * 2.2 : 2);
     const lignes = couperNomZone(r.zone.nom, (r.x + r.w - 1 - x0) / 1.3);
     return `<g class="zone-g">
-      <rect class="zone-rect${zoneActive === r.zone ? ' active' : ''}" x="${co(r.x)}" y="${co(r.y)}" width="${co(r.w)}" height="${co(r.h)}" rx="2.4" fill="${COULEUR_ZONE(r.zone.numero)}" data-action="zone" data-valeur="${attr(r.zone.numero ?? r.zone.nom)}" tabindex="0" role="button" aria-label="Zone ${attr(r.zone.numero ?? '')} ${attr(r.zone.nom)}"/>
+      <rect class="zone-rect${zoneActive === r.zone ? ' active' : ''}" x="${co(r.x)}" y="${co(r.y)}" width="${co(r.w)}" height="${co(r.h)}" rx="2.4" fill="${COULEUR_ZONE(r.zone.numero)}" data-action="zone" data-valeur="${attr(r.zone.numero ?? r.zone.nom)}" tabindex="0" role="button" aria-label="${r.zone.fonction ? '' : 'Village '}${attr(r.zone.numero ?? '')} ${attr(r.zone.nom)}"/>
       <text class="zone-num" x="${co(r.x + 2.2)}" y="${co(r.y + 5)}">${h(r.zone.numero ?? '')}</text>
       ${lignes.map((l, i) => `<text class="zone-nom" x="${co(x0)}" y="${co(r.y + 4.4 + i * 2.7)}">${h(l)}</text>`).join('')}
     </g>`;
@@ -395,23 +473,33 @@ export function ecranPlan(etat) {
     : salleDemandee ? `<section class="guidage" aria-live="polite"><h2>${h(salleDemandee)}</h2><p>${h(phraseGuidage(null, salleDemandee))}</p></section>`
     : ui.recherchePlan ? '<p class="vide">Rien trouvé. Essayez le numéro de la salle ou le nom de l\'école.</p>' : '';
 
-  const legende = `<div class="legende" aria-hidden="true">${rects.filter((r) => r.zone.numero !== null && r.zone.numero <= 7).map((r) => `<span style="--c:${COULEUR_ZONE(r.zone.numero)}">${h(r.zone.numero)} ${h(r.zone.nom)}</span>`).join('')}</div>`;
+  const legende = `<div class="legende" aria-hidden="true">${rects.filter((r) => r.zone.numero !== null).map((r) => `<span style="--c:${COULEUR_ZONE(r.zone.numero)}">${h(r.zone.numero)} ${h(r.zone.nom)}</span>`).join('')}</div>`;
 
-  const equivalent = `<details class="equivalent"><summary>Le plan en liste (zones et salles)</summary>
-    <ul class="liste">${modele.zones.map((z) => `<li class="ligne"><div class="heure">${h(z.numero ?? '·')}</div><div class="corps"><button class="filtre" type="button" data-action="zone" data-valeur="${attr(z.numero ?? z.nom)}">${h(z.nom)}</button><div class="meta"><span>${z.salles.length ? z.salles.map((s) => h(s.nom)).join(', ') : 'salles à venir'}</span></div></div><div></div></li>`).join('')}</ul>
+  // Les onglets d'étage : deux niveaux, deux plans. On ne les affiche que si le
+  // tableur en connaît plus d'un — un festival de plain-pied n'a pas à choisir.
+  const onglets = etages.length > 1 ? `<div class="onglets etages" role="tablist" aria-label="Étage">
+    ${etages.map((e) => `<button class="onglet" type="button" role="tab" aria-selected="${e === etage}" data-action="etage" data-valeur="${attr(e)}">${h(e)}</button>`).join('')}
+  </div>` : '';
+
+  const listeEtage = (e) => modele.zones.filter((z) => z.salles.some((s) => s.etage === e))
+    .map((z) => `<li class="ligne"><div class="heure">${h(z.numero ?? '·')}</div><div class="corps"><button class="filtre" type="button" data-action="zone" data-valeur="${attr(z.numero ?? z.nom)}">${h(z.nom)}</button><div class="meta"><span>${z.salles.filter((s) => s.etage === e).map((s) => h(s.nom)).join(', ') || 'salles à venir'}</span></div></div><div></div></li>`).join('');
+  const equivalent = `<details class="equivalent"><summary>Le plan en liste (villages et salles)</summary>
+    ${etages.map((e) => `<h3 class="titre-section">${h(e)}</h3><ul class="liste">${listeEtage(e) || '<li class="ligne"><div class="corps">Rien à cet étage pour l\'instant.</div></li>'}</ul>`).join('')}
   </details>`;
 
-  return `${entete('Plan du festival', salleAllumeeObj ? h(salleAllumeeObj.nom) : 'Touchez une zone, ou cherchez une salle ou une école')}
+  const villagesDuPlan = rects.filter((r) => r.zone.numero !== null).map((r) => `${r.zone.numero} ${r.zone.nom}`).join(', ');
+  return `${entete('Plan du festival', salleAllumeeObj ? h(salleAllumeeObj.nom) : 'Touchez un village, ou cherchez une salle ou une école')}
   ${champRecherche('recherchePlan', ui.recherchePlan, 'Une salle, une école, un événement')}
+  ${onglets}
   <div class="plan-viewport" id="plan-viewport">
     <svg viewBox="0 0 ${dim.largeur} ${dim.hauteur}" role="img" aria-labelledby="plan-titre plan-desc" preserveAspectRatio="xMidYMid meet">
-      <title id="plan-titre">Plan stylisé du lycée Maurice Rondeau</title>
-      <desc id="plan-desc">Sept zones numérotées : ${h(modele.zones.filter((z) => z.numero).map((z) => `${z.numero} ${z.nom}`).join(', '))}. Entrée du lycée en bas. La liste équivalente est sous le plan.</desc>
+      <title id="plan-titre">Plan stylisé de l'Ensemble Scolaire Maurice Rondeau — ${h(etage)}</title>
+      <desc id="plan-desc">${h(etage)} : ${h(villagesDuPlan)}. La liste équivalente est sous le plan.</desc>
       <g class="plan-monde" id="plan-monde" data-hauteur="${dim.hauteur}">
         <rect x="0" y="0" width="${dim.largeur}" height="${dim.hauteur}" fill="transparent"/>
         ${svgZones}
         ${svgSalles}
-        <text class="entree-txt" x="50" y="${Math.min(dim.hauteur - 1.5, 98.5)}">Entrée lycée</text>
+        ${etage === etages[0] ? `<text class="entree-txt" x="50" y="${co(dim.hauteur - 1.5)}">Entrée</text>` : ''}
       </g>
     </svg>
     <div class="outils">
@@ -424,17 +512,17 @@ export function ecranPlan(etat) {
   ${guidage}
   ${contenuDeLaSalle ? `<section class="panneau-zone" aria-live="polite">
     <h2>${h(salleAllumeeObj.nom)}</h2>
-    <p class="salles-de-la-zone">${contenuDeLaSalle.exposants.length ? `${contenuDeLaSalle.exposants.length} exposant${contenuDeLaSalle.exposants.length > 1 ? 's' : ''} dans cette salle` : "Aucun exposant dans cette salle pour l'instant"}${salleAllumeeObj.zone ? `, zone ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}` : ''}</p>
+    <p class="salles-de-la-zone">${contenuDeLaSalle.exposants.length ? `${contenuDeLaSalle.exposants.length} exposant${contenuDeLaSalle.exposants.length > 1 ? 's' : ''} dans cette salle` : "Aucun exposant dans cette salle pour l'instant"}${salleAllumeeObj.zone ? `, village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}` : ''}, ${h(salleAllumeeObj.etage.toLowerCase())}</p>
     ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>` : ''}
     ${contenuDeLaSalle.evenements.length ? `<h3 class="titre-section">Événements dans cette salle</h3><ul class="liste">${contenuDeLaSalle.evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
-    ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">Voir toute la zone ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}</button></div>` : ''}
+    ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">Voir tout le village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}</button></div>` : ''}
   </section>` : ''}
   ${contenu ? `<section class="panneau-zone" aria-live="polite">
     <h2><span class="num">${h(zoneOuverte.numero ?? '')}</span>${h(zoneOuverte.nom)}</h2>
-    ${contenu.salles.length ? `<p class="salles-de-la-zone">Salles : ${contenu.salles.map((s) => `<a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a>`).join(', ')}</p>` : '<p class="salles-de-la-zone">Salles à venir.</p>'}
+    ${contenu.salles.length ? `<p class="salles-de-la-zone">Salles : ${contenu.salles.map((s) => `<a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a>`).join(', ')} — ${h(etagesDeZone(zoneOuverte).join(' et ').toLowerCase())}</p>` : '<p class="salles-de-la-zone">Salles à venir.</p>'}
     ${contenu.exposants.length ? `<h3 class="titre-section">Exposants</h3><ul class="liste">${contenu.exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>` : ''}
     ${contenu.evenements.length ? `<h3 class="titre-section">Événements</h3><ul class="liste">${contenu.evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
-    ${!contenu.exposants.length && !contenu.evenements.length ? '<p class="vide">Rien n\'est encore affecté à cette zone.</p>' : ''}
+    ${!contenu.exposants.length && !contenu.evenements.length ? '<p class="vide">Rien n\'est encore affecté à ce village.</p>' : ''}
   </section>` : ''}
   ${equivalent}`;
 }
@@ -470,7 +558,7 @@ export function ecranVisite(etat) {
 
 export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions = null } = {}) {
   const { modele, visite } = etat;
-  const secteursPresents = new Set(modele.exposants.map((e) => e.secteur).concat(modele.evenements.map((e) => e.secteur)).filter(Boolean));
+  const domainesPresents = new Set(modele.exposants.flatMap((e) => e.domaines).concat(modele.evenements.flatMap((e) => e.domaines)).filter(Boolean));
   const s = suggestions(visite, modele);
   const types = typesPresents(modele);
   const questions = questionsPour(visite, modele, typeQuestions);
@@ -489,7 +577,7 @@ export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions 
   }
   return `${entete('Préparer ma visite', 'Avant le festival, depuis la maison')}
   <h2 class="titre-section">Ce qui m'intéresse</h2>
-  <div class="choix" role="group" aria-label="Centres d'intérêt">${SECTEURS.filter((x) => secteursPresents.has(x)).map((x) => `<button class="filtre" type="button" data-action="interet" data-valeur="${attr(x)}" aria-pressed="${visite.interets.includes(x)}">${h(x)}</button>`).join('')}</div>
+  <div class="choix" role="group" aria-label="Centres d'intérêt">${ordonner(domainesPresents, DOMAINES).map((x) => `<button class="filtre" type="button" data-action="interet" data-valeur="${attr(x)}" aria-pressed="${visite.interets.includes(x)}">${h(x)}</button>`).join('')}</div>
   <h2 class="titre-section">Je suis</h2>
   <div class="choix" role="group" aria-label="Niveau">${NIVEAUX.map((n) => `<button class="filtre" type="button" data-action="niveau" data-valeur="${attr(n)}" aria-pressed="${visite.niveau === n}">${h(n)}</button>`).join('')}</div>
   <div class="boutons"><button class="bouton large" type="button" data-action="suggestions" aria-expanded="${etat.ui.suggestionsOuvertes}">Voir les ${h(nbTexte)} pour moi</button></div>
@@ -524,7 +612,7 @@ export function ecranAide(etat) {
     ${blocLien('toilettes', 'Où sont les toilettes ?', salleWc ? phraseGuidage(salleWc) : "Près de l'accueil", '#/plan?salle=Toilettes')}
     ${blocLien('cafe', 'Où prendre un café ?', i.restauration || (salleFood ? phraseGuidage(salleFood) : 'Foodtruck'), salleFood ? '#/plan?salle=Foodtruck' : '#/plan')}
     ${blocLien('recherche', 'Comment retrouver une salle ?', "Tapez son numéro ou le nom de l'école dans le plan : la salle s'allume en orange.", '#/plan')}
-    ${bloc('telephone', 'Qui contacter ?', contact || "L'équipe APEL à l'accueil, zone 1")}
+    ${bloc('telephone', 'Qui contacter ?', contact || "L'équipe APEL à l'accueil, village 1")}
   </section>
   <h2 class="titre-section">Infos pratiques</h2>
   <section class="carte">
@@ -590,7 +678,13 @@ export function piedDePage(etat) {
   const jour = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const lib = { script: 'tableur', gviz: 'classeur public', snapshot: 'version embarquée', cache: 'dernière version connue' }[source] || source;
   const panne = debug && reseau && reseau.enErreur ? ' · <span class="erreur">lecture en direct en échec, nouvel essai bientôt</span>' : '';
-  return `<p class="maj">Mis à jour le ${h(jour)} à ${h(heure)} (${h(lib)})${panne}</p>${version}`;
+  // Un refus de complétude se lit avec « ?debug », comme la panne : le Visiteur voit des
+  // données complètes et n'a rien à faire, l'Organisateur a besoin de savoir pourquoi
+  // l'heure de mise à jour ne bouge plus.
+  const refuse = debug && reseau && reseau.refus
+    ? ` · <span class="erreur">source ${h(reseau.refus.source)} refusée (${h(reseau.refus.motif)})</span>`
+    : '';
+  return `<p class="maj">Mis à jour le ${h(jour)} à ${h(heure)} (${h(lib)})${panne}${refuse}</p>${version}`;
 }
 
 // ---------------------------------------------------------------- aiguillage

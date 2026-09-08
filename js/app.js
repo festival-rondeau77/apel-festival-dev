@@ -20,11 +20,11 @@ const etat = {
   versionAppli: CONFIG.version, versionSW: null,
   visite: Visite.etatInitial(),
   ui: {
-    rechercheProgramme: '', filtreSecteurProgramme: '', filtreFormat: '', filtrePublic: '',
-    rechercheExposants: '', ongletExposants: 'École', filtreSecteurExposants: '',
-    recherchePlan: '', zoneOuverte: null, salleAllumee: null, suggestionsOuvertes: false,
+    rechercheProgramme: '', filtreDomaineProgramme: '', filtreFormat: '', filtrePublic: '',
+    rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
+    recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, suggestionsOuvertes: false,
   },
-  reseau: { enErreur: false },
+  reseau: { enErreur: false, refus: null },
   maintenant: { jourJ: false, minutes: 0 },
   debug: location.search.includes('debug'),
 };
@@ -101,14 +101,18 @@ function appliquerRoute() {
   const p = etat.route.params;
   if (etat.route.nom === 'plan') {
     etat.ui.salleAllumee = p.salle || null;
-    if (p.zone !== undefined) etat.ui.zoneOuverte = p.zone;
+    // « village » et « zone » désignent la même chose : le second est l'ancien
+    // nom, gardé parce qu'il peut dormir dans un favori ou un QR code déjà gravé.
+    if (p.village !== undefined) etat.ui.zoneOuverte = p.village;
+    else if (p.zone !== undefined) etat.ui.zoneOuverte = p.zone;
     if (p.salle) { etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; }
     planTransform.centrerSur = p.salle || null;
     if (!p.salle) { planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; } // « Plan » montre toujours la vue d'ensemble
   }
   if (etat.route.nom === 'exposants') {
     if (p.onglet) etat.ui.ongletExposants = p.onglet;
-    if (p.secteur !== undefined) etat.ui.filtreSecteurExposants = p.secteur;
+    if (p.domaine !== undefined) etat.ui.filtreDomaineExposants = p.domaine;
+    else if (p.secteur !== undefined) etat.ui.filtreDomaineExposants = p.secteur;
   }
   if (etat.route.nom === 'exposant' && p.qr === '1') stats.noter('qr_scan', p.cle || '');
   if (etat.route.nom === 'exposant') stats.noter('fiche_exposant', p.cle || '');
@@ -194,11 +198,14 @@ document.addEventListener('click', (e) => {
     case 'retirer': e.preventDefault(); modifierVisite(Visite.retirer(etat.visite, cle)); break;
     case 'effacer': etat.ui[champ] = ''; if (champ === 'recherchePlan') etat.ui.salleAllumee = null; rendre({ conserver: true }); el.main.querySelector(`[data-champ="${champ}"]`)?.focus(); break;
     case 'filtre': etat.ui[filtre] = etat.ui[filtre] === valeur && filtre !== 'filtrePublic' ? '' : valeur; rendre({ conserver: true }); break;
-    // Changer d'onglet garde le Secteur : il traverse les onglets (voir ecranExposants),
+    // Changer d'onglet garde le Domaine : il traverse les onglets (voir ecranExposants),
     // et le compte affiché sur chaque onglet dit déjà combien on y trouvera.
     case 'onglet': etat.ui.ongletExposants = valeur; rendre({ conserver: true }); break;
     case 'zone': etat.ui.zoneOuverte = etat.ui.zoneOuverte === valeur ? null : valeur; etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; rendre({ conserver: true }); break;
     case 'salle': etat.ui.salleAllumee = valeur; etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; planTransform.centrerSur = valeur; rendre({ conserver: true }); break;
+    // Changer d'étage remet le plan à plat : on regarde un autre niveau, pas la
+    // même chose sous un autre angle.
+    case 'etage': etat.ui.etagePlan = valeur; etat.ui.salleAllumee = null; etat.ui.zoneOuverte = null; planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; rendre({ conserver: true }); break;
     case 'zoom': zoomerPlan(Number(valeur) > 0 ? 1.4 : 1 / 1.4); break;
     case 'recentrer': planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; appliquerTransformPlan(); break;
     case 'calendrier': ajouterAuCalendrier(cle); break;
@@ -379,9 +386,14 @@ async function chargerSnapshot() {
 async function rafraichirDonnees() {
   const r = await sources.rafraichir(etat.version);
   etat.reseau.enErreur = false;
-  if (r.bandeau !== null && r.bandeau !== undefined) afficherBandeau(r.bandeau);
-  if (r.change) installerTables(r.tables, r.version, r.source);
-  else { etat.derniereMaj = Date.now(); etat.source = r.source; }
+  etat.reseau.refus = r.refus ? r.refus[0] : null;
+  // Une source refusée n'a rien à nous apprendre : ni ses tables, ni son bandeau, ni
+  // même son heure — dire « mis à jour » ici serait mentir, puisqu'on garde l'ancien.
+  if (!r.refus) {
+    if (r.bandeau !== null && r.bandeau !== undefined) afficherBandeau(r.bandeau);
+    if (r.change) installerTables(r.tables, r.version, r.source);
+    else { etat.derniereMaj = Date.now(); etat.source = r.source; }
+  }
   rendre({ conserver: true });
 }
 
