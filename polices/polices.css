@@ -1,0 +1,16 @@
+/* Police de titre auto-hébergée : Bricolage Grotesque (OFL 1.1), sous-ensemble
+   français, graisses statiques 700 et 800. Voir LICENCE-Bricolage-Grotesque.txt. */
+@font-face {
+  font-family: 'Bricolage';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./bricolage-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Bricolage';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('./bricolage-800.woff2') format('woff2');
+}

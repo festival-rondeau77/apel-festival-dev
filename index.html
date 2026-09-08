@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Festival de l'Orientation</title>
+  <meta name="description" content="Programme, plan, exposants et visite personnelle du Festival de l'Orientation, lycée Maurice Rondeau, Bussy-Saint-Georges.">
+  <meta name="theme-color" content="#2B24E8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17110F" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Festival">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icones/icone-180.png">
+  <link rel="preload" href="./polices/bricolage-800.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./polices/polices.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="visuellement-cache" href="#ecran">Aller au contenu</a>
+  <div id="bandeau" class="bandeau" role="status" aria-live="polite" hidden></div>
+  <div class="appli">
+    <main id="ecran" tabindex="-1" aria-live="off"><p class="maj">Chargement…</p></main>
+    <div id="pied"></div>
+  </div>
+  <nav id="nav" class="nav" aria-label="Navigation principale"></nav>
+  <div id="messages" class="messages" aria-live="polite"></div>
+  <div id="annonce" class="visuellement-cache" aria-live="assertive"></div>
+  <noscript><p class="appli">Cette application a besoin de JavaScript.</p></noscript>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
