@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
-import { creerStats } from './stats.js';
+import { creerStats, plateforme } from './stats.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, calculerPlan, etageAffiche, h as echapper } from './rendu.js';
@@ -534,7 +534,10 @@ async function demarrer() {
   if (initial) installerTables(initial.tables, initial.version, initial.sourceOrigine || initial.source, { heure: initial.heure || Date.now(), silencieux: true });
   else etat.derniereMaj = null;
   const installee = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  stats.noter('ouverture', initial ? initial.source : 'aucune', installee ? 'installee' : 'navigateur');
+  // « installee·ios », « navigateur·android »… : d'où vient la donnée en cible,
+  // et en detail comment l'appli est ouverte ET sur quelle famille d'appareil.
+  stats.noter('ouverture', initial ? initial.source : 'aucune',
+    `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}`);
   appliquerRoute();
   enregistrerServiceWorker();
   versionServiceWorker().then((v) => { etat.versionSW = v; el.pied.innerHTML = piedDePage(etat); });

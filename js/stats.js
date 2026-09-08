@@ -17,6 +17,19 @@ function tronquer(v, n) {
   return t.length > n ? t.slice(0, n) : t;
 }
 
+// La plateforme, en trois seaux et rien de plus : c'est ce qui décide s'il faudra
+// un jour une application native, et laquelle en premier. On ne garde ni la version
+// du système, ni le modèle, ni rien qui rapprocherait deux visites — un seau parmi
+// trois n'identifie personne, là où un user-agent complet est une empreinte.
+// iPadOS 13+ se déclare « Macintosh » : c'est l'écran tactile qui le trahit.
+export function plateforme(ua, pointsTactiles = 0) {
+  const t = String(ua || '');
+  if (/iPad|iPhone|iPod/.test(t)) return 'ios';
+  if (/Macintosh/.test(t) && pointsTactiles > 1) return 'ios';
+  if (/Android/.test(t)) return 'android';
+  return 'autre';
+}
+
 export function identifiantAleatoire(aleatoire) {
   if (aleatoire) return aleatoire();
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
