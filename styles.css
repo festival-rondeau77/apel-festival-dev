@@ -221,12 +221,26 @@ main { min-height: 60vh; }
    La règle ne s'applique donc plus qu'au groupe secondaire. */
 .grille-boutons.secondaires a:last-child:nth-child(odd) { grid-column: span 2; }
 
-.prochain { margin: 26px 0 0; padding: 18px 0 0; border-top: 3px solid var(--encre); }
-.prochain .quand { font-family: var(--display); font-weight: 800; font-size: 1.7rem; color: var(--orange); line-height: 1; letter-spacing: -0.02em; }
-.prochain .etiquette { font-size: 0.82rem; color: var(--encre-2); font-weight: 600; margin-bottom: 8px; }
-.prochain h2 { font-size: 1.25rem; margin: 6px 0 8px; }
-.prochain h2 a { color: inherit; text-decoration: none; }
-.prochain h2 a:hover { text-decoration: underline; }
+/* Le prochain rendez-vous se lit comme les boutons du dessus : une carte, le
+   même coin cassé, un filet de couleur à gauche — framboise, la couleur du
+   programme sur l'affiche. Il flottait avant entre deux blocs, sous un filet de
+   3 px en var(--encre) qui, la nuit, devenait une barre presque blanche. */
+.prochain { margin: 26px 0 0; }
+.prochain .etiquette { font-size: 0.8rem; color: var(--encre-2); font-weight: 650; margin: 0 0 8px; display: flex; align-items: center; gap: 7px; }
+/* « En ce moment » mérite qu'on le voie de loin : un point framboise suffit. */
+.prochain .etiquette.en-cours { color: var(--framboise); }
+.prochain .etiquette.en-cours::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--framboise); flex: none; }
+.carte-prochain {
+  background: var(--carte); border: 1px solid var(--trait); border-left: 4px solid var(--framboise);
+  border-radius: 6px 6px 18px 6px; padding: 14px 16px;
+}
+.carte-prochain .quand {
+  margin: 0; font-family: var(--display); font-weight: 800; font-size: 1.45rem; color: var(--framboise);
+  line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.carte-prochain h2 { font-size: 1.2rem; margin: 7px 0 0; }
+.carte-prochain h2 a { color: inherit; text-decoration: none; }
+.carte-prochain h2 a:hover { text-decoration: underline; }
 
 .commencer { margin: 30px 0 0; }
 .commencer p { margin: 0 0 12px; color: var(--encre-2); }
@@ -367,10 +381,17 @@ main { min-height: 60vh; }
    règle vivait sous « .ligne » seulement, si bien que le prochain événement de
    l'accueil collait sa salle à son format et donnait à lire « AccueilOuverture ». */
 .meta { color: var(--encre-2); font-size: 0.86rem; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px 12px; align-items: center; line-height: 1.35; }
-.ligne .salle { color: var(--orange); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
-.ligne .salle svg { width: 14px; height: 14px; }
-.ligne .salle:hover { text-decoration: underline; }
-.ligne .salle.avenir { color: var(--encre-2); font-weight: 500; font-style: italic; }
+/* Le repère de salle est une pièce à lui : partout où salleHtml() le pose —
+   une ligne de liste, une fiche, l'accueil — il doit garder son épingle collée
+   à son nom. Scopé à .ligne, il retombait ailleurs en lien souligné, épingle
+   sur une ligne et nom sur la suivante. */
+/* Qualifié par l'élément à dessein : le panneau du plan porte lui aussi
+   « salle », sur une <section> que l'inline-flex sortirait du cadre. Ici, le
+   repère est toujours le <a> ou le <span> que rend salleHtml(). */
+:is(a, span).salle { color: var(--orange); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+:is(a, span).salle svg { width: 14px; height: 14px; flex: none; }
+a.salle:hover { text-decoration: underline; }
+span.salle.avenir { color: var(--encre-2); font-weight: 500; font-style: italic; }
 .ligne.fait .corps > a { text-decoration: line-through; color: var(--encre-2); }
 .ligne.chevauche { background: var(--alerte-pale); border-radius: 4px; padding-left: 10px; padding-right: 10px; margin: 0 -10px; }
 .alerte-ico { color: var(--alerte); font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
@@ -441,9 +462,6 @@ main { min-height: 60vh; }
 .fiche dl { display: grid; grid-template-columns: 5.6em 1fr; gap: 11px 14px; margin: 20px 0; padding: 18px 0; border-top: 1px solid var(--trait); border-bottom: 1px solid var(--trait); }
 .fiche dt { color: var(--encre-2); font-size: 0.86rem; padding-top: 2px; }
 .fiche dd { margin: 0; font-weight: 650; }
-.fiche dd .salle { color: var(--orange); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
-.fiche dd .salle svg { width: 14px; height: 14px; }
-.fiche dd .salle.avenir { color: var(--encre-2); font-style: italic; }
 .fiche p.description { margin: 18px 0; line-height: 1.55; max-width: 62ch; }
 .qr-entete {
   background: var(--bleu); color: #fff; border-radius: 4px 4px 16px 4px; padding: 14px 16px; margin: 4px 0 18px;

@@ -227,10 +227,12 @@ export function ecranAccueil(etat) {
     ${nb ? bouton('#/visite', 'visite', 'Ma visite', { ton: 'construire', extra: `<span class="compte">${nb} élément${nb > 1 ? 's' : ''}</span>` }) : ''}
   </nav>
   ${prochain ? `<section class="prochain" aria-labelledby="prochain-titre">
-    <p class="etiquette">${prochain.enCours ? 'En ce moment' : (maintenant.jourJ ? 'Prochain événement' : 'Le festival commence par')}</p>
-    <p class="quand">${h(minutesEnHeure(prochain.debut))}</p>
-    <h2 id="prochain-titre"><a href="${lienEvenement(prochain.cle)}">${h(prochain.titre)}</a></h2>
-    <div class="meta">${salleHtml(prochain.salle, prochain.salleAVenir)}<span>${h(prochain.format)}${prochain.intervenantsTexte ? `, ${h(prochain.intervenantsTexte)}` : ''}</span></div>
+    <p class="etiquette${prochain.enCours ? ' en-cours' : ''}">${prochain.enCours ? 'En ce moment' : (maintenant.jourJ ? 'Prochain événement' : 'Le festival commence par')}</p>
+    <div class="carte-prochain">
+      <p class="quand">${h(minutesEnHeure(prochain.debut))}</p>
+      <h2 id="prochain-titre"><a href="${lienEvenement(prochain.cle)}">${h(prochain.titre)}</a></h2>
+      <div class="meta">${salleHtml(prochain.salle, prochain.salleAVenir)}<span>${h(prochain.format)}${prochain.intervenantsTexte ? `, ${h(prochain.intervenantsTexte)}` : ''}</span></div>
+    </div>
   </section>` : ''}
   ${domaines.size ? `<section class="commencer">
     <h2 class="titre-section">Par où commencer ?</h2>
