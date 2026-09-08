@@ -576,8 +576,14 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
   .appli { max-width: 960px; }
   /* Le plan et son panneau tiennent ensemble à l'écran : on cesse de faire défiler
      pour lire ce qu'on vient de toucher. */
-  .plan-cote-a-cote:has(.panneau-zone.village) { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr); gap: 22px; align-items: start; }
-  .plan-cote-a-cote .panneau-zone.village { margin-top: 0; }
+  /* La carte et son panneau tiennent ensemble : on cesse de faire défiler pour
+     lire ce qu'on vient de toucher. L'ordre du DOM garde le panneau AVANT la
+     carte — c'est ce qu'il faut sur un téléphone ; la grille le remet à droite. */
+  .plan-cote-a-cote:has(.panneau-zone) { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr); gap: 22px; align-items: start; }
+  .plan-cote-a-cote:has(.panneau-zone) .plan-carte { grid-column: 1; grid-row: 1; }
+  .plan-cote-a-cote:has(.panneau-zone) .panneau-zone,
+  .plan-cote-a-cote:has(.panneau-zone) .guidage { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .plan-cote-a-cote:has(.panneau-zone) .panneau-zone.village ~ .panneau-zone { grid-row: 2; }
   .liste .ligne { padding-inline: 4px; }
 }
 

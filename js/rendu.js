@@ -106,7 +106,7 @@ function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche 
   </li>`;
 }
 
-function ligneExposant(etat, ex, { entree = null, chrono = false, de = '' } = {}) {
+function ligneExposant(etat, ex, { entree = null, chrono = false, de = '', sansSalle = false } = {}) {
   const meta = [];
   if (ex.stand) meta.push(`<span>stand ${h(ex.stand)}</span>`);
   if (ex.organisation && ex.organisation !== ex.type) meta.push(`<span class="puce">${h(ex.organisation)}</span>`);
@@ -117,7 +117,7 @@ function ligneExposant(etat, ex, { entree = null, chrono = false, de = '' } = {}
     ${chrono ? `<div class="rail-heure"></div>${pointChrono(entree, { petit: true })}`
     : entree ? coche(entree) : `<div class="marque">${icone('exposants', 18)}</div>`}
     <div class="corps"><a href="${lienExposant(ex.cle, de)}">${h(ex.nom)}</a>
-      <div class="meta">${salleHtml(ex.salle, ex.salleAVenir)}${meta.join('')}${alerte}</div></div>
+      <div class="meta">${sansSalle ? '' : salleHtml(ex.salle, ex.salleAVenir)}${meta.join('')}${alerte}</div></div>
     ${entree ? boutonRetirer(ex.cle, ex.nom) : etoile(etat, ex, ex.nom)}
   </li>`;
 }
@@ -546,7 +546,7 @@ export function ecranPlan(etat) {
     <p class="salles-de-la-zone">${h(phraseGuidage(salleAllumeeObj))}</p>
     <p class="salles-de-la-zone">${contenuDeLaSalle.exposants.length ? `${contenuDeLaSalle.exposants.length} exposant${contenuDeLaSalle.exposants.length > 1 ? 's' : ''} ici` : "Aucun exposant dans cette salle pour l'instant"}</p>
     ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">Voir tout le village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}</button></div>` : ''}
-    ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e, { de: `plan:${salleAllumeeObj.nom}` })).join('')}</ul>` : ''}
+    ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e, { de: `plan:${salleAllumeeObj.nom}`, sansSalle: true })).join('')}</ul>` : ''}
     ${contenuDeLaSalle.evenements.length ? `<h3 class="titre-section">Événements dans cette salle</h3><ul class="liste">${contenuDeLaSalle.evenements.map((e) => ligneEvenement(etat, e, { de: `plan:${salleAllumeeObj.nom}` })).join('')}</ul>` : ''}
   </section>` : '';
 
@@ -569,9 +569,9 @@ export function ecranPlan(etat) {
   ${champRecherche('recherchePlan', ui.recherchePlan, 'Une salle, une école, un événement')}
   ${onglets}
   <div class="plan-cote-a-cote">
-  <div class="plan-carte">
   ${guidage}
   ${panneauSalle}
+  <div class="plan-carte">
   <div class="plan-viewport" id="plan-viewport">
     <svg viewBox="0 0 ${dim.largeur} ${dim.hauteur}" role="img" aria-labelledby="plan-titre plan-desc" preserveAspectRatio="xMidYMid meet">
       <title id="plan-titre">Plan stylisé de l'Ensemble Scolaire Maurice Rondeau — ${h(etage)}</title>
@@ -678,7 +678,11 @@ export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions 
     ${suivant ? `<button class="bouton" type="button" data-action="etape" data-valeur="${etape + 1}">${h(ETAPES_PREPARER[etape + 1])}${icone('chevron', 18)}</button>` : ''}
   </div>`;
 
-  const listeSuggestions = (liste, rendre) => (tout ? liste : liste.slice(0, MAX_SUGGESTIONS)).map(rendre).join('');
+  // Douze au TOTAL, pas douze par groupe : plafonner chaque type laissait
+  // quarante-quatre lignes à l'écran, ce qui n'est plus une sélection.
+  // Les événements passent d'abord : ils imposent une heure, donc une décision.
+  const evAffiches = tout ? s.evenements : s.evenements.slice(0, MAX_SUGGESTIONS);
+  const exAffiches = tout ? s.exposants : s.exposants.slice(0, Math.max(0, MAX_SUGGESTIONS - evAffiches.length));
   const trop = s.exposants.length + s.evenements.length > MAX_SUGGESTIONS;
 
   const corps = [
@@ -689,8 +693,8 @@ export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions 
     <div class="choix" role="group" aria-label="Centres d'intérêt">${ordonner(domainesPresents, DOMAINES).map((x) => `<button class="filtre" type="button" data-action="interet" data-valeur="${attr(x)}" aria-pressed="${visite.interets.includes(x)}">${h(x)}</button>`).join('')}</div>`,
     // 2. Ma sélection
     `${s.exposants.length || s.evenements.length ? `<p class="sous-etape">${s.exposants.length} exposant${s.exposants.length > 1 ? 's' : ''} et ${s.evenements.length} événement${s.evenements.length > 1 ? 's' : ''} correspondent à ce que vous avez dit.</p>
-    ${types.map((t) => { const l = s.exposants.filter((e) => e.type === t); return l.length ? `<h2 class="titre-section">${h(PLURIEL_TYPE[t])}</h2><ul class="liste carte">${listeSuggestions(l, (e) => ligneExposant(etat, e, { de: 'preparer' }))}</ul>` : ''; }).join('')}
-    ${s.evenements.length ? `<h2 class="titre-section">Événements</h2><ul class="liste carte">${listeSuggestions(s.evenements, (e) => ligneEvenement(etat, e, { de: 'preparer' }))}</ul>` : ''}
+    ${evAffiches.length ? `<h2 class="titre-section">Événements</h2><ul class="liste carte">${evAffiches.map((e) => ligneEvenement(etat, e, { de: 'preparer' })).join('')}</ul>` : ''}
+    ${types.map((t) => { const l = exAffiches.filter((e) => e.type === t); return l.length ? `<h2 class="titre-section">${h(PLURIEL_TYPE[t])}</h2><ul class="liste carte">${l.map((e) => ligneExposant(etat, e, { de: 'preparer' })).join('')}</ul>` : ''; }).join('')}
     ${trop ? `<div class="boutons"><button class="bouton secondaire large" type="button" data-action="suggestions" aria-expanded="${Boolean(tout)}">${tout ? 'Revenir à une sélection courte' : 'Tout voir'}</button></div>` : ''}`
       : '<p class="vide">Rien ne correspond encore. Revenez à l\'étape précédente et élargissez vos centres d\'intérêt.</p>'}`,
     // 3. Mes questions
