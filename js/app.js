@@ -35,6 +35,9 @@ etat.visite = stockageVisite.charger();
 
 const stats = creerStats({
   stockage,
+  // Le nom d'hôte, et rien d'autre : il dit « recette » ou « le vrai site » sans
+  // qu'on ait à le configurer, et il ne peut pas mentir sur la provenance.
+  origine: location.hostname,
   envoyer: async (salve) => {
     if (!CONFIG.scriptUrl) return { ok: false, definitif: true };
     try {

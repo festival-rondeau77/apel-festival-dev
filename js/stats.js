@@ -6,6 +6,7 @@ export const CLE_FILE = 'festival.stats.file';
 export const CLE_APPAREIL = 'festival.appareil';
 const LONGUEUR_CIBLE = 120;
 const LONGUEUR_DETAIL = 80;
+const LONGUEUR_ORIGINE = 80;
 
 export const ACTIONS = [
   'ouverture', 'ecran', 'fiche_evenement', 'fiche_exposant', 'recherche', 'visite_ajout', 'visite_retrait',
@@ -37,7 +38,12 @@ export function identifiantAleatoire(aleatoire) {
 }
 
 // stockage : { getItem, setItem } ; horloge : () → ms ; envoyer : (salve) → Promise<{ ok, definitif }>.
-export function creerStats({ stockage, horloge = () => Date.now(), envoyer, aleatoire, plafond = 500, taille = 50 } = {}) {
+export function creerStats({ stockage, horloge = () => Date.now(), envoyer, aleatoire, origine = '', plafond = 500, taille = 50 } = {}) {
+  // L'origine voyage par salve, pas par mesure : c'est une propriété de
+  // l'expéditeur, comme l'appareil. Elle sépare la recette du vrai — sans elle,
+  // notre navigation de mise au point se mélange aux mesures des visiteurs dans
+  // le même onglet, et plus rien n'est séparable après coup.
+  const dou = tronquer(origine, LONGUEUR_ORIGINE);
   const lire = (cle) => { try { return stockage.getItem(cle); } catch { return null; } };
   const ecrire = (cle, v) => { try { stockage.setItem(cle, v); } catch { /* stockage indisponible : on continue en mémoire */ } };
 
@@ -66,7 +72,7 @@ export function creerStats({ stockage, horloge = () => Date.now(), envoyer, alea
       while (file.length) {
         const salve = file.slice(0, taille);
         let resultat;
-        try { resultat = await envoyer({ appareil, mesures: salve }); } catch { resultat = { ok: false, definitif: false }; }
+        try { resultat = await envoyer({ appareil, origine: dou, mesures: salve }); } catch { resultat = { ok: false, definitif: false }; }
         if (resultat && resultat.ok) {
           file = file.slice(salve.length);
           envoyees += salve.length;
@@ -88,7 +94,7 @@ export function creerStats({ stockage, horloge = () => Date.now(), envoyer, alea
     const salve = file.slice(0, taille);
     file = file.slice(salve.length);
     persister();
-    return { appareil, mesures: salve };
+    return { appareil, origine: dou, mesures: salve };
   }
 
   function remettre(salve) {
