@@ -2,12 +2,15 @@
 // stockage et l'horloge sont injectés. Chaque opération renvoie un nouvel état.
 import { publicInclut, minutesEnHeure } from './donnees.js';
 
-export const SCHEMA = 1;
+export const SCHEMA = 2;
 const DUREE_PAR_DEFAUT = 45; // minutes, quand un Événement n'a pas de fin
 const RAPPEL_MINUTES = 10;
 
 export function etatInitial() {
-  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauVu: '' };
+  // `bandeauFerme` retient le message que le Visiteur a refermé, pour que le même
+  // ne revienne pas et qu'un message DIFFÉRENT revienne (schéma 2 ; l'ancien
+  // `bandeauVu` du schéma 1 disait « déjà notifié », ce qui n'a plus cours).
+  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauFerme: '' };
 }
 
 // ---------------------------------------------------------------- entrées
@@ -60,6 +63,13 @@ export function finDe(ev) {
 }
 
 // Paires d'Événements de la visite qui se chevauchent.
+// Le ou les chevauchements que l'ajout d'UNE entrée vient de créer. C'est ce qui
+// permet d'avertir au moment du geste, quand le Visiteur peut encore choisir, au
+// lieu d'attendre qu'il pense à ouvrir Ma visite (ADR-0010).
+export function chevauchementsDe(etat, modele, cle) {
+  return chevauchements(etat, modele).filter((p) => p.a === cle || p.b === cle);
+}
+
 export function chevauchements(etat, modele) {
   const parCle = objetsParCle(modele);
   const evs = etat.entrees.map((e) => parCle.get(e.cle)).filter((o) => o && genreDe(o) === 'evenement' && o.debut !== null);
@@ -128,7 +138,7 @@ export function suggestions(etat, modele) {
   const parDomaine = (o) => etat.interets.length === 0 || (o.domaines || []).some((d) => etat.interets.includes(d));
   return {
     exposants: modele.exposants.filter(parDomaine),
-    evenements: modele.evenements.filter((e) => !e.synthetique && parDomaine(e) && publicInclut(e.public, etat.niveau)),
+    evenements: modele.evenements.filter((e) => !e.moment && parDomaine(e) && publicInclut(e.public, etat.niveau)),
   };
 }
 
@@ -209,7 +219,7 @@ function migrer(brut) {
   etat.interets = Array.isArray(brut.interets) ? brut.interets.filter((s) => typeof s === 'string') : [];
   etat.niveau = typeof brut.niveau === 'string' ? brut.niveau : null;
   etat.questionsCochees = Array.isArray(brut.questionsCochees) ? brut.questionsCochees.filter((s) => typeof s === 'string') : [];
-  etat.bandeauVu = typeof brut.bandeauVu === 'string' ? brut.bandeauVu : '';
+  etat.bandeauFerme = typeof brut.bandeauFerme === 'string' ? brut.bandeauFerme : '';
   return etat;
 }
 
@@ -269,10 +279,17 @@ export function icalendar(evenement, infos = {}) {
 // ---------------------------------------------------------------- questions
 
 // Les questions à poser pour un type d'Exposant (ou tous), avec l'état coché.
-export function questionsPour(etat, modele, typeExposant = null) {
+// Les questions à poser. `selonMaVisite` les restreint aux types d'Exposants que
+// le Visiteur a ENREGISTRÉS : lire des questions destinées à quelqu'un d'autre
+// allonge la page sans l'aider. Sans rien d'enregistré, on retombe sur tous les
+// types présents au festival — un carnet vide vaut mieux qu'un écran vide.
+export function questionsPour(etat, modele, typeExposant = null, { selonMaVisite = false } = {}) {
   const typesPresents = new Set(modele.exposants.map((e) => e.type));
+  const parCle = objetsParCle(modele);
+  const miens = new Set(etat.entrees.map((e) => parCle.get(e.cle)).filter(Boolean).map((o) => o.type).filter(Boolean));
+  const retenus = selonMaVisite && miens.size ? miens : typesPresents;
   return modele.questions
-    .filter((q) => typesPresents.has(q.typeExposant))
+    .filter((q) => retenus.has(q.typeExposant))
     .filter((q) => !typeExposant || q.typeExposant === typeExposant)
     .map((q) => ({ ...q, cochee: etat.questionsCochees.includes(q.cle) }));
 }

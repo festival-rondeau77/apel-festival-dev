@@ -69,6 +69,27 @@ export function placerSalles(salles, rects) {
   });
 }
 
+// Le cadrage d'une Salle : assez serré pour qu'elle soit franche, assez large pour
+// que son Village reste reconnaissable autour d'elle. C'était jusqu'ici un
+// agrandissement CONSTANT de 2,2× calculé dans l'adaptateur navigateur, qui sortait
+// les bords du village du cadre et privait le Visiteur de son seul repère.
+// Géométrie pure : le module Plan connaît la disposition, l'adaptateur applique.
+const CADRAGE = { villagesVisibles: 1.35, kMin: 1.3, kMax: 2.4, poidsSalle: 2 };
+
+export function cadrageSalle(rects, placements, cleSalle) {
+  const p = placements.find((q) => q.salle.cle === cleSalle && q.x !== null);
+  if (!p) return null;
+  const r = rects.find((x) => x.zone === p.salle.zone);
+  if (!r) return { x: p.x, y: p.y, k: CADRAGE.kMax };
+  // Montrer environ 1,35 largeur de village : le village tient dans le cadre avec
+  // de la marge, donc il se reconnaît, et la salle reste grande.
+  const k = Math.min(CADRAGE.kMax, Math.max(CADRAGE.kMin, 100 / (Math.max(r.w, r.h) * CADRAGE.villagesVisibles)));
+  // Le centre penche vers la Salle sans lâcher le centre du Village.
+  const cx = (CADRAGE.poidsSalle * p.x + (r.x + r.w / 2)) / (CADRAGE.poidsSalle + 1);
+  const cy = (CADRAGE.poidsSalle * p.y + (r.y + r.h / 2)) / (CADRAGE.poidsSalle + 1);
+  return { x: Math.round(cx * 10) / 10, y: Math.round(cy * 10) / 10, k: Math.round(k * 100) / 100 };
+}
+
 export function etendue(rects, placements) {
   let maxY = 100;
   for (const r of rects) maxY = Math.max(maxY, r.y + r.h + 4);

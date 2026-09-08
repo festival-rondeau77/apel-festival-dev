@@ -18,6 +18,7 @@ const D = {
   externe: `<path ${T} d="M14.2 4.2h5.6v5.6m0-5.6L12 12"/><path ${T} d="M18 14.4v4.2a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8V7.8A1.8 1.8 0 0 1 5.4 6h4.2"/>`,
   fermer: `<path ${T} d="M6 6l12 12M18 6 6 18"/>`,
   recherche: `<circle ${T} cx="10.8" cy="10.8" r="6.6"/><path ${T} d="m20 20-4.6-4.6"/>`,
+  filtres: `<path ${T} d="M4 5.5h16l-6.2 7.3v5.4l-3.6 2v-7.4z"/>`,
   chevron: `<path ${T} d="m9.6 5.4 6.6 6.6-6.6 6.6"/>`,
   retour: `<path ${T} d="M19 12H5m0 0 6.2-6.2M5 12l6.2 6.2"/>`,
   plus: `<path ${T} d="M12 5.4v13.2M5.4 12h13.2"/>`,

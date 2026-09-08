@@ -12,9 +12,29 @@ export function h(texte) {
 }
 const attr = (v) => h(v).replace(/`/g, '&#96;');
 const url = (v) => /^(https?:|mailto:|tel:|geo:|maps:)/i.test(String(v)) ? attr(v) : '#';
-const lienExposant = (cle) => `#/exposant/${encodeURIComponent(cle)}`;
-const lienEvenement = (cle) => `#/evenement/${encodeURIComponent(cle)}`;
+// L'origine voyage dans le fragment d'URL (comme le marqueur de QR code) : elle
+// survit ainsi à un rechargement et au bouton « précédent » du navigateur. Sans
+// elle, le retour était déduit du TYPE de la fiche, si bien qu'une école ouverte
+// depuis la Salle 21 du plan renvoyait à l'onglet « Écoles ».
+const avecOrigine = (base, de) => (de ? `${base}${base.includes('?') ? '&' : '?'}de=${encodeURIComponent(de)}` : base);
+const lienExposant = (cle, de = '') => avecOrigine(`#/exposant/${encodeURIComponent(cle)}`, de);
+const lienEvenement = (cle, de = '') => avecOrigine(`#/evenement/${encodeURIComponent(cle)}`, de);
 const lienPlanSalle = (salle) => `#/plan?salle=${encodeURIComponent(salle)}`;
+
+// Une origine → où revenir, et sous quel nom. « plan:Salle 21 » ramène à la salle,
+// « visite » à Ma visite, « domaine:Santé & Soin » à la liste filtrée.
+export function retourDepuis(de, defaut) {
+  const [genre, ...reste] = String(de || '').split(':');
+  const valeur = reste.join(':');
+  if (genre === 'plan' && valeur) return { href: lienPlanSalle(valeur), libelle: valeur };
+  if (genre === 'village' && valeur) return { href: `#/plan?village=${encodeURIComponent(valeur)}`, libelle: 'Le plan' };
+  if (genre === 'plan') return { href: '#/plan', libelle: 'Le plan' };
+  if (genre === 'visite') return { href: '#/visite', libelle: 'Ma visite' };
+  if (genre === 'programme') return { href: '#/programme', libelle: 'Le programme' };
+  if (genre === 'preparer') return { href: '#/preparer', libelle: 'Préparer ma visite' };
+  if (genre === 'exposants') return { href: '#/exposants', libelle: 'Les exposants' };
+  return defaut;
+}
 
 const PLURIEL_TYPE = { 'École': 'Écoles', 'Pro': 'Pros', 'Entreprise': 'Entreprises', 'Ancien élève': 'Anciens élèves' };
 const PLURIEL_FORMAT = { 'Conférence': 'Conférences', 'Table ronde': 'Tables rondes', 'Atelier': 'Ateliers' };
@@ -71,7 +91,7 @@ function colonneHeure(ev) {
   return `<div class="rail-heure"><span class="rail-debut">${h(debut)}</span>${fin ? `<span class="rail-fin">${h(fin)}</span>` : ''}</div>`;
 }
 
-function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche = false, entree = null } = {}) {
+function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche = false, entree = null, de = '' } = {}) {
   const meta = [h(ev.format)];
   if (ev.fin !== null && ev.debut !== null) meta.push(`${ev.fin - ev.debut} min`);
   if (ev.intervenantsTexte) meta.push(h(ev.intervenantsTexte));
@@ -80,13 +100,13 @@ function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche 
   return `<li class="ligne${chevauche ? ' chevauche' : ''}${entree && entree.fait ? ' fait' : ''}">
     ${chrono ? `${colonneHeure(ev)}${pointChrono(entree)}`
     : avecHeure ? `<div class="heure">${h(minutesEnHeure(ev.debut) || '—')}</div>` : (entree ? coche(entree) : '<div class="marque"></div>')}
-    <div class="corps"><a href="${lienEvenement(ev.cle)}">${h(ev.titre)}</a>
+    <div class="corps"><a href="${lienEvenement(ev.cle, de)}">${h(ev.titre)}</a>
       <div class="meta">${salleHtml(ev.salle, ev.salleAVenir)}<span>${meta.join(', ')}</span>${pucesDomaines(ev.domaines)}${alerte}</div></div>
     ${entree ? boutonRetirer(ev.cle, ev.titre) : etoile(etat, ev, ev.titre)}
   </li>`;
 }
 
-function ligneExposant(etat, ex, { entree = null, chrono = false } = {}) {
+function ligneExposant(etat, ex, { entree = null, chrono = false, de = '' } = {}) {
   const meta = [];
   if (ex.stand) meta.push(`<span>stand ${h(ex.stand)}</span>`);
   if (ex.organisation && ex.organisation !== ex.type) meta.push(`<span class="puce">${h(ex.organisation)}</span>`);
@@ -96,7 +116,7 @@ function ligneExposant(etat, ex, { entree = null, chrono = false } = {}) {
   return `<li class="ligne${entree && entree.fait ? ' fait' : ''}">
     ${chrono ? `<div class="rail-heure"></div>${pointChrono(entree, { petit: true })}`
     : entree ? coche(entree) : `<div class="marque">${icone('exposants', 18)}</div>`}
-    <div class="corps"><a href="${lienExposant(ex.cle)}">${h(ex.nom)}</a>
+    <div class="corps"><a href="${lienExposant(ex.cle, de)}">${h(ex.nom)}</a>
       <div class="meta">${salleHtml(ex.salle, ex.salleAVenir)}${meta.join('')}${alerte}</div></div>
     ${entree ? boutonRetirer(ex.cle, ex.nom) : etoile(etat, ex, ex.nom)}
   </li>`;
@@ -114,13 +134,40 @@ function ordonner(presents, reference) {
   return reference.filter((s) => presents.has(s)).concat([...presents].filter((s) => !reference.includes(s)));
 }
 
-function filtresDomaine(nom, actif, presents, { libelleTous = 'Tous les domaines', aria = 'Filtrer par domaine' } = {}) {
-  const liste = ordonner(presents, DOMAINES);
-  if (!liste.length) return '';
-  return `<div class="filtres" role="group" aria-label="${attr(aria)}">
-    <button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="" aria-pressed="${!actif}">${h(libelleTous)}</button>
-    ${liste.map((s) => `<button class="filtre" type="button" data-action="filtre" data-filtre="${nom}" data-valeur="${attr(s)}" aria-pressed="${actif === s}">${h(nomCourt(s))}</button>`).join('')}
+// Les filtres d'un écran : une définition par rangée. La commande compacte, le
+// résumé des filtres posés et le compte de résultats sont trois vues de CE calcul,
+// écrit une fois et servi au Programme comme aux Exposants. Trois rangées empilées
+// dominaient huit rendez-vous et débordaient à droite sans que rien ne le dise.
+function rangeesActives(rangees) {
+  return rangees.filter((r) => r.actif).map((r) => ({ cle: r.cle, valeur: r.actif, libelle: r.libelle(r.actif) }));
+}
+
+function panneauFiltres(rangees, ouvert) {
+  const actifs = rangeesActives(rangees);
+  const utiles = rangees.filter((r) => r.valeurs.length > 1 || r.actif);
+  if (!utiles.length) return '';
+  return `<div class="barre-filtres">
+    <button class="filtre commande${actifs.length ? ' pose' : ''}" type="button" data-action="filtres" aria-expanded="${Boolean(ouvert)}" aria-controls="panneau-filtres">
+      ${icone('filtres', 17)}Filtres${actifs.length ? ` <span class="compte">${actifs.length}</span>` : ''}
+    </button>
+    ${actifs.map((a) => `<button class="filtre pose retirable" type="button" data-action="filtre" data-filtre="${attr(a.cle)}" data-valeur="" aria-label="Retirer le filtre ${attr(a.libelle)}">${h(a.libelle)}${icone('fermer', 15)}</button>`).join('')}
+  </div>
+  <div class="panneau-filtres" id="panneau-filtres"${ouvert ? '' : ' hidden'}>
+    ${utiles.map((r) => `<div class="filtres" role="group" aria-label="${attr(r.aria)}">
+      <span class="titre-filtre">${h(r.titre)}</span>
+      <button class="filtre" type="button" data-action="filtre" data-filtre="${attr(r.cle)}" data-valeur="" aria-pressed="${!r.actif}">${h(r.tous)}</button>
+      ${r.valeurs.map((v) => `<button class="filtre" type="button" data-action="filtre" data-filtre="${attr(r.cle)}" data-valeur="${attr(r.actif === v ? '' : v)}" aria-pressed="${r.actif === v}">${h(r.libelle(v))}</button>`).join('')}
+    </div>`).join('')}
   </div>`;
+}
+
+// Le sous-titre d'une liste : ce qu'on voit d'abord, le total ensuite. Sans filtre,
+// le total redevient l'information principale — c'est lui qui donne la mesure du
+// festival ; avec un filtre, c'est le nombre de résultats qui explique l'écran.
+export function sousTitreListe({ affiches, total, phraseTotale, filtre }) {
+  if (!total) return '';
+  if (!filtre) return phraseTotale;
+  return `${affiches} résultat${affiches > 1 ? 's' : ''} · ${total} au total`;
 }
 
 export function entete(titre, sous = '', retour = null) {
@@ -171,9 +218,13 @@ export function ecranAccueil(etat) {
     ${bouton('#/plan', 'plan', 'Plan du festival', { classe: 'principal', ton: 'explorer' })}
     ${bouton('#/exposants', 'exposants', 'Les exposants', { ton: 'echanger' })}
     ${bouton('#/programme', 'programme', 'Le programme', { ton: 'informer' })}
-    ${bouton('#/visite', 'visite', 'Ma visite', { ton: 'construire', extra: nb ? `<span class="compte">${nb} élément${nb > 1 ? 's' : ''}</span>` : '' })}
+  </nav>
+  <!-- « Préparer ma visite » et « Besoin d'aide ? » ne sont dans aucune barre de
+       navigation : l'accueil est le seul endroit où on peut les trouver. -->
+  <nav class="grille-boutons secondaires" aria-label="Préparer et se repérer">
     ${bouton('#/preparer', 'preparer', 'Préparer ma visite', { ton: 'construire' })}
     ${bouton('#/aide', 'aide', "Besoin d'aide ?")}
+    ${nb ? bouton('#/visite', 'visite', 'Ma visite', { ton: 'construire', extra: `<span class="compte">${nb} élément${nb > 1 ? 's' : ''}</span>` }) : ''}
   </nav>
   ${prochain ? `<section class="prochain" aria-labelledby="prochain-titre">
     <p class="etiquette">${prochain.enCours ? 'En ce moment' : (maintenant.jourJ ? 'Prochain événement' : 'Le festival commence par')}</p>
@@ -194,7 +245,7 @@ export function prochainEvenement(modele, maintenant) {
   if (!evs.length) return null;
   if (!maintenant || !maintenant.jourJ) return { ...evs[0], enCours: false };
   const m = maintenant.minutes;
-  const enCours = evs.find((e) => e.debut <= m && finDe(e) > m && !e.synthetique);
+  const enCours = evs.find((e) => e.debut <= m && finDe(e) > m && !e.moment);
   if (enCours) return { ...enCours, enCours: true };
   const suivant = evs.find((e) => e.debut > m);
   return suivant ? { ...suivant, enCours: false } : null;
@@ -204,7 +255,7 @@ export function prochainEvenement(modele, maintenant) {
 
 export function filtrerEvenements(modele, ui) {
   return modele.evenements.filter((e) => {
-    if (ui.filtreDomaineProgramme && !e.domaines.includes(ui.filtreDomaineProgramme) && !e.synthetique) return false;
+    if (ui.filtreDomaineProgramme && !e.domaines.includes(ui.filtreDomaineProgramme) && !e.moment) return false;
     if (ui.filtreFormat && e.format !== ui.filtreFormat) return false;
     if (ui.filtrePublic && !publicInclut(e.public, ui.filtrePublic)) return false;
     if (ui.rechercheProgramme) {
@@ -218,21 +269,28 @@ export function filtrerEvenements(modele, ui) {
 export function ecranProgramme(etat) {
   const { modele, ui } = etat;
   const liste = filtrerEvenements(modele, ui);
-  const domaines = new Set(modele.evenements.flatMap((e) => e.domaines).filter(Boolean));
+  const domaines = ordonner(new Set(modele.evenements.flatMap((e) => e.domaines).filter(Boolean)), DOMAINES);
   const formats = FORMATS.filter((f) => modele.evenements.some((e) => e.format === f));
-  const publics = [['', 'Tout public'], ['3e', 'Collégiens'], ['Terminale', 'Lycéens'], ['étudiant', 'Étudiants'], ['parent', 'Parents']];
-  const nb = liste.filter((e) => !e.synthetique).length;
-  return `${entete('Le programme', nb ? `${nb} rendez-vous dans la matinée` : '')}
+  const publics = [['3e', 'Collégiens'], ['Terminale', 'Lycéens'], ['étudiant', 'Étudiants'], ['parent', 'Parents']];
+  const rangees = [
+    { cle: 'filtreDomaineProgramme', titre: 'Domaine', tous: 'Tous', aria: 'Filtrer par domaine',
+      valeurs: domaines, actif: ui.filtreDomaineProgramme, libelle: (v) => nomCourt(v) },
+    { cle: 'filtreFormat', titre: 'Format', tous: 'Tous', aria: 'Filtrer par format',
+      valeurs: formats, actif: ui.filtreFormat, libelle: (v) => PLURIEL_FORMAT[v] || v },
+    { cle: 'filtrePublic', titre: 'Public', tous: 'Tout public', aria: 'Filtrer par public',
+      valeurs: publics.map(([v]) => v), actif: ui.filtrePublic,
+      libelle: (v) => (publics.find(([x]) => x === v) || [v, v])[1] },
+  ];
+  // Le compte annoncé doit égaler le nombre de lignes sous les yeux. L'ouverture
+  // est une ligne, mais pas un rendez-vous : on la nomme au lieu de la taire.
+  const rendezVous = liste.filter((e) => !e.moment).length;
+  const ouverture = liste.length - rendezVous;
+  const phraseTotale = `${rendezVous} rendez-vous${rendezVous > 1 ? '' : ''}${ouverture ? ' et l’ouverture' : ''}`;
+  const filtre = Boolean(ui.filtreDomaineProgramme || ui.filtreFormat || ui.filtrePublic || ui.rechercheProgramme);
+  return `${entete('Le programme', sousTitreListe({ affiches: liste.length, total: modele.evenements.length, phraseTotale, filtre }))}
   ${champRecherche('rechercheProgramme', ui.rechercheProgramme, 'Un domaine, une école, un intervenant')}
-  ${filtresDomaine('filtreDomaineProgramme', ui.filtreDomaineProgramme, domaines)}
-  ${formats.length > 1 || ui.filtreFormat ? `<div class="filtres" role="group" aria-label="Filtrer par format">
-    <button class="filtre" type="button" data-action="filtre" data-filtre="filtreFormat" data-valeur="" aria-pressed="${!ui.filtreFormat}">Tous les formats</button>
-    ${formats.map((f) => `<button class="filtre" type="button" data-action="filtre" data-filtre="filtreFormat" data-valeur="${attr(ui.filtreFormat === f ? '' : f)}" aria-pressed="${ui.filtreFormat === f}">${h(PLURIEL_FORMAT[f] || f)}</button>`).join('')}
-  </div>` : ''}
-  <div class="filtres" role="group" aria-label="Filtrer par public">
-    ${publics.map(([v, l]) => `<button class="filtre" type="button" data-action="filtre" data-filtre="filtrePublic" data-valeur="${attr(v)}" aria-pressed="${ui.filtrePublic === v}">${h(l)}</button>`).join('')}
-  </div>
-  ${liste.length ? `<ul class="liste">${liste.map((e) => ligneEvenement(etat, e)).join('')}</ul>`
+  ${panneauFiltres(rangees, ui.filtresOuverts)}
+  ${liste.length ? `<ul class="liste">${liste.map((e) => ligneEvenement(etat, e, { de: 'programme' })).join('')}</ul>`
     : `<p class="vide">${modele.evenements.length ? 'Aucun événement ne correspond. Élargissez la recherche ou les filtres.' : 'Le programme arrive bientôt : les événements confirmés s\'afficheront ici.'}</p>`}
   ${modele.infos.restauration ? `<p class="info">${icone('cafe', 19)}${h(modele.infos.restauration)}</p>` : ''}`;
 }
@@ -242,14 +300,14 @@ export function ecranProgramme(etat) {
 export function ecranEvenement(etat, cle) {
   const { modele } = etat;
   const ev = modele.evenements.find((e) => e.cle === cle);
-  if (!ev) return `${entete('Événement introuvable', '', { href: '#/programme', libelle: 'Le programme' })}
+  if (!ev) return `${entete('Événement introuvable', '', retourDepuis(etat.route.params.de, { href: '#/programme', libelle: 'Le programme' }))}
     <p class="vide">Cet événement n'est plus au programme, ou le lien est incomplet.</p>
     <div class="boutons"><a class="bouton" href="#/programme">Voir le programme</a></div>`;
   const intervenants = ev.intervenants.map((c) => modele.exposants.find((x) => x.cle === c)).filter(Boolean);
   const dans = visiteContient(etat.visite, ev.cle);
   const entree = etat.visite.entrees.find((e) => e.cle === ev.cle);
   return `<article class="fiche">
-    ${entete(ev.titre, '', { href: '#/programme', libelle: 'Le programme' })}
+    ${entete(ev.titre, '', retourDepuis(etat.route.params.de, { href: '#/programme', libelle: 'Le programme' }))}
     <div class="puces"><span class="puce">${h(ev.format)}</span>${ev.domaines.map((d) => `<span class="puce neutre">${h(d)}</span>`).join('')}${ev.public.length ? `<span class="puce neutre">${h(ev.public.join(', '))}</span>` : ''}</div>
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>Changement : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
@@ -260,11 +318,11 @@ export function ecranEvenement(etat, cle) {
     ${ev.description ? `<p class="description">${h(ev.description)}</p>` : ''}
     <div class="boutons">
       <button class="bouton${dans ? ' orange' : ''}" type="button" data-action="etoile" data-cle="${attr(ev.cle)}" aria-pressed="${dans}">${icone('visite', 19)}${dans ? 'Dans ma visite' : 'Ajouter à ma visite'}</button>
-      ${ev.debut !== null && !ev.synthetique ? `<button class="bouton secondaire" type="button" data-action="calendrier" data-cle="${attr(ev.cle)}">${icone('calendrier', 19)}Ajouter au calendrier</button>` : ''}
+      ${ev.debut !== null && !ev.moment ? `<button class="bouton secondaire" type="button" data-action="calendrier" data-cle="${attr(ev.cle)}">${icone('calendrier', 19)}Ajouter au calendrier</button>` : ''}
       ${ev.salle && !ev.salleAVenir ? `<a class="bouton secondaire" href="${lienPlanSalle(ev.salle)}">${icone('plan', 19)}Voir la salle sur le plan</a>` : ''}
     </div>
     ${intervenants.length ? `<h2 class="titre-section">Les intervenants</h2><ul class="liste carte">${intervenants.map((x) => ligneExposant(etat, x)).join('')}</ul>` : ''}
-    ${!ev.synthetique ? `<p class="rappel">${icone('cloche', 17)}Rappel 10 min avant, si l'appli est ouverte</p>` : ''}
+    ${!ev.moment ? `<p class="rappel">${icone('cloche', 17)}Rappel 10 min avant, si l'appli est ouverte</p>` : ''}
   </article>`;
 }
 
@@ -318,26 +376,33 @@ export function ecranExposants(etat) {
   const liste = filtrerExposants(modele, ui, type);
   // Les Domaines proposés viennent de TOUS les Exposants, pas du seul onglet :
   // autrement le filtre actif disparaît de l'écran et devient impossible à annuler.
-  const domaines = new Set(modele.exposants.flatMap((e) => e.domaines).filter(Boolean));
+  const domaines = ordonner(new Set(modele.exposants.flatMap((e) => e.domaines).filter(Boolean)), DOMAINES);
   const total = modele.exposants.length;
+  const villagesOccupes = modele.zones.filter((z) => !z.fonction && z.salles.length).length;
   const numeroDe = (nom) => { const z = modele.zones.find((x) => x.nom === nom); return z ? z.numero : null; };
+  const rangees = [
+    { cle: 'filtreDomaineExposants', titre: 'Domaine', tous: 'Tous', aria: 'Filtrer par domaine',
+      valeurs: domaines, actif: ui.filtreDomaineExposants, libelle: (v) => nomCourt(v) },
+  ];
+  const filtre = Boolean(ui.filtreDomaineExposants || ui.rechercheExposants);
+  const phraseTotale = `${total} à rencontrer${villagesOccupes ? `, dans ${villagesOccupes} village${villagesOccupes > 1 ? 's' : ''}` : ''}`;
   // Groupé par Village : c'est la question du Visiteur (« où vais-je trouver la
   // santé ? »), et c'est ce que le plan lui montrera. Une liste alphabétique de
   // cent trente noms ne répond à aucune question.
   const groupes = grouperParVillage(liste);
-  return `${entete('Les exposants', total ? `${total} à rencontrer, dans ${modele.zones.filter((z) => !z.fonction && z.salles.length).length} villages` : '')}
+  return `${entete('Les exposants', sousTitreListe({ affiches: liste.length, total, phraseTotale, filtre }))}
   ${types.length > 1 ? `<div class="onglets" role="tablist" aria-label="Type d'exposant">
-    ${types.map((t) => { const n = ui.filtreDomaineExposants ? compte(t) : null; return `<button class="onglet" type="button" role="tab" id="onglet-${attr(normaliser(t))}" aria-selected="${t === type}" data-action="onglet" data-valeur="${attr(t)}">${h(PLURIEL_TYPE[t])}${n === null ? '' : ` <span class="compte">${n}</span>`}</button>`; }).join('')}
+    ${types.map((t) => { const n = filtre ? compte(t) : null; return `<button class="onglet" type="button" role="tab" id="onglet-${attr(normaliser(t))}" aria-selected="${t === type}" data-action="onglet" data-valeur="${attr(t)}">${h(PLURIEL_TYPE[t])}${n === null ? '' : ` <span class="compte">${n}</span>`}</button>`; }).join('')}
   </div>` : ''}
   ${champRecherche('rechercheExposants', ui.rechercheExposants, type === 'Pro' ? 'Un métier, un nom, une entreprise' : 'Une école, une formation, une ville')}
-  ${filtresDomaine('filtreDomaineExposants', ui.filtreDomaineExposants, domaines)}
+  ${panneauFiltres(rangees, ui.filtresOuverts)}
   <div role="tabpanel" ${type ? `aria-labelledby="onglet-${attr(normaliser(type))}"` : ''}>
   ${groupes.length ? groupes.map(({ village, exposants }) => {
     const num = village ? numeroDe(village) : null;
     return `<h2 class="titre-village">${village
       ? `<a href="#/plan?village=${encodeURIComponent(num ?? village)}">${num !== null && num !== undefined ? `<span class="num">${h(num)}</span>` : ''}${h(village)}</a>`
       : 'Village à venir'}<span class="compte">${exposants.length}</span></h2>
-    <ul class="liste">${exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>`;
+    <ul class="liste">${exposants.map((e) => ligneExposant(etat, e, { de: 'exposants' })).join('')}</ul>`;
   }).join('')
     : `<p class="vide">${modele.exposants.length ? 'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.' : 'La liste des exposants arrive bientôt.'}</p>`}
   </div>`;
@@ -348,7 +413,7 @@ export function ecranExposants(etat) {
 export function ecranExposant(etat, cle, { qr = false } = {}) {
   const { modele } = etat;
   const ex = modele.exposants.find((e) => e.cle === cle);
-  if (!ex) return `${entete('Exposant introuvable', '', { href: '#/exposants', libelle: 'Les exposants' })}
+  if (!ex) return `${entete('Exposant introuvable', '', retourDepuis(etat.route.params.de, { href: '#/exposants', libelle: 'Les exposants' }))}
     <p class="vide">Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.</p>
     <div class="boutons"><a class="bouton" href="#/exposants">Voir les exposants</a></div>`;
   const dans = visiteContient(etat.visite, ex.cle);
@@ -360,7 +425,7 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
   const questionsType = questionsPour(etat.visite, modele, ex.type);
   return `<article class="fiche">
     ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>Vous venez de scanner le QR code du stand${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, stand ${h(ex.stand)}` : ''}` : ''}</span></p>` : ''}
-    ${entete(ex.nom, '', { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] || 'Les exposants' })}
+    ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] || 'Les exposants' }))}
     <div class="puces"><span class="puce">${h(ex.type)}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(ex.organisation)}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(d)}</span>`).join('')}</div>
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>Changement : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
@@ -465,13 +530,25 @@ export function ecranPlan(etat) {
 
   const contenu = zoneOuverte ? contenuZone(modele, zoneOuverte) : null;
   const contenuDeLaSalle = !zoneOuverte && salleAllumeeObj ? contenuSalle(modele, salleAllumeeObj) : null;
-  const guidage = resultat ? `<section class="guidage" aria-live="polite"><h2>${h(resultat.libelle)}</h2>
+  // Le nom de la Salle allumée n'est plus écrit qu'UNE fois — il l'était trois :
+  // dans le sous-titre, dans le guidage, puis dans le panneau. C'est le panneau
+  // qui parle, et il passe AVANT la carte, pour être lu sans faire défiler.
+  const guidage = resultat && !(resultat.genre === 'salle' && salleAllumeeObj)
+    ? `<section class="guidage" aria-live="polite"><h2>${h(resultat.libelle)}</h2>
       <p><span class="ou">${h(resultat.nomSalle || 'salle à venir')}</span> — ${h(resultat.phrase)}</p>
       <div class="boutons">${resultat.exposant ? `<a class="bouton secondaire" href="${lienExposant(resultat.exposant.cle)}">Voir la fiche</a>${etoile(etat, resultat.exposant, resultat.exposant.nom)}` : ''}${resultat.evenement ? `<a class="bouton secondaire" href="${lienEvenement(resultat.evenement.cle)}">Voir l'événement</a>` : ''}</div>
     </section>`
-    : salleAllumeeObj ? `<section class="guidage" aria-live="polite"><h2>${h(salleAllumeeObj.nom)}</h2><p>${h(phraseGuidage(salleAllumeeObj))}</p></section>`
     : salleDemandee ? `<section class="guidage" aria-live="polite"><h2>${h(salleDemandee)}</h2><p>${h(phraseGuidage(null, salleDemandee))}</p></section>`
-    : ui.recherchePlan ? '<p class="vide">Rien trouvé. Essayez le numéro de la salle ou le nom de l\'école.</p>' : '';
+    : ui.recherchePlan && !resultat ? '<p class="vide">Rien trouvé. Essayez le numéro de la salle ou le nom de l\'école.</p>' : '';
+
+  const panneauSalle = contenuDeLaSalle ? `<section class="panneau-zone salle" aria-live="polite">
+    <h2>${h(salleAllumeeObj.nom)}</h2>
+    <p class="salles-de-la-zone">${h(phraseGuidage(salleAllumeeObj))}</p>
+    <p class="salles-de-la-zone">${contenuDeLaSalle.exposants.length ? `${contenuDeLaSalle.exposants.length} exposant${contenuDeLaSalle.exposants.length > 1 ? 's' : ''} ici` : "Aucun exposant dans cette salle pour l'instant"}</p>
+    ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">Voir tout le village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}</button></div>` : ''}
+    ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e, { de: `plan:${salleAllumeeObj.nom}` })).join('')}</ul>` : ''}
+    ${contenuDeLaSalle.evenements.length ? `<h3 class="titre-section">Événements dans cette salle</h3><ul class="liste">${contenuDeLaSalle.evenements.map((e) => ligneEvenement(etat, e, { de: `plan:${salleAllumeeObj.nom}` })).join('')}</ul>` : ''}
+  </section>` : '';
 
   const legende = `<div class="legende" aria-hidden="true">${rects.filter((r) => r.zone.numero !== null).map((r) => `<span style="--c:${COULEUR_ZONE(r.zone.numero)}">${h(r.zone.numero)} ${h(r.zone.nom)}</span>`).join('')}</div>`;
 
@@ -488,9 +565,13 @@ export function ecranPlan(etat) {
   </details>`;
 
   const villagesDuPlan = rects.filter((r) => r.zone.numero !== null).map((r) => `${r.zone.numero} ${r.zone.nom}`).join(', ');
-  return `${entete('Plan du festival', salleAllumeeObj ? h(salleAllumeeObj.nom) : 'Touchez un village, ou cherchez une salle ou une école')}
+  return `${entete('Plan du festival', 'Touchez un village, ou cherchez une salle ou une école')}
   ${champRecherche('recherchePlan', ui.recherchePlan, 'Une salle, une école, un événement')}
   ${onglets}
+  <div class="plan-cote-a-cote">
+  <div class="plan-carte">
+  ${guidage}
+  ${panneauSalle}
   <div class="plan-viewport" id="plan-viewport">
     <svg viewBox="0 0 ${dim.largeur} ${dim.hauteur}" role="img" aria-labelledby="plan-titre plan-desc" preserveAspectRatio="xMidYMid meet">
       <title id="plan-titre">Plan stylisé de l'Ensemble Scolaire Maurice Rondeau — ${h(etage)}</title>
@@ -509,21 +590,15 @@ export function ecranPlan(etat) {
     </div>
   </div>
   ${legende}
-  ${guidage}
-  ${contenuDeLaSalle ? `<section class="panneau-zone" aria-live="polite">
-    <h2>${h(salleAllumeeObj.nom)}</h2>
-    <p class="salles-de-la-zone">${contenuDeLaSalle.exposants.length ? `${contenuDeLaSalle.exposants.length} exposant${contenuDeLaSalle.exposants.length > 1 ? 's' : ''} dans cette salle` : "Aucun exposant dans cette salle pour l'instant"}${salleAllumeeObj.zone ? `, village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}` : ''}, ${h(salleAllumeeObj.etage.toLowerCase())}</p>
-    ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>` : ''}
-    ${contenuDeLaSalle.evenements.length ? `<h3 class="titre-section">Événements dans cette salle</h3><ul class="liste">${contenuDeLaSalle.evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
-    ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">Voir tout le village ${h(salleAllumeeObj.zone.numero ?? '')} ${h(salleAllumeeObj.zone.nom)}</button></div>` : ''}
-  </section>` : ''}
-  ${contenu ? `<section class="panneau-zone" aria-live="polite">
+  </div>
+  ${contenu ? `<section class="panneau-zone village" aria-live="polite">
     <h2><span class="num">${h(zoneOuverte.numero ?? '')}</span>${h(zoneOuverte.nom)}</h2>
     ${contenu.salles.length ? `<p class="salles-de-la-zone">Salles : ${contenu.salles.map((s) => `<a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a>`).join(', ')} — ${h(etagesDeZone(zoneOuverte).join(' et ').toLowerCase())}</p>` : '<p class="salles-de-la-zone">Salles à venir.</p>'}
-    ${contenu.exposants.length ? `<h3 class="titre-section">Exposants</h3><ul class="liste">${contenu.exposants.map((e) => ligneExposant(etat, e)).join('')}</ul>` : ''}
-    ${contenu.evenements.length ? `<h3 class="titre-section">Événements</h3><ul class="liste">${contenu.evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
+    ${contenu.exposants.length ? `<h3 class="titre-section">Exposants</h3><ul class="liste">${contenu.exposants.map((e) => ligneExposant(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
+    ${contenu.evenements.length ? `<h3 class="titre-section">Événements</h3><ul class="liste">${contenu.evenements.map((e) => ligneEvenement(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
     ${!contenu.exposants.length && !contenu.evenements.length ? '<p class="vide">Rien n\'est encore affecté à ce village.</p>' : ''}
   </section>` : ''}
+  </div>
   ${equivalent}`;
 }
 
@@ -532,18 +607,30 @@ export function ecranPlan(etat) {
 export function ecranVisite(etat) {
   const { modele } = etat;
   const lignes = matinee(etat.visite, modele);
-  const nbEv = lignes.filter((l) => l.genre === 'evenement').length;
-  const nbSt = lignes.length - nbEv;
+  // Deux natures d'engagement, deux groupes (ADR-0010) : un stand glissé entre
+  // deux conférences se lisait comme une conférence de plus. L'ordre calculé par
+  // matinee() survit — il devient l'ordre à l'intérieur du groupe des stands.
+  const rendezVous = lignes.filter((l) => l.genre === 'evenement');
+  const stands = lignes.filter((l) => l.genre !== 'evenement');
   const chev = lignes.filter((l) => l.chevauche);
   const questions = questionsPour(etat.visite, modele);
-  const sous = lignes.length ? `${nbEv} événement${nbEv > 1 ? 's' : ''} et ${nbSt} stand${nbSt > 1 ? 's' : ''}` : 'Votre carnet de visite';
-  return `${entete('Ma visite', h(sous))}
-  ${lignes.length ? `${chev.length ? `<p class="avert">${icone('alerte', 19)}<span>${h(minutesEnHeure(chev[0].objet.debut))} : deux événements en même temps. Gardez-en un.</span></p>` : ''}
-  <h2 class="titre-section">Ma matinée</h2>
-  <ul class="liste carte chrono">${lignes.map((l) => {
+  // Un groupe vide ne se compte pas : « 1 événement et 0 stand » comptait du vide.
+  const parts = [];
+  if (rendezVous.length) parts.push(`${rendezVous.length} rendez-vous`);
+  if (stands.length) parts.push(`${stands.length} stand${stands.length > 1 ? 's' : ''}`);
+  const sous = parts.length ? parts.join(' et ') : 'Votre carnet de visite';
+  const ligne = (l) => {
     if (!l.objet) return `<li class="ligne"><div class="rail-heure"></div>${pointChrono(l.entree, { petit: true })}<div class="corps"><span>${h(l.entree.cle)}</span><div class="meta"><span class="puce alerte">n'est plus au programme</span></div></div>${boutonRetirer(l.entree.cle, l.entree.cle)}</li>`;
-    return l.genre === 'evenement' ? ligneEvenement(etat, l.objet, { chrono: true, chevauche: l.chevauche, entree: l.entree }) : ligneExposant(etat, l.objet, { chrono: true, entree: l.entree });
-  }).join('')}</ul>`
+    return l.genre === 'evenement'
+      ? ligneEvenement(etat, l.objet, { chrono: true, chevauche: l.chevauche, entree: l.entree, de: 'visite' })
+      : ligneExposant(etat, l.objet, { chrono: true, entree: l.entree, de: 'visite' });
+  };
+  return `${entete('Ma visite', h(sous))}
+  ${lignes.length ? `${chev.length ? `<p class="avert">${icone('alerte', 19)}<span>${h(minutesEnHeure(chev[0].objet ? chev[0].objet.debut : null))} : deux événements en même temps. Gardez-en un.</span></p>` : ''}
+  ${rendezVous.length ? `<h2 class="titre-section">Rendez-vous à heure fixe</h2>
+  <ul class="liste carte chrono">${rendezVous.map(ligne).join('')}</ul>` : ''}
+  ${stands.length ? `<h2 class="titre-section">Stands à visiter quand j'ai un créneau</h2>
+  <ul class="liste carte chrono">${stands.map(ligne).join('')}</ul>` : ''}`
     : `<p class="vide">Rien pour l'instant. Touchez l'étoile sur un événement ou un exposant pour construire votre matinée.</p>
   <div class="boutons"><a class="bouton" href="#/programme">${icone('programme', 19)}Le programme</a><a class="bouton secondaire" href="#/exposants">${icone('exposants', 19)}Les exposants</a></div>`}
   <div class="boutons">
@@ -556,14 +643,20 @@ export function ecranVisite(etat) {
 
 // ---------------------------------------------------------------- préparer ma visite
 
+// Quatre étapes courtes plutôt qu'une page interminable. L'étape est un état
+// d'interface et non une route : le parcours se fait d'une traite, et quatre
+// entrées d'historique pour un aller simple ne rendraient service à personne.
+const ETAPES_PREPARER = ['Me situer', 'Ma sélection', 'Mes questions', 'Ma visite'];
+const MAX_SUGGESTIONS = 12;
+
 export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions = null } = {}) {
   const { modele, visite } = etat;
   const domainesPresents = new Set(modele.exposants.flatMap((e) => e.domaines).concat(modele.evenements.flatMap((e) => e.domaines)).filter(Boolean));
   const s = suggestions(visite, modele);
   const types = typesPresents(modele);
-  const questions = questionsPour(visite, modele, typeQuestions);
+  const tout = etat.ui.suggestionsOuvertes;
+  const questions = questionsPour(visite, modele, typeQuestions, { selonMaVisite: !seulementQuestions });
   const groupes = types.filter((t) => questions.some((q) => q.typeExposant === t));
-  const nbTexte = `${s.exposants.length} exposant${s.exposants.length > 1 ? 's' : ''} et ${s.evenements.length} événement${s.evenements.length > 1 ? 's' : ''}`;
   const article = (t) => (t === 'École' || t === 'Entreprise' ? 'une' : 'un');
   const blocQuestions = `${groupes.map((t) => `<h2 class="titre-section">Questions à poser à ${article(t)} ${h(t.toLowerCase())}</h2>
     <div class="carte">${questions.filter((q) => q.typeExposant === t).map((q) => `<div class="question${q.cochee ? ' cochee' : ''}">
@@ -575,18 +668,44 @@ export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions 
     return `${entete('Mes questions', typeQuestions ? `Pour ${article(typeQuestions)} ${h(typeQuestions.toLowerCase())}` : 'À avoir sous les yeux devant le stand', { href: '#/visite', libelle: 'Ma visite' })}
       ${typeQuestions ? '<div class="boutons"><a class="bouton secondaire" href="#/questions">Toutes les questions</a></div>' : ''}${blocQuestions}`;
   }
-  return `${entete('Préparer ma visite', 'Avant le festival, depuis la maison')}
-  <h2 class="titre-section">Ce qui m'intéresse</h2>
-  <div class="choix" role="group" aria-label="Centres d'intérêt">${ordonner(domainesPresents, DOMAINES).map((x) => `<button class="filtre" type="button" data-action="interet" data-valeur="${attr(x)}" aria-pressed="${visite.interets.includes(x)}">${h(x)}</button>`).join('')}</div>
-  <h2 class="titre-section">Je suis</h2>
-  <div class="choix" role="group" aria-label="Niveau">${NIVEAUX.map((n) => `<button class="filtre" type="button" data-action="niveau" data-valeur="${attr(n)}" aria-pressed="${visite.niveau === n}">${h(n)}</button>`).join('')}</div>
-  <div class="boutons"><button class="bouton large" type="button" data-action="suggestions" aria-expanded="${etat.ui.suggestionsOuvertes}">Voir les ${h(nbTexte)} pour moi</button></div>
-  ${etat.ui.suggestionsOuvertes ? `<section aria-live="polite">
-    ${types.map((t) => { const l = s.exposants.filter((e) => e.type === t); return l.length ? `<h2 class="titre-section">${h(PLURIEL_TYPE[t])}</h2><ul class="liste carte">${l.map((e) => ligneExposant(etat, e)).join('')}</ul>` : ''; }).join('')}
-    ${s.evenements.length ? `<h2 class="titre-section">Événements</h2><ul class="liste carte">${s.evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
-    ${!s.exposants.length && !s.evenements.length ? '<p class="vide">Rien ne correspond encore. Élargissez vos centres d\'intérêt.</p>' : ''}
-  </section>` : ''}
-  ${blocQuestions}`;
+
+  const etape = Math.min(Math.max(Number(etat.ui.etapePreparer) || 0, 0), ETAPES_PREPARER.length - 1);
+  const fil = `<ol class="etapes" aria-label="Étapes de la préparation">
+    ${ETAPES_PREPARER.map((nom, i) => `<li${i === etape ? ' aria-current="step"' : ''}><button type="button" data-action="etape" data-valeur="${i}"><span class="num">${i + 1}</span>${h(nom)}</button></li>`).join('')}
+  </ol>`;
+  const boutons = (precedent, suivant) => `<div class="boutons nav-etapes">
+    ${precedent ? `<button class="bouton secondaire" type="button" data-action="etape" data-valeur="${etape - 1}">${icone('retour', 18)}${h(ETAPES_PREPARER[etape - 1])}</button>` : ''}
+    ${suivant ? `<button class="bouton" type="button" data-action="etape" data-valeur="${etape + 1}">${h(ETAPES_PREPARER[etape + 1])}${icone('chevron', 18)}</button>` : ''}
+  </div>`;
+
+  const listeSuggestions = (liste, rendre) => (tout ? liste : liste.slice(0, MAX_SUGGESTIONS)).map(rendre).join('');
+  const trop = s.exposants.length + s.evenements.length > MAX_SUGGESTIONS;
+
+  const corps = [
+    // 1. Me situer
+    `<h2 class="titre-section">Je suis</h2>
+    <div class="choix" role="group" aria-label="Niveau">${NIVEAUX.map((n) => `<button class="filtre" type="button" data-action="niveau" data-valeur="${attr(n)}" aria-pressed="${visite.niveau === n}">${h(n)}</button>`).join('')}</div>
+    <h2 class="titre-section">Ce qui m'intéresse</h2>
+    <div class="choix" role="group" aria-label="Centres d'intérêt">${ordonner(domainesPresents, DOMAINES).map((x) => `<button class="filtre" type="button" data-action="interet" data-valeur="${attr(x)}" aria-pressed="${visite.interets.includes(x)}">${h(x)}</button>`).join('')}</div>`,
+    // 2. Ma sélection
+    `${s.exposants.length || s.evenements.length ? `<p class="sous-etape">${s.exposants.length} exposant${s.exposants.length > 1 ? 's' : ''} et ${s.evenements.length} événement${s.evenements.length > 1 ? 's' : ''} correspondent à ce que vous avez dit.</p>
+    ${types.map((t) => { const l = s.exposants.filter((e) => e.type === t); return l.length ? `<h2 class="titre-section">${h(PLURIEL_TYPE[t])}</h2><ul class="liste carte">${listeSuggestions(l, (e) => ligneExposant(etat, e, { de: 'preparer' }))}</ul>` : ''; }).join('')}
+    ${s.evenements.length ? `<h2 class="titre-section">Événements</h2><ul class="liste carte">${listeSuggestions(s.evenements, (e) => ligneEvenement(etat, e, { de: 'preparer' }))}</ul>` : ''}
+    ${trop ? `<div class="boutons"><button class="bouton secondaire large" type="button" data-action="suggestions" aria-expanded="${Boolean(tout)}">${tout ? 'Revenir à une sélection courte' : 'Tout voir'}</button></div>` : ''}`
+      : '<p class="vide">Rien ne correspond encore. Revenez à l\'étape précédente et élargissez vos centres d\'intérêt.</p>'}`,
+    // 3. Mes questions
+    `${blocQuestions}
+    <div class="boutons"><a class="bouton secondaire large" href="#/questions">Toutes les questions</a></div>`,
+    // 4. Ma visite
+    `<p class="sous-etape">Votre carnet est prêt. Le jour du festival, gardez-le ouvert : il vous dit quoi faire et quand.</p>
+    <div class="boutons"><a class="bouton large" href="#/visite">${icone('visite', 19)}Ouvrir ma visite</a></div>
+    <div class="boutons"><a class="bouton secondaire large" href="#/plan">${icone('plan', 19)}Voir le plan</a><a class="bouton secondaire large" href="#/aide">${icone('info', 19)}Besoin d'aide ?</a></div>`,
+  ][etape];
+
+  return `${entete('Préparer ma visite', `Étape ${etape + 1} sur ${ETAPES_PREPARER.length} · ${ETAPES_PREPARER[etape]}`)}
+  ${fil}
+  ${corps}
+  ${boutons(etape > 0, etape < ETAPES_PREPARER.length - 1)}`;
 }
 
 // ---------------------------------------------------------------- besoin d'aide ?
@@ -606,7 +725,7 @@ export function ecranAide(etat) {
     i.contact_email ? `<a href="mailto:${attr(i.contact_email)}">${h(i.contact_email)}</a>` : '',
     i.contact_tel ? `<a href="tel:${attr(i.contact_tel.replace(/\s/g, ''))}">${h(i.contact_tel)}</a>` : '',
   ].filter(Boolean).join(' · ');
-  return `${entete("Besoin d'aide ?", h(adresse))}
+  return `${entete("Besoin d'aide ?", h(i.lieu || ''))}
   <section class="carte">
     ${blocLien('info', "Où est l'accueil ?", salleAccueil ? phraseGuidage(salleAccueil) : (i.entree || "À l'entrée du lycée"), '#/plan?salle=Accueil')}
     ${blocLien('toilettes', 'Où sont les toilettes ?', salleWc ? phraseGuidage(salleWc) : "Près de l'accueil", '#/plan?salle=Toilettes')}

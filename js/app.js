@@ -6,8 +6,8 @@ import * as Visite from './visite.js';
 import { creerStats } from './stats.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
-import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, calculerPlan, h as echapper } from './rendu.js';
-import { rechercherSurPlan } from './plan.js';
+import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, calculerPlan, etageAffiche, h as echapper } from './rendu.js';
+import { rechercherSurPlan, cadrageSalle } from './plan.js';
 
 const journal = (...a) => { if (location.hostname === 'localhost' || location.search.includes('debug')) console.info('[festival]', ...a); };
 const stockage = (() => { try { localStorage.setItem('festival.test', '1'); localStorage.removeItem('festival.test'); return localStorage; } catch { return Visite.stockageMemoire(); } })();
@@ -23,6 +23,7 @@ const etat = {
     rechercheProgramme: '', filtreDomaineProgramme: '', filtreFormat: '', filtrePublic: '',
     rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
     recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, suggestionsOuvertes: false,
+    filtresOuverts: false, etapePreparer: 0, bandeauFerme: '',
   },
   reseau: { enErreur: false, refus: null },
   maintenant: { jourJ: false, minutes: 0 },
@@ -82,8 +83,7 @@ function rendre({ conserver = false } = {}) {
   el.nav.innerHTML = navigation(etat);
   el.pied.innerHTML = piedDePage(etat);
   document.title = titreDocument(etat);
-  el.bandeau.textContent = etat.bandeau || '';
-  el.bandeau.hidden = !etat.bandeau;
+  peindreBandeau();
   if (champActif) {
     const champ = el.main.querySelector(`[data-champ="${champActif}"]`);
     if (champ) { champ.focus({ preventScroll: true }); try { champ.setSelectionRange(selection[0], selection[1]); } catch { /* type search sur certains navigateurs */ } }
@@ -96,8 +96,20 @@ function rendre({ conserver = false } = {}) {
 
 // ---------------------------------------------------------------- navigation
 
+// La position de défilement de chaque écran, pour la rendre au retour. Le
+// mécanisme existait dans rendre() mais `scrollAvant` n'était JAMAIS écrit : le
+// retour ne restaurait donc rien, sur aucun écran. On ne restaure qu'au retour
+// d'une fiche — arriver sur une liste par la navigation doit montrer son début.
+const positions = new Map();
+const FICHES = ['exposant', 'evenement'];
+
 function appliquerRoute() {
+  const precedente = etat.route.nom;
+  positions.set(precedente, window.scrollY);
   etat.route = analyserRoute(location.hash);
+  if (FICHES.includes(precedente) && !FICHES.includes(etat.route.nom) && positions.has(etat.route.nom)) {
+    scrollAvant = positions.get(etat.route.nom);
+  }
   const p = etat.route.params;
   if (etat.route.nom === 'plan') {
     etat.ui.salleAllumee = p.salle || null;
@@ -147,7 +159,14 @@ function basculerEtoile(cle) {
   modifierVisite(Visite.basculer(etat.visite, objet, Date.now()));
   stats.noter(dans ? 'visite_retrait' : 'visite_ajout', cle);
   const nom = objet.titre || objet.nom;
-  message(dans ? `Retiré de ma visite : ${echapper(nom)}` : `★ Ajouté à ma visite : ${echapper(nom)}`, { duree: 2500 });
+  if (dans) { message(`Retiré de ma visite : ${echapper(nom)}`, { duree: 2500 }); return; }
+  // Le conflit se dit MAINTENANT, pendant que le Visiteur peut encore choisir : la
+  // détection existait déjà, elle n'était lue qu'à l'ouverture de Ma visite (ADR-0010).
+  const conflits = Visite.chevauchementsDe(etat.visite, etat.modele, cle);
+  if (!conflits.length) { message(`★ Ajouté à ma visite : ${echapper(nom)}`, { duree: 2500 }); return; }
+  const autre = objetParCle(conflits[0].a === cle ? conflits[0].b : conflits[0].a);
+  message(`★ Ajouté, mais à la même heure que « ${echapper(autre ? autre.titre || autre.nom : 'un autre événement')} »`,
+    { classe: 'alerte', duree: 9000, action: { libelle: 'Voir', faire: () => { location.hash = '#/visite'; } } });
 }
 
 function ajouterAuCalendrier(cle) {
@@ -198,6 +217,7 @@ document.addEventListener('click', (e) => {
     case 'retirer': e.preventDefault(); modifierVisite(Visite.retirer(etat.visite, cle)); break;
     case 'effacer': etat.ui[champ] = ''; if (champ === 'recherchePlan') etat.ui.salleAllumee = null; rendre({ conserver: true }); el.main.querySelector(`[data-champ="${champ}"]`)?.focus(); break;
     case 'filtre': etat.ui[filtre] = etat.ui[filtre] === valeur && filtre !== 'filtrePublic' ? '' : valeur; rendre({ conserver: true }); break;
+    case 'filtres': etat.ui.filtresOuverts = !etat.ui.filtresOuverts; rendre({ conserver: true }); break;
     // Changer d'onglet garde le Domaine : il traverse les onglets (voir ecranExposants),
     // et le compte affiché sur chaque onglet dit déjà combien on y trouvera.
     case 'onglet': etat.ui.ongletExposants = valeur; rendre({ conserver: true }); break;
@@ -212,6 +232,7 @@ document.addEventListener('click', (e) => {
     case 'interet': modifierVisite(Visite.basculerInteret(etat.visite, valeur)); break;
     case 'niveau': modifierVisite(Visite.definirNiveau(etat.visite, valeur)); break;
     case 'suggestions': etat.ui.suggestionsOuvertes = !etat.ui.suggestionsOuvertes; rendre({ conserver: true }); break;
+    case 'etape': etat.ui.etapePreparer = Number(valeur) || 0; rendre(); break;
     case 'avis': stats.noter('clic_avis'); break;
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
@@ -282,12 +303,17 @@ function initialiserPlan() {
   const vp = $('#plan-viewport');
   if (!vp) return;
   if (planTransform.centrerSur) {
-    const { placements } = calculerPlan(etat.modele);
+    // Le même Étage que celui qui est à l'écran : la disposition était calculée
+    // tous étages confondus, si bien que les coordonnées de centrage ne
+    // correspondaient à rien dès qu'il y avait deux niveaux.
     let cle = null;
     if (planTransform.centrerSur === 'resultat') { const r = rechercherSurPlan(etat.modele, etat.ui.recherchePlan); cle = r && r.salle ? r.salle.cle : null; }
     else cle = normaliser(planTransform.centrerSur);
-    const p = placements.find((q) => q.salle.cle === cle && q.x !== null);
-    if (p) centrerPlanSur(p.x, p.y); else if (planTransform.centrerSur !== 'resultat') { planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; }
+    const salle = etat.modele.salles.find((s) => s.cle === cle) || null;
+    const { rects, placements } = calculerPlan(etat.modele, etageAffiche(etat.modele, etat.ui, salle));
+    const cadre = cle ? cadrageSalle(rects, placements, cle) : null;
+    if (cadre) centrerPlanSur(cadre.x, cadre.y, cadre.k);
+    else if (planTransform.centrerSur !== 'resultat') { planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; }
     planTransform.centrerSur = null;
   }
   appliquerTransformPlan();
@@ -343,13 +369,29 @@ function initialiserPlan() {
 
 let sources = null;
 
-// Le bandeau s'affiche dès qu'il est non vide, avec un message éphémère la première fois.
+// Le bandeau est le canal des Organisateurs : un message saisi dans le tableur.
+// Il s'affichait AUSSI en notification éphémère, donc deux fois le même texte,
+// dont une par-dessus le contenu. Un seul canal désormais : le bandeau, refermable.
+// Sa fermeture se retient dans la Visite ; un message différent revient malgré tout.
 function afficherBandeau(texte) {
   if (texte === etat.bandeau) return;
   etat.bandeau = texte;
-  el.bandeau.textContent = texte; el.bandeau.hidden = !texte;
-  if (texte && etat.visite.bandeauVu !== texte) { message(echapper(texte), { classe: 'orange', duree: 10000 }); modifierVisite({ ...etat.visite, bandeauVu: texte }); }
+  peindreBandeau();
 }
+
+function peindreBandeau() {
+  const texte = etat.bandeau || '';
+  const cache = texte && etat.visite.bandeauFerme === texte;
+  el.bandeau.hidden = !texte || cache;
+  if (el.bandeau.hidden) { el.bandeau.textContent = ''; return; }
+  el.bandeau.innerHTML = `<span>${echapper(texte)}</span><button type="button" data-action="fermer-bandeau" aria-label="Fermer ce message">✕</button>`;
+}
+
+el.bandeau.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-action="fermer-bandeau"]')) return;
+  modifierVisite({ ...etat.visite, bandeauFerme: etat.bandeau || '' });
+  peindreBandeau();
+});
 
 function installerTables(tables, version, source, { heure = Date.now(), silencieux = false } = {}) {
   const ancien = etat.modele;

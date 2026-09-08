@@ -356,6 +356,10 @@ export function construireModele(tables) {
     const salle = texte(ev.salle);
     evenements.push({
       cle: cleEvenement(titre, debut), format: formatCanonique(ev.format), titre, domaines, domainesConnus: connus,
+      // Un Moment (l'ouverture) est un repère de la matinée, pas un rendez-vous
+      // auquel s'inscrire : ni fin, ni intervenant, ni rappel, ni calendrier. Le
+      // modèle le décide une fois pour tous les écrans, qui se contentent de lire.
+      moment: formatCanonique(ev.format) === 'Ouverture',
       public: publicsDepuis(ev.public), debut, fin, salle, salleAVenir: salle === '',
       description: texte(ev.description), intervenantsTexte, intervenants, zone: zoneDeSalle(salle), synthetique: false,
     });
@@ -363,7 +367,7 @@ export function construireModele(tables) {
   const debutFestival = heureEnMinutes(infos.heure_debut);
   if (debutFestival !== null && !evenements.some((e) => normaliser(e.titre).startsWith('ouverture'))) {
     evenements.push({
-      cle: cleEvenement('Ouverture du festival', debutFestival), format: 'Ouverture', titre: 'Ouverture du festival',
+      cle: cleEvenement('Ouverture du festival', debutFestival), format: 'Ouverture', titre: 'Ouverture du festival', moment: true,
       domaines: [], domainesConnus: true, public: ['Tous'], debut: debutFestival, fin: null, salle: 'Accueil', salleAVenir: false,
       description: infos.slogan || '', intervenantsTexte: '', intervenants: [], zone: zoneDeSalle('Accueil'), synthetique: true,
     });
