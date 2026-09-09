@@ -112,6 +112,12 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 .bandeau[hidden] { display: none; }
 
 .entete { padding: 26px 0 14px; }
+/* Le sélecteur de langue : quatre pastilles discrètes, alignées à droite, chacune
+   dans sa propre langue. Pas dans la navigation basse — un Visiteur ne change de
+   langue qu'une fois, et il la retrouve mémorisée. */
+.langues { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 0 0; }
+.langue { font: inherit; font-size: 0.74rem; font-weight: 650; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--trait); background: transparent; color: var(--encre-2); cursor: pointer; min-height: 30px; }
+.langue[aria-pressed="true"] { background: var(--encre); border-color: var(--encre); color: var(--fond); }
 .entete h1 { font-size: clamp(1.9rem, 8vw, 2.5rem); }
 .entete .sous { color: var(--encre-2); margin: 8px 0 0; font-size: 0.95rem; line-height: 1.35; }
 .retour {

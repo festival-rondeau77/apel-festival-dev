@@ -1,6 +1,7 @@
 // Module Données : des cinq tables brutes (Exposants, Événements, Salles,
-// Préparation, Infos) vers le modèle du glossaire (CONTEXT.md). Logique pure :
-// ni DOM, ni réseau, ni horloge. Importable tel quel par Node pour les tests.
+// Préparation, Infos) vers le modèle du glossaire (CONTEXT.md), plus la sixième
+// table Traductions vers un dictionnaire (ADR-0012). Logique pure : ni DOM, ni
+// réseau, ni horloge. Importable tel quel par Node pour les tests.
 import { empreinte } from './empreinte.js';
 
 // Les Villages : le festival est découpé par DOMAINE D'ACTIVITÉ, pas par type de
@@ -407,6 +408,22 @@ export function diff(avant, apres, options = {}) {
 
 export function versionDe(tables) {
   return empreinte(tables);
+}
+
+// ---------------------------------------------------------------- traductions
+
+// La table `traductions` (en-têtes fr, en, es, zh — produite par le script
+// Apps Script, ADR-0012) devient un dictionnaire : texte français → { en, es, zh }.
+// Tolérante : table absente, vide ou sans en-tête → dictionnaire vide, jamais
+// une erreur ; l'appli affiche alors le français.
+export function dictionnaireDepuis(tables) {
+  const dico = new Map();
+  for (const l of tablesEnObjets(tables && tables.traductions)) {
+    const fr = texte(l.fr);
+    if (!fr) continue;
+    dico.set(fr, { en: texte(l.en), es: texte(l.es), zh: texte(l.zh) });
+  }
+  return dico;
 }
 
 // ---------------------------------------------------------------- lecture des sources

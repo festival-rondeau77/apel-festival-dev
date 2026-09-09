@@ -1,9 +1,9 @@
-// Empreinte de version des cinq tables. Ce fichier existe en deux exemplaires
+// Empreinte de version des six tables (les cinq du tableur et les traductions). Ce fichier existe en deux exemplaires
 // identiques (au mot-clé `export` près) : app/js/empreinte.js pour l'appli et
 // script/empreinte.js pour le script Apps Script. Un test vérifie qu'ils ne
 // divergent pas : la même donnée doit donner la même empreinte des deux côtés.
 
-var ORDRE_TABLES = ['exposants', 'evenements', 'salles', 'preparation', 'infos'];
+var ORDRE_TABLES = ['exposants', 'evenements', 'salles', 'preparation', 'infos', 'traductions'];
 
 function celluleCanonique(v) {
   if (v === null || v === undefined) return '';

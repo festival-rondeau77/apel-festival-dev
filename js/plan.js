@@ -2,6 +2,7 @@
 // étage par étage, recherche depuis le plan, phrase de guidage, contenu d'une
 // Zone. Pure.
 import { normaliser, contient, ETAGES, ETAGE_PAR_DEFAUT } from './donnees.js';
+import { t, tt } from './i18n.js';
 
 // Tant que l'établissement ne nous a pas donné ses plans du rez-de-chaussée et
 // du premier étage, la disposition est une grille : deux colonnes de villages,
@@ -124,14 +125,16 @@ export function salleParNom(modele, nom) {
 
 // La phrase pour s'y rendre : Village, étage, puis notes de la Salle. L'étage
 // vient en deuxième parce que c'est la première décision du visiteur qui marche.
+// Traduite au rendu : le mot « Village », le nom du village et l'étage viennent
+// des dictionnaires statiques, les notes de la Salle de la traduction du tableur.
 export function phraseGuidage(salle, nomSalle = '') {
-  if (!salle) return nomSalle ? `${nomSalle} : salle à localiser, demandez à l'accueil` : "Salle à venir : demandez à l'accueil";
+  if (!salle) return nomSalle ? `${nomSalle} : ${t('salle à localiser')}, ${t("demandez à l'accueil")}` : `${t('salle à venir').charAt(0).toUpperCase()}${t('salle à venir').slice(1)} : ${t("demandez à l'accueil")}`;
   const morceaux = [];
-  if (salle.zone) morceaux.push(`Village ${salle.zone.numero ?? ''} ${salle.zone.nom}`.replace(/\s+/g, ' ').trim());
-  if (salle.etage && (salle.zone || salle.notes)) morceaux.push(salle.etage.toLowerCase());
-  if (salle.notes) morceaux.push(salle.notes);
+  if (salle.zone) morceaux.push(`${t('Village')} ${salle.zone.numero ?? ''} ${t(salle.zone.nom)}`.replace(/\s+/g, ' ').trim());
+  if (salle.etage && (salle.zone || salle.notes)) morceaux.push(t(salle.etage).toLowerCase());
+  if (salle.notes) morceaux.push(tt(salle.notes));
   // Ni village ni note : l'étage seul ne suffit pas à trouver, on renvoie à l'accueil.
-  if (!morceaux.length) return `${salle.nom} : ${salle.etage ? `${salle.etage.toLowerCase()}, ` : ''}demandez à l'accueil`;
+  if (!morceaux.length) return `${salle.nom} : ${salle.etage ? `${t(salle.etage).toLowerCase()}, ` : ''}${t("demandez à l'accueil")}`;
   return morceaux.join(', ');
 }
 
@@ -140,14 +143,14 @@ export function phraseGuidage(salle, nomSalle = '') {
 export function rechercherSurPlan(modele, requete) {
   const q = normaliser(requete);
   if (!q) return null;
-  const salle = modele.salles.find((s) => s.cle === q) || modele.salles.find((s) => s.cle.includes(q)) || modele.salles.find((s) => contient(s.notes, requete));
+  const salle = modele.salles.find((s) => s.cle === q) || modele.salles.find((s) => s.cle.includes(q)) || modele.salles.find((s) => contient(s.notes, requete) || contient(tt(s.notes), requete));
   if (salle && !(modele.exposants.some((e) => normaliser(e.nom) === q))) return { genre: 'salle', salle, nomSalle: salle.nom, phrase: phraseGuidage(salle), libelle: salle.nom };
-  const exposant = modele.exposants.find((e) => normaliser(e.nom) === q) || modele.exposants.find((e) => contient(e.nom, requete)) || modele.exposants.find((e) => contient(e.sousTitre, requete) || contient(e.ville, requete));
+  const exposant = modele.exposants.find((e) => normaliser(e.nom) === q) || modele.exposants.find((e) => contient(e.nom, requete)) || modele.exposants.find((e) => contient(e.sousTitre, requete) || contient(tt(e.sousTitre), requete) || contient(e.ville, requete));
   if (exposant) {
     const s = salleParNom(modele, exposant.salle);
     return { genre: 'exposant', exposant, salle: s, nomSalle: exposant.salle, phrase: phraseGuidage(s, exposant.salle), libelle: exposant.nom };
   }
-  const evenement = modele.evenements.find((e) => contient(e.titre, requete) || contient(e.intervenantsTexte, requete));
+  const evenement = modele.evenements.find((e) => contient(e.titre, requete) || contient(tt(e.titre), requete) || contient(e.intervenantsTexte, requete));
   if (evenement) {
     const s = salleParNom(modele, evenement.salle);
     return { genre: 'evenement', evenement, salle: s, nomSalle: evenement.salle, phrase: phraseGuidage(s, evenement.salle), libelle: evenement.titre };

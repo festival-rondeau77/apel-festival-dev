@@ -8,6 +8,8 @@ import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, calculerPlan, etageAffiche, h as echapper } from './rendu.js';
 import { rechercherSurPlan, cadrageSalle } from './plan.js';
+import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, LANGUES } from './i18n.js';
+import { dictionnaireDepuis } from './donnees.js';
 
 const journal = (...a) => { if (location.hostname === 'localhost' || location.search.includes('debug')) console.info('[festival]', ...a); };
 const stockage = (() => { try { localStorage.setItem('festival.test', '1'); localStorage.removeItem('festival.test'); return localStorage; } catch { return Visite.stockageMemoire(); } })();
@@ -15,6 +17,9 @@ const stockage = (() => { try { localStorage.setItem('festival.test', '1'); loca
 const etat = {
   route: analyserRoute(location.hash),
   modele: construireModele({}), tables: null, version: null, source: null, derniereMaj: null, bandeau: '',
+  // La langue affichée (ADR-0012) et les traductions du bandeau jointes à l'état
+  // du script ({ en, es, zh }) — celles du tableur passent par tt().
+  langue: 'fr', bandeaux: null,
   // Version du code chargé, et version que le service worker sert réellement.
   // Les deux sont affichées en pied de page : leur écart révèle un cache périmé.
   versionAppli: CONFIG.version, versionSW: null,
@@ -32,6 +37,31 @@ const etat = {
 
 const stockageVisite = Visite.creerStockageVisite(stockage);
 etat.visite = stockageVisite.charger();
+
+// ---------------------------------------------------------------- langue
+
+// L'URL d'abord (« ?lang=en » avant ou après le dièse), puis le choix mémorisé,
+// puis la langue du téléphone. Le squelette de index.html est en français : on
+// le traduit ici, avant le premier rendu.
+function parametreLangue() {
+  const dansRecherche = new URLSearchParams(location.search).get('lang');
+  return dansRecherche || (analyserRoute(location.hash).params.lang || null);
+}
+function appliquerLangue(l, { memoriser = false } = {}) {
+  etat.langue = definirLangue(l);
+  document.documentElement.lang = etat.langue;
+  const squelette = { '.visuellement-cache[href="#ecran"]': t('Aller au contenu'), '#ecran > .maj': t('Chargement…'), 'noscript p': t('Cette application a besoin de JavaScript.') };
+  for (const [sel, texte] of Object.entries(squelette)) { const e = document.querySelector(sel); if (e) e.textContent = texte; }
+  if (memoriser) { try { stockage.setItem(CLE_STOCKAGE_LANGUE, etat.langue); } catch { /* quota ou navigation privée */ } }
+}
+appliquerLangue(langueInitiale({ param: parametreLangue(), stockage, navigateur: navigator.languages || navigator.language }));
+
+function changerLangue(l) {
+  if (!LANGUES.includes(l) || l === etat.langue) return;
+  appliquerLangue(l, { memoriser: true });
+  stats.noter('ecran', `langue:${l}`);
+  rendre({ conserver: true });
+}
 
 const stats = creerStats({
   stockage,
@@ -67,7 +97,7 @@ function message(texte, { classe = '', duree = 6000, action = null } = {}) {
   const div = document.createElement('div');
   div.className = `message ${classe}`;
   div.setAttribute('role', 'status');
-  div.innerHTML = `<span>${texte}</span>${action ? `<button type="button">${action.libelle}</button>` : '<button type="button" aria-label="Fermer">✕</button>'}`;
+  div.innerHTML = `<span>${texte}</span>${action ? `<button type="button">${echapper(action.libelle)}</button>` : `<button type="button" aria-label="${echapper(t('Fermer'))}">✕</button>`}`;
   div.querySelector('button').addEventListener('click', () => { if (action) action.faire(); div.remove(); });
   el.messages.appendChild(div);
   if (duree) setTimeout(() => div.remove(), duree);
@@ -161,21 +191,21 @@ function basculerEtoile(cle) {
   const dans = Visite.contient(etat.visite, cle);
   modifierVisite(Visite.basculer(etat.visite, objet, Date.now()));
   stats.noter(dans ? 'visite_retrait' : 'visite_ajout', cle);
-  const nom = objet.titre || objet.nom;
-  if (dans) { message(`Retiré de ma visite : ${echapper(nom)}`, { duree: 2500 }); return; }
+  const nom = objet.titre ? tt(objet.titre) : objet.nom;
+  if (dans) { message(echapper(t('Retiré de ma visite : %s', nom)), { duree: 2500 }); return; }
   // Le conflit se dit MAINTENANT, pendant que le Visiteur peut encore choisir : la
   // détection existait déjà, elle n'était lue qu'à l'ouverture de Ma visite (ADR-0010).
   const conflits = Visite.chevauchementsDe(etat.visite, etat.modele, cle);
-  if (!conflits.length) { message(`★ Ajouté à ma visite : ${echapper(nom)}`, { duree: 2500 }); return; }
+  if (!conflits.length) { message(echapper(t('★ Ajouté à ma visite : %s', nom)), { duree: 2500 }); return; }
   const autre = objetParCle(conflits[0].a === cle ? conflits[0].b : conflits[0].a);
-  message(`★ Ajouté, mais à la même heure que « ${echapper(autre ? autre.titre || autre.nom : 'un autre événement')} »`,
-    { classe: 'alerte', duree: 9000, action: { libelle: 'Voir', faire: () => { location.hash = '#/visite'; } } });
+  message(echapper(t('★ Ajouté, mais à la même heure que « %s »', autre ? (autre.titre ? tt(autre.titre) : autre.nom) : t('un autre événement'))),
+    { classe: 'alerte', duree: 9000, action: { libelle: t('Voir'), faire: () => { location.hash = '#/visite'; } } });
 }
 
 function ajouterAuCalendrier(cle) {
   const ev = etat.modele.evenements.find((e) => e.cle === cle);
   const ics = Visite.icalendar(ev, etat.modele.infos);
-  if (!ics) { message('Date du festival inconnue : impossible de créer le rappel.', { classe: 'alerte' }); return; }
+  if (!ics) { message(echapper(t('Date du festival inconnue : impossible de créer le rappel.')), { classe: 'alerte' }); return; }
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -239,6 +269,7 @@ document.addEventListener('click', (e) => {
     case 'avis': stats.noter('clic_avis'); break;
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
+    case 'langue': changerLangue(valeur); break;
     default: break;
   }
 });
@@ -376,10 +407,20 @@ let sources = null;
 // Il s'affichait AUSSI en notification éphémère, donc deux fois le même texte,
 // dont une par-dessus le contenu. Un seul canal désormais : le bandeau, refermable.
 // Sa fermeture se retient dans la Visite ; un message différent revient malgré tout.
-function afficherBandeau(texte) {
-  if (texte === etat.bandeau) return;
+// Le bandeau est mémorisé en français (c'est la clé de « refermé ») ; ses
+// traductions viennent de l'état du script quand il les joint, sinon de tt().
+function afficherBandeau(texte, bandeaux = undefined) {
+  if (bandeaux !== undefined) etat.bandeaux = bandeaux;
+  if (texte === etat.bandeau && bandeaux === undefined) return;
   etat.bandeau = texte;
   peindreBandeau();
+}
+
+function texteBandeau() {
+  const fr = etat.bandeau || '';
+  if (!fr || etat.langue === 'fr') return fr;
+  const duScript = etat.bandeaux && typeof etat.bandeaux[etat.langue] === 'string' && etat.bandeaux[etat.langue].trim();
+  return duScript || tt(fr);
 }
 
 function peindreBandeau() {
@@ -387,7 +428,7 @@ function peindreBandeau() {
   const cache = texte && etat.visite.bandeauFerme === texte;
   el.bandeau.hidden = !texte || cache;
   if (el.bandeau.hidden) { el.bandeau.textContent = ''; return; }
-  el.bandeau.innerHTML = `<span>${echapper(texte)}</span><button type="button" data-action="fermer-bandeau" aria-label="Fermer ce message">✕</button>`;
+  el.bandeau.innerHTML = `<span>${echapper(texteBandeau())}</span><button type="button" data-action="fermer-bandeau" aria-label="${echapper(t('Fermer ce message'))}">✕</button>`;
 }
 
 el.bandeau.addEventListener('click', (e) => {
@@ -403,6 +444,7 @@ function installerTables(tables, version, source, { heure = Date.now(), silencie
   etat.source = source;
   etat.derniereMaj = heure;
   etat.modele = construireModele(tables);
+  definirTraductions(dictionnaireDepuis(tables));
   for (const a of etat.modele.avertissements) console.warn('[festival] donnée à vérifier dans le tableur :', a);
   afficherBandeau(etat.modele.infos.bandeau || ''); // le bandeau vit dans Infos : valable pour toute source, pas seulement l'état du script
   if (!silencieux && ancien && ancien.exposants.length + ancien.evenements.length) {
@@ -413,7 +455,7 @@ function installerTables(tables, version, source, { heure = Date.now(), silencie
       stockageVisite.sauver(etat.visite);
       for (const a of r.alertes) {
         const o = objetParCle(a.cle);
-        message(`⚠︎ ${echapper(o ? (o.titre || o.nom) : a.cle)} : ${echapper(Visite.texteAlerte(a))}`, { classe: 'orange', duree: 12000 });
+        message(`⚠︎ ${echapper(o ? (o.titre ? tt(o.titre) : o.nom) : a.cle)} : ${echapper(Visite.texteAlerte(a))}`, { classe: 'orange', duree: 12000 });
       }
       stats.noter('donnees_changees', version, String(changements.length));
     }
@@ -435,7 +477,7 @@ async function rafraichirDonnees() {
   // Une source refusée n'a rien à nous apprendre : ni ses tables, ni son bandeau, ni
   // même son heure — dire « mis à jour » ici serait mentir, puisqu'on garde l'ancien.
   if (!r.refus) {
-    if (r.bandeau !== null && r.bandeau !== undefined) afficherBandeau(r.bandeau);
+    if (r.bandeau !== null && r.bandeau !== undefined) afficherBandeau(r.bandeau, r.bandeaux === undefined ? null : r.bandeaux);
     if (r.change) installerTables(r.tables, r.version, r.source);
     else { etat.derniereMaj = Date.now(); etat.source = r.source; }
   }
@@ -461,7 +503,7 @@ function verifierRappels() {
   for (const ev of Visite.rappelsAFaire(etat.visite, etat.modele, etat.maintenant.minutes)) {
     if (rappelsFaits.has(ev.cle)) continue;
     rappelsFaits.add(ev.cle);
-    message(`🔔 Dans ${ev.debut - etat.maintenant.minutes} min : ${echapper(ev.titre)} · ${echapper(ev.salle || 'salle à venir')}`, { classe: 'orange', duree: 60000 });
+    message(`🔔 ${echapper(t('Dans %s min', ev.debut - etat.maintenant.minutes))} : ${echapper(tt(ev.titre))} · ${echapper(ev.salle || t('salle à venir'))}`, { classe: 'orange', duree: 60000 });
   }
 }
 
@@ -506,7 +548,7 @@ async function enregistrerServiceWorker() {
     const reg = await navigator.serviceWorker.register('./sw.js');
     const proposer = (worker) => {
       swEnAttente = worker;
-      message('Nouvelle version disponible.', { duree: 0, action: { libelle: 'Recharger', faire: rechargerNouvelleVersion } });
+      message(echapper(t('Nouvelle version disponible.')), { duree: 0, action: { libelle: t('Recharger'), faire: rechargerNouvelleVersion } });
     };
     if (reg.waiting && navigator.serviceWorker.controller) proposer(reg.waiting);
     reg.addEventListener('updatefound', () => {
@@ -537,17 +579,18 @@ async function demarrer() {
   if (initial) installerTables(initial.tables, initial.version, initial.sourceOrigine || initial.source, { heure: initial.heure || Date.now(), silencieux: true });
   else etat.derniereMaj = null;
   const installee = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  // « installee·ios », « navigateur·android »… : d'où vient la donnée en cible,
-  // et en detail comment l'appli est ouverte ET sur quelle famille d'appareil.
+  // « installee·ios·fr », « navigateur·android·en »… : d'où vient la donnée en
+  // cible, et en detail comment l'appli est ouverte, sur quelle famille d'appareil,
+  // et dans quelle langue — ce qui dira combien de Visiteurs ne lisent pas le français.
   stats.noter('ouverture', initial ? initial.source : 'aucune',
-    `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}`);
+    `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}·${langue()}`);
   appliquerRoute();
   enregistrerServiceWorker();
   versionServiceWorker().then((v) => { etat.versionSW = v; el.pied.innerHTML = piedDePage(etat); });
   rafraichisseur.demarrer();
   verifierRappels();
   setInterval(verifierRappels, 30000);
-  window.__festival = { etat, rendre, stats, sources }; // pour le test de fumée et le débogage
+  window.__festival = { etat, rendre, stats, sources, changerLangue }; // pour le test de fumée et le débogage
 }
 
 demarrer();

@@ -1,6 +1,7 @@
 // Module Visite : l'état de Ma visite et de la préparation. Logique pure ; le
 // stockage et l'horloge sont injectés. Chaque opération renvoie un nouvel état.
-import { publicInclut, minutesEnHeure } from './donnees.js';
+import { publicInclut } from './donnees.js';
+import { t, heure } from './i18n.js';
 
 export const SCHEMA = 2;
 const DUREE_PAR_DEFAUT = 45; // minutes, quand un Événement n'a pas de fin
@@ -173,9 +174,9 @@ export function alertesNonVues(etat) {
 
 export function texteAlerte(alerte) {
   if (!alerte) return '';
-  if (alerte.champ === 'salle') return `${alerte.apres || 'salle à venir'} au lieu de ${alerte.avant || '(sans salle)'}`;
-  if (alerte.champ === 'debut') return `commence à ${minutesEnHeure(alerte.apres)} au lieu de ${minutesEnHeure(alerte.avant)}`;
-  if (alerte.champ === 'fin') return `finit à ${minutesEnHeure(alerte.apres)} au lieu de ${minutesEnHeure(alerte.avant)}`;
+  if (alerte.champ === 'salle') return t('%s au lieu de %s', alerte.apres || t('salle à venir'), alerte.avant || t('(sans salle)'));
+  if (alerte.champ === 'debut') return t('commence à %s au lieu de %s', heure(alerte.apres), heure(alerte.avant));
+  if (alerte.champ === 'fin') return t('finit à %s au lieu de %s', heure(alerte.apres), heure(alerte.avant));
   return '';
 }
 

@@ -1,5 +1,5 @@
 // Module Sources : la chaîne de lecture des données (ADR-0004).
-//   1. script Apps Script (`etat` : version + bandeau ; `donnees` : cinq tables)
+//   1. script Apps Script (`etat` : version + bandeau ; `donnees` : six tables)
 //   2. classeur « Festival — Export public » via gviz, onglet par onglet
 //   3. snapshot embarqué au déploiement
 // À chaque succès, les tables sont mises en cache local avec version et heure.
@@ -7,7 +7,10 @@
 import { tablesDepuisGviz, tablesDepuisSnapshot, versionDe } from './donnees.js';
 
 export const CLE_CACHE = 'festival.donnees';
-export const ONGLETS_GVIZ = { exposants: 'Exposants', evenements: 'Événements', salles: 'Salles', preparation: 'Préparation', infos: 'Infos' };
+export const ONGLETS_GVIZ = { exposants: 'Exposants', evenements: 'Événements', salles: 'Salles', preparation: 'Préparation', infos: 'Infos', traductions: 'Traductions' };
+// La table des traductions est facultative : un classeur public pas encore migré
+// (onglet absent, IMPORTRANGE non autorisé) reste une source valable — en français.
+const TABLES_FACULTATIVES = ['traductions'];
 const DELAI_MAX = 8000; // ms avant de considérer une source comme trop lente
 const SEUIL_CHUTE = 0.5; // une source qui perd plus de la moitié de son volume est refusée
 
@@ -17,6 +20,16 @@ function attendreParDefaut(ms) { return new Promise((r) => setTimeout(r, ms)); }
 export function bandeauDe(tables) {
   for (const ligne of (tables && tables.infos || []).slice(1)) if (String(ligne[0] ?? '').trim().toLowerCase() === 'bandeau') return String(ligne[1] ?? '').trim();
   return '';
+}
+
+// Les traductions du bandeau que le script joint à l'état ({ en, es, zh }), ou null.
+// Le bandeau du jour J ne peut pas attendre le passage du traducteur : le script
+// le traduit à la volée, et c'est ici qu'on le recueille (ADR-0012).
+export function bandeauxDe(rep) {
+  if (!rep || !rep.bandeaux || typeof rep.bandeaux !== 'object') return null;
+  const b = {};
+  for (const [l, v] of Object.entries(rep.bandeaux)) if (typeof v === 'string') b[l] = v;
+  return b;
 }
 
 // Le nombre de lignes de DONNÉES de chaque table (la première ligne porte les en-têtes).
@@ -40,6 +53,7 @@ export function motifDeRefus(candidat, reference, { seuilChute = SEUIL_CHUTE } =
   if (!reference) return null; // premier démarrage : rien à protéger
   const vc = volumes(candidat);
   const vr = volumes(reference);
+  for (const f of TABLES_FACULTATIVES) { delete vc[f]; delete vr[f]; }
   for (const [nom, n] of Object.entries(vr)) {
     if (n > 0 && !(vc[nom] > 0)) return `table « ${nom} » vidée (${n} → ${vc[nom] ?? 0})`;
   }
@@ -78,20 +92,23 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
   async function etatScript() {
     const rep = JSON.parse(await requete(urlScript('etat'), { redirect: 'follow' }));
     if (!rep || typeof rep.version !== 'string') throw new Error('etat : réponse invalide');
-    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '' };
+    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '', bandeaux: bandeauxDe(rep) };
   }
 
   async function donneesScript() {
     const rep = JSON.parse(await requete(urlScript('donnees'), { redirect: 'follow' }));
     if (!rep || !rep.tables) throw new Error('donnees : réponse invalide');
-    return { tables: rep.tables, version: rep.version || versionDe(rep.tables), source: 'script', bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : null };
+    return { tables: rep.tables, version: rep.version || versionDe(rep.tables), source: 'script', bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : null, bandeaux: bandeauxDe(rep) };
   }
 
   async function donneesGviz() {
     if (!config.sheetId) throw new Error('classeur Export public non configuré');
     const tables = {};
-    for (const [nom, onglet] of Object.entries(ONGLETS_GVIZ)) tables[nom] = tablesDepuisGviz(await requete(urlGviz(config.sheetId, onglet)));
-    return { tables, version: versionDe(tables), source: 'gviz', bandeau: bandeauDe(tables) };
+    for (const [nom, onglet] of Object.entries(ONGLETS_GVIZ)) {
+      try { tables[nom] = tablesDepuisGviz(await requete(urlGviz(config.sheetId, onglet))); }
+      catch (e) { if (!TABLES_FACULTATIVES.includes(nom)) throw e; tables[nom] = []; journal('gviz : onglet facultatif absent', onglet, e.message); }
+    }
+    return { tables, version: versionDe(tables), source: 'gviz', bandeau: bandeauDe(tables), bandeaux: null };
   }
 
   function depuisSnapshot() {
@@ -143,19 +160,19 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     };
     try {
       const etat = await etatScript();
-      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, source: 'script', version: etat.version };
+      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, bandeaux: etat.bandeaux, source: 'script', version: etat.version };
       const d = await donneesScript();
       if (acceptable(d)) {
         memoriser(d);
-        return { change: true, bandeau: d.bandeau ?? etat.bandeau, source: 'script', tables: d.tables, version: d.version };
+        return { change: true, bandeau: d.bandeau ?? etat.bandeau, bandeaux: d.bandeaux || etat.bandeaux, source: 'script', tables: d.tables, version: d.version };
       }
     } catch (e) { erreurs.push(e); journal('script indisponible', e); }
     try {
       const d = await donneesGviz();
-      if (d.version === versionActuelle) return { change: false, bandeau: d.bandeau, source: 'gviz', version: d.version };
+      if (d.version === versionActuelle) return { change: false, bandeau: d.bandeau, bandeaux: null, source: 'gviz', version: d.version };
       if (acceptable(d)) {
         memoriser(d);
-        return { change: true, bandeau: d.bandeau, source: 'gviz', tables: d.tables, version: d.version };
+        return { change: true, bandeau: d.bandeau, bandeaux: null, source: 'gviz', tables: d.tables, version: d.version };
       }
     } catch (e) { erreurs.push(e); journal('gviz indisponible', e); }
     // Refusée n'est pas muette : on garde la version courante et on le dit au pied de page.
