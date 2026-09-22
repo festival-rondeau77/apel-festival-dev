@@ -6,8 +6,8 @@ import * as Visite from './visite.js';
 import { creerStats, plateforme } from './stats.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
-import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, calculerPlan, etageAffiche, h as echapper } from './rendu.js';
-import { rechercherSurPlan, cadrageSalle } from './plan.js';
+import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
+import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
 import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, LANGUES } from './i18n.js';
 import { dictionnaireDepuis } from './donnees.js';
 
@@ -27,7 +27,7 @@ const etat = {
   ui: {
     rechercheProgramme: '', filtreDomaineProgramme: '', filtreFormat: '', filtrePublic: '',
     rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
-    recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, suggestionsOuvertes: false,
+    recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, feuillePlan: null, suggestionsOuvertes: false,
     filtresOuverts: false, etapePreparer: 0, bandeauFerme: '',
   },
   reseau: { enErreur: false, refus: null },
@@ -124,7 +124,9 @@ function rendre({ conserver = false } = {}) {
   if (conserver) window.scrollTo(0, y);
   else if (scrollAvant !== null) { window.scrollTo(0, scrollAvant); scrollAvant = null; }
   else window.scrollTo(0, 0);
+  document.body.classList.toggle('plan-ouvert', etat.route.nom === 'plan');
   if (etat.route.nom === 'plan') initialiserPlan();
+  else { if (plan.anim) cancelAnimationFrame(plan.anim); plan.anim = null; plan.cam = null; plan.cible = ''; plan.noeuds = []; }
 }
 
 // ---------------------------------------------------------------- navigation
@@ -151,8 +153,10 @@ function appliquerRoute() {
     if (p.village !== undefined) etat.ui.zoneOuverte = p.village;
     else if (p.zone !== undefined) etat.ui.zoneOuverte = p.zone;
     if (p.salle) { etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; }
-    planTransform.centrerSur = p.salle || null;
-    if (!p.salle) { planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; } // « Plan » montre toujours la vue d'ensemble
+    etat.ui.feuillePlan = null;
+    // La croix ramène d'où l'on vient quand un écran de l'appli précède le plan,
+    // à l'accueil sinon (arrivée directe par l'URL ou un QR code).
+    if (precedente !== 'plan') plan.retour = demarre ? 'back' : 'accueil';
   }
   if (etat.route.nom === 'exposants') {
     if (p.onglet) etat.ui.ongletExposants = p.onglet;
@@ -170,6 +174,7 @@ function appliquerRoute() {
   rendre();
 }
 
+let demarre = false;
 window.addEventListener('hashchange', appliquerRoute);
 
 // ---------------------------------------------------------------- visite
@@ -224,7 +229,7 @@ document.addEventListener('input', (e) => {
   etat.ui[champ] = e.target.value;
   clearTimeout(minuteurRecherche);
   minuteurRecherche = setTimeout(() => {
-    if (champ === 'recherchePlan') { etat.ui.salleAllumee = null; etat.ui.zoneOuverte = null; planTransform.centrerSur = 'resultat'; }
+    if (champ === 'recherchePlan') { etat.ui.salleAllumee = null; etat.ui.zoneOuverte = null; etat.ui.feuillePlan = null; }
     rendre({ conserver: true });
     noterRecherche(champ);
   }, 180);
@@ -248,19 +253,28 @@ document.addEventListener('click', (e) => {
   switch (action) {
     case 'etoile': e.preventDefault(); basculerEtoile(cle); break;
     case 'retirer': e.preventDefault(); modifierVisite(Visite.retirer(etat.visite, cle)); break;
-    case 'effacer': etat.ui[champ] = ''; if (champ === 'recherchePlan') etat.ui.salleAllumee = null; rendre({ conserver: true }); el.main.querySelector(`[data-champ="${champ}"]`)?.focus(); break;
+    case 'effacer': etat.ui[champ] = ''; if (champ === 'recherchePlan') { etat.ui.salleAllumee = null; etat.ui.feuillePlan = null; } rendre({ conserver: true }); el.main.querySelector(`[data-champ="${champ}"]`)?.focus(); break;
     case 'filtre': etat.ui[filtre] = etat.ui[filtre] === valeur && filtre !== 'filtrePublic' ? '' : valeur; rendre({ conserver: true }); break;
     case 'filtres': etat.ui.filtresOuverts = !etat.ui.filtresOuverts; rendre({ conserver: true }); break;
     // Changer d'onglet garde le Domaine : il traverse les onglets (voir ecranExposants),
     // et le compte affiché sur chaque onglet dit déjà combien on y trouvera.
     case 'onglet': etat.ui.ongletExposants = valeur; rendre({ conserver: true }); break;
-    case 'zone': etat.ui.zoneOuverte = etat.ui.zoneOuverte === valeur ? null : valeur; etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; rendre({ conserver: true }); break;
-    case 'salle': etat.ui.salleAllumee = valeur; etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; planTransform.centrerSur = valeur; rendre({ conserver: true }); break;
-    // Changer d'étage remet le plan à plat : on regarde un autre niveau, pas la
-    // même chose sous un autre angle.
-    case 'etage': etat.ui.etagePlan = valeur; etat.ui.salleAllumee = null; etat.ui.zoneOuverte = null; planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; rendre({ conserver: true }); break;
-    case 'zoom': zoomerPlan(Number(valeur) > 0 ? 1.4 : 1 / 1.4); break;
-    case 'recentrer': planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; appliquerTransformPlan(); break;
+    case 'zone': etat.ui.zoneOuverte = etat.ui.zoneOuverte === valeur ? null : valeur; etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; etat.ui.feuillePlan = null; rendre({ conserver: true }); break;
+    case 'salle': etat.ui.salleAllumee = valeur; etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; etat.ui.feuillePlan = null; rendre({ conserver: true }); break;
+    // Toucher un étage l'ouvre à plat ; le retoucher quand il est ouvert ferme
+    // ce qui était sélectionné dessus. Le village allumé, lui, traverse les vues.
+    case 'etage': {
+      const ouvert = ($('#plan-plein') || {}).dataset?.nom === valeur;
+      if (!ouvert) etat.ui.etagePlan = valeur;
+      etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; etat.ui.feuillePlan = null;
+      if (ouvert) etat.ui.zoneOuverte = null;
+      rendre({ conserver: true }); break;
+    }
+    case 'vue-ensemble': etat.ui.etagePlan = null; etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; etat.ui.feuillePlan = null; rendre({ conserver: true }); break;
+    case 'zoom': { if (!plan.cam) break; const d = dimensionsPlan(); plan.cam = zoomer(plan.cam, Number(valeur) > 0 ? 1.4 : 1 / 1.4, d.largeur / 2, (d.hauteur - d.reserve.bas) / 2, plan.base); dessinerPlan(); break; }
+    case 'recentrer': plan.yaw = ORIENTATION_DEFAUT; plan.pitch = INCLINAISON.defaut; plan.cible = ''; initialiserPlan(); break;
+    case 'fermer-plan': fermerPlan(); break;
+    case 'feuille': if (plan.feuilleGlisse) break; etat.ui.feuillePlan = ($('#feuille') || {}).dataset?.hauteur === 'repliee' ? 'mi' : 'repliee'; rendre({ conserver: true }); break;
     case 'calendrier': ajouterAuCalendrier(cle); break;
     case 'interet': modifierVisite(Visite.basculerInteret(etat.visite, valeur)); break;
     case 'niveau': modifierVisite(Visite.definirNiveau(etat.visite, valeur)); break;
@@ -286,118 +300,253 @@ document.addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) { e.preventDefault(); e.target.click(); }
 });
 
-// ---------------------------------------------------------------- plan : zoom et déplacement
+// ---------------------------------------------------------------- plan : caméra, dessin, gestes (ADR-0013)
 
-const planTransform = { k: 1, tx: 0, ty: 0, centrerSur: null };
+// Le module Plan calcule ; ici on mesure la scène, on pose les coordonnées sur le
+// SVG à chaque image, et on lit les doigts. La caméra vit ici, pas dans l'état
+// rendu : elle bouge soixante fois par seconde et n'a pas à refaire l'écran.
+const plan = {
+  scene: null, modele: null,      // la scène jointe, recalculée quand le modèle change
+  cam: null, base: 1,             // caméra courante, échelle qui cadre la vue entière
+  yaw: ORIENTATION_DEFAUT, pitch: INCLINAISON.defaut, // l'orientation choisie en vue d'ensemble
+  op: {},                         // opacité par étage
+  cible: '',                      // ce que la caméra cadre (vue, salle, place réservée)
+  noeuds: [], anim: null,
+  retour: 'accueil',              // 'back' si un écran de l'appli précède le plan
+  feuilleGlisse: false,           // la poignée vient d'être tirée : pas un appui
+};
 const SEUIL_GESTE = 4; // px : en deçà, c'est un appui, pas un déplacement
-let planPointeurs = new Map();
-let planPincementDistance = 0;
+const REDUIRE_MOUVEMENT = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
-function facteurPlan() {
-  const svg = $('#plan-viewport svg');
-  if (!svg) return { f: 1, cx: 50, cy: 50 };
-  const vb = svg.viewBox.baseVal;
-  const r = svg.getBoundingClientRect();
-  const f = Math.min(r.width / vb.width, r.height / vb.height);
-  return { f, cx: vb.width / 2, cy: vb.height / 2, vb, r };
+function sceneCourante() {
+  if (plan.modele !== etat.modele || !plan.scene) { plan.modele = etat.modele; plan.scene = construireScene(etat.modele); }
+  return plan.scene;
 }
 
-function appliquerTransformPlan() {
-  const monde = $('#plan-monde');
-  if (!monde) return;
-  planTransform.k = Math.min(6, Math.max(0.6, planTransform.k));
-  monde.setAttribute('transform', `translate(${planTransform.tx.toFixed(2)} ${planTransform.ty.toFixed(2)}) scale(${planTransform.k.toFixed(3)})`);
+// La place que la feuille prend sur la scène : en bas sur un téléphone (elle se
+// pose par-dessus), rien au large (elle est à côté).
+function reservePlan() {
+  const feuille = $('#feuille');
+  if (!feuille || getComputedStyle(feuille).position !== 'absolute') return { bas: 0 };
+  return { bas: Math.min(feuille.offsetHeight, Math.round(($('#plan-viewport') || feuille).clientHeight * 0.55)) };
+}
+function dimensionsPlan() {
+  const vp = $('#plan-viewport');
+  return { largeur: vp ? vp.clientWidth : 360, hauteur: vp ? vp.clientHeight : 600, reserve: reservePlan() };
 }
 
-function zoomerPlan(ratio, px = null, py = null) {
-  const { f, cx, cy, vb, r } = facteurPlan();
-  let ux = cx, uy = cy;
-  if (px !== null && vb) {
-    // Coordonnées du pointeur en unités du viewBox (avant transformation).
-    const ox = (r.width - vb.width * f) / 2, oy = (r.height - vb.height * f) / 2;
-    ux = (px - r.left - ox) / f; uy = (py - r.top - oy) / f;
+const points = (a) => a.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+const chemin = (polys) => polys.map((poly) => `M${poly.map((q) => `${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('L')}Z`).join('');
+const etoileSvg = (x, y, r) => { let d = ''; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.44 : r; d += `${k ? 'L' : 'M'}${(x + Math.cos(a) * rr).toFixed(1)} ${(y + Math.sin(a) * rr).toFixed(1)}`; } return `${d}Z`; };
+
+// Les nœuds du SVG, retrouvés une fois par rendu : le squelette vient de rendu.js,
+// dans l'ordre de la scène, et chaque Pièce porte son index.
+function attacherPlan(svg, scene) {
+  plan.noeuds = scene.etages.map((e) => {
+    const g = svg.querySelector(`.etage[data-etage="${CSS.escape(e.etage)}"]`);
+    const etiq = svg.querySelector(`.etiq-etage[data-etage="${CSS.escape(e.etage)}"]`);
+    const parIndex = new Map([...g.querySelectorAll('.piece')].map((n) => [Number(n.dataset.i), n]));
+    return {
+      e, g, sol: g.querySelector('.sol'), tranches: g.querySelector('.tranches'), dalle: g.querySelector('.dalle'), trous: [...g.querySelectorAll('.vide')], gPieces: g.querySelector('.pieces'), ordre: '',
+      pieces: e.pieces.map((p) => { const n = parIndex.get(p.i); return { p, g: n, cotes: n.querySelector('.cotes'), halo: n.querySelector('.halo'), ft: n.querySelector('.face-t'), txt: n.querySelector('.lbl'), spans: n.querySelectorAll('tspan'), marque: n.querySelector('.marque') }; }),
+      etiq: { g: etiq, filet: etiq.querySelector('.filet'), nom: etiq.querySelector('.nom'), det: etiq.querySelector('.det') },
+    };
+  });
+}
+
+function dessinerPlan() {
+  const cam = plan.cam, scene = plan.scene;
+  if (!cam || !scene || !plan.noeuds.length) return;
+  const vp = $('#plan-viewport');
+  const petit = (vp ? vp.clientWidth : 400) < 560;
+  const axo = ($('#plan-plein') || {}).dataset?.vue === 'axo';
+  const zs = altitudes(scene, cam);
+  for (const nd of plan.noeuds) {
+    const zT = zs[nd.e.index];
+    const op = plan.op[nd.e.etage] ?? 1;
+    nd.g.style.opacity = op;
+    nd.g.classList.toggle('eteint', op < 0.2);
+    if (nd.sol) nd.sol.setAttribute('points', points(nd.e.sol.map(([x, y]) => projeter(x, y, zT, cam))));
+    const tr = tranches(nd.e.contour, zT, cam);
+    while (nd.tranches.childNodes.length < tr.length) nd.tranches.append(document.createElementNS('http://www.w3.org/2000/svg', 'polygon'));
+    tr.forEach((q, i) => nd.tranches.childNodes[i].setAttribute('points', points(q.points)));
+    nd.dalle.setAttribute('d', chemin([nd.e.contour, ...nd.e.trous].map((poly) => poly.map(([x, y]) => projeter(x, y, zT, cam)))));
+    nd.e.trous.forEach((tp, i) => nd.trous[i].setAttribute('points', points(tp.map(([x, y]) => projeter(x, y, zT - H_DALLE, cam)))));
+    const ordre = ordreDeDessin(nd.e.pieces, cam);
+    const cle = ordre.join();
+    if (nd.ordre !== cle) { nd.ordre = cle; for (const i of ordre) nd.gPieces.append(nd.pieces[i].g); }
+    for (const s of nd.pieces) {
+      const { haut, cotes } = facesVisibles(s.p.poly, zT, s.p.H, cam);
+      const pts = points(haut);
+      s.ft.setAttribute('points', pts);
+      s.halo.setAttribute('points', pts);
+      while (s.cotes.childNodes.length < cotes.length) s.cotes.append(document.createElementNS('http://www.w3.org/2000/svg', 'polygon'));
+      while (s.cotes.childNodes.length > cotes.length) s.cotes.lastChild.remove();
+      cotes.forEach((c, i) => { const n = s.cotes.childNodes[i]; n.setAttribute('points', points(c.points)); n.style.setProperty('--o', `${Math.round(c.ombre * 100)}%`); });
+      const xs = haut.map((q) => q[0]), ys = haut.map((q) => q[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const label = s.txt.dataset.label ?? (s.txt.dataset.label = s.g.classList.contains('muette') ? '' : s.g.getAttribute('aria-label') ? s.g.getAttribute('aria-label').split(',')[0] : s.spans[0].textContent);
+      // Les repères extérieurs gardent leur nom ; les Salles l'écrivent si la place le permet.
+      const et = label ? etiquette(label, x1 - x0, y1 - y0, { petit }) : null;
+      if (!et || (axo && cam.scale < plan.base * 1.6 && !s.p.salle && s.p.k !== 'p')) s.txt.setAttribute('opacity', 0);
+      else {
+        s.txt.setAttribute('opacity', 1);
+        s.txt.setAttribute('font-size', et.taille.toFixed(1));
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+        const pose = (n, texte, y) => { if (n.textContent !== texte) n.textContent = texte; n.setAttribute('x', cx.toFixed(1)); n.setAttribute('y', y.toFixed(1)); };
+        if (et.lignes.length === 1) { pose(s.spans[0], et.lignes[0], cy); pose(s.spans[1], '', cy); }
+        else { pose(s.spans[0], et.lignes[0], cy - et.taille * 0.56); pose(s.spans[1], et.lignes[1], cy + et.taille * 0.56); }
+      }
+      s.marque.setAttribute('d', s.g.classList.contains('visite') ? etoileSvg(x1 - 6, y0 + 6, 4.6) : '');
+    }
+    // L'étiquette de l'étage, à gauche de sa dalle, en vue d'ensemble seulement.
+    const visible = axo && op > 0.6;
+    nd.etiq.g.setAttribute('opacity', visible ? 1 : 0);
+    nd.etiq.g.style.pointerEvents = visible ? 'auto' : 'none';
+    nd.etiq.g.setAttribute('tabindex', visible ? '0' : '-1');
+    if (visible) {
+      let bb; try { bb = nd.dalle.getBBox(); } catch { bb = null; }
+      if (bb) {
+        // Le nom colle au bord gauche de la scène, le filet le relie à sa dalle.
+        const X = 12, Y = bb.y + bb.height / 2;
+        nd.etiq.nom.setAttribute('x', X); nd.etiq.nom.setAttribute('y', Y - 3); nd.etiq.nom.setAttribute('text-anchor', 'start');
+        nd.etiq.det.setAttribute('x', X); nd.etiq.det.setAttribute('y', Y + 13); nd.etiq.det.setAttribute('text-anchor', 'start');
+        let largeurTexte = 90; try { largeurTexte = Math.max(nd.etiq.nom.getComputedTextLength(), nd.etiq.det.getComputedTextLength()); } catch { /* hors navigateur */ }
+        const finTexte = X + largeurTexte + 8;
+        nd.etiq.filet.setAttribute('x1', finTexte); nd.etiq.filet.setAttribute('y1', Y + 3); nd.etiq.filet.setAttribute('x2', Math.max(finTexte, bb.x + 4)); nd.etiq.filet.setAttribute('y2', Y + 3);
+      }
+    }
   }
-  const k2 = Math.min(6, Math.max(0.6, planTransform.k * ratio));
-  const reel = k2 / planTransform.k;
-  planTransform.tx = ux - (ux - planTransform.tx) * reel;
-  planTransform.ty = uy - (uy - planTransform.ty) * reel;
-  planTransform.k = k2;
-  appliquerTransformPlan();
 }
 
-function centrerPlanSur(x, y, k = 2.2) {
-  const { cx, cy } = facteurPlan();
-  planTransform.k = k;
-  planTransform.tx = cx - k * x;
-  planTransform.ty = cy - k * y;
-  appliquerTransformPlan();
+// La caméra vole d'où elle est vers sa cible : tourner, incliner, cadrer et
+// effacer les autres étages en un seul mouvement.
+function volerPlan(camCible, opCible, duree = 640) {
+  if (plan.anim) cancelAnimationFrame(plan.anim);
+  const d = REDUIRE_MOUVEMENT.matches ? 0 : duree;
+  const c0 = { ...plan.cam }, o0 = { ...plan.op }, t0 = performance.now();
+  const pas = (now) => {
+    if (!plan.cam) { plan.anim = null; return; } // le plan a été fermé en plein vol
+    const u = d ? Math.min(1, (now - t0) / d) : 1;
+    const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    for (const k of Object.keys(camCible)) plan.cam[k] = c0[k] + (camCible[k] - c0[k]) * e;
+    for (const k of Object.keys(opCible)) plan.op[k] = (o0[k] ?? 1) + (opCible[k] - (o0[k] ?? 1)) * e;
+    dessinerPlan();
+    plan.anim = u < 1 ? requestAnimationFrame(pas) : null;
+  };
+  plan.anim = requestAnimationFrame(pas);
 }
 
 function initialiserPlan() {
-  const vp = $('#plan-viewport');
-  if (!vp) return;
-  if (planTransform.centrerSur) {
-    // Le même Étage que celui qui est à l'écran : la disposition était calculée
-    // tous étages confondus, si bien que les coordonnées de centrage ne
-    // correspondaient à rien dès qu'il y avait deux niveaux.
-    let cle = null;
-    if (planTransform.centrerSur === 'resultat') { const r = rechercherSurPlan(etat.modele, etat.ui.recherchePlan); cle = r && r.salle ? r.salle.cle : null; }
-    else cle = normaliser(planTransform.centrerSur);
-    const salle = etat.modele.salles.find((s) => s.cle === cle) || null;
-    const { rects, placements } = calculerPlan(etat.modele, etageAffiche(etat.modele, etat.ui, salle));
-    const cadre = cle ? cadrageSalle(rects, placements, cle) : null;
-    if (cadre) centrerPlanSur(cadre.x, cadre.y, cadre.k);
-    else if (planTransform.centrerSur !== 'resultat') { planTransform.k = 1; planTransform.tx = 0; planTransform.ty = 0; }
-    planTransform.centrerSur = null;
-  }
-  appliquerTransformPlan();
-  planPointeurs = new Map();
-  let bouge = false;
-  // La capture de pointeur n'est prise QUE lorsqu'un vrai déplacement commence.
-  // Un simple appui ne capture rien, donc le clic atteint la Zone ou la Salle
-  // touchée : Safari (contrairement à Chrome) redirige sinon le clic vers le
-  // conteneur du plan, et plus rien ne répond.
-  const capture = new Set();
-  const prendreCapture = (id) => { if (capture.has(id)) return; try { vp.setPointerCapture(id); capture.add(id); } catch { /* pointeur déjà relâché */ } };
-  const rendreCapture = (id) => { if (!capture.has(id)) return; try { vp.releasePointerCapture(id); } catch { /* déjà relâché */ } capture.delete(id); };
-
-  vp.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.outils')) return;
-    planPointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
-    bouge = false;
-    if (planPointeurs.size === 2) {
-      const [a, b] = [...planPointeurs.values()];
-      planPincementDistance = Math.hypot(a.x - b.x, a.y - b.y);
-      for (const id of planPointeurs.keys()) prendreCapture(id); // le pincement est toujours un geste, jamais un appui
-      bouge = true;
+  const vp = $('#plan-viewport'), svg = $('#plan-svg'), plein = $('#plan-plein');
+  if (!vp || !svg || !plein) return;
+  const scene = sceneCourante();
+  attacherPlan(svg, scene);
+  const vue = plein.dataset.nom || 'axo';
+  const axo = vue === 'axo';
+  const allumee = svg.querySelector('.piece.allumee');
+  const dims = dimensionsPlan();
+  const cle = `${vue}|${allumee ? allumee.dataset.valeur : ''}|${dims.reserve.bas}|${dims.largeur}x${dims.hauteur}`;
+  if (plan.cible !== cle || !plan.cam) {
+    let cam = cameraPour(scene, vue, { ...dims, yaw: plan.yaw, pitch: plan.pitch });
+    plan.base = cam.scale;
+    if (allumee && !axo) {
+      const nd = plan.noeuds.find((n) => n.e.etage === vue);
+      const piece = nd && nd.pieces.find((s) => s.g === allumee);
+      if (piece) cam = cadrerSur(cam, scene, piece.p, dims);
     }
+    const op = Object.fromEntries(scene.etages.map((e) => [e.etage, axo || e.etage === vue ? 1 : 0]));
+    if (plan.cam) volerPlan(cam, op);
+    else { plan.cam = cam; plan.op = op; dessinerPlan(); }
+    plan.cible = cle;
+  } else dessinerPlan();
+
+  // Les doigts : un doigt tourne et incline en vue d'ensemble, déplace à plat ;
+  // deux doigts zooment. La capture de pointeur n'est prise QU'au-delà de quatre
+  // pixels : un appui reste un clic sur la Pièce touchée, sinon Safari redirige
+  // le clic vers le conteneur et plus rien ne répond.
+  const pointeurs = new Map();
+  let pincement = 0, bouge = false;
+  const capture = new Set();
+  const prendre = (id) => { if (capture.has(id)) return; try { vp.setPointerCapture(id); capture.add(id); } catch { /* relâché */ } };
+  const rendreCapture = (id) => { if (!capture.has(id)) return; try { vp.releasePointerCapture(id); } catch { /* déjà */ } capture.delete(id); };
+  const milieu = () => { const [a, b] = [...pointeurs.values()]; return [(a.x + b.x) / 2, (a.y + b.y) / 2]; };
+  const local = (x, y) => { const r = vp.getBoundingClientRect(); return [x - r.left, y - r.top]; };
+  vp.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.outils, .feuille')) return;
+    pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
+    bouge = false;
+    if (pointeurs.size === 2) { const [a, b] = [...pointeurs.values()]; pincement = Math.hypot(a.x - b.x, a.y - b.y); for (const id of pointeurs.keys()) prendre(id); bouge = true; }
   });
   vp.addEventListener('pointermove', (e) => {
-    const p = planPointeurs.get(e.pointerId);
-    if (!p) return;
-    const { f } = facteurPlan();
-    if (planPointeurs.size === 1) {
-      if (!bouge && Math.abs(e.clientX - p.x0) + Math.abs(e.clientY - p.y0) <= SEUIL_GESTE) return; // encore un appui, pas un déplacement
-      if (!bouge) { bouge = true; prendreCapture(e.pointerId); }
-      planTransform.tx += (e.clientX - p.x) / f; planTransform.ty += (e.clientY - p.y) / f;
+    const p = pointeurs.get(e.pointerId);
+    if (!p || !plan.cam) return;
+    if (pointeurs.size === 1) {
+      if (!bouge && Math.abs(e.clientX - p.x0) + Math.abs(e.clientY - p.y0) <= SEUIL_GESTE) return;
+      if (!bouge) { bouge = true; prendre(e.pointerId); vp.classList.add('attrape'); if (plan.anim) { cancelAnimationFrame(plan.anim); plan.anim = null; } }
+      const dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
-      appliquerTransformPlan();
-    } else if (planPointeurs.size === 2) {
+      if (plein.dataset.vue === 'axo') {
+        plan.yaw += dx * 0.008;
+        plan.pitch = Math.min(INCLINAISON.max, Math.max(INCLINAISON.min, plan.pitch - dy * 0.006));
+        const facteur = plan.cam.scale / plan.base;
+        const cam = cameraPour(scene, 'axo', { ...dimensionsPlan(), yaw: plan.yaw, pitch: plan.pitch });
+        plan.base = cam.scale;
+        plan.cam = zoomer(cam, facteur, cam.panX, cam.panY, plan.base);
+      } else { plan.cam.panX += dx; plan.cam.panY += dy; }
+      dessinerPlan();
+    } else if (pointeurs.size === 2) {
       p.x = e.clientX; p.y = e.clientY;
-      const [a, b] = [...planPointeurs.values()];
+      const [a, b] = [...pointeurs.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (planPincementDistance > 0) zoomerPlan(d / planPincementDistance, (a.x + b.x) / 2, (a.y + b.y) / 2);
-      planPincementDistance = d;
-      bouge = true;
+      if (pincement > 0) { const [mx, my] = local(...milieu()); plan.cam = zoomer(plan.cam, d / pincement, mx, my, plan.base); dessinerPlan(); }
+      pincement = d; bouge = true;
     }
   });
-  const fin = (e) => { rendreCapture(e.pointerId); planPointeurs.delete(e.pointerId); planPincementDistance = 0; };
+  const fin = (e) => { rendreCapture(e.pointerId); pointeurs.delete(e.pointerId); pincement = 0; if (!pointeurs.size) vp.classList.remove('attrape'); };
   vp.addEventListener('pointerup', fin);
   vp.addEventListener('pointercancel', fin);
-  // Un déplacement ne doit pas être compris comme un appui sur ce qui se trouve dessous.
   vp.addEventListener('click', (e) => { if (bouge) { e.stopPropagation(); e.preventDefault(); bouge = false; } }, true);
-  vp.addEventListener('wheel', (e) => { e.preventDefault(); zoomerPlan(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); }, { passive: false });
+  vp.addEventListener('wheel', (e) => { e.preventDefault(); if (!plan.cam) return; const [mx, my] = local(e.clientX, e.clientY); plan.cam = zoomer(plan.cam, e.deltaY < 0 ? 1.15 : 1 / 1.15, mx, my, plan.base); dessinerPlan(); }, { passive: false });
+
+  // La poignée de la feuille : tirer vers le haut l'agrandit, vers le bas la réduit.
+  const tete = $('#feuille .feuille-tete');
+  if (tete) {
+    let depart = null;
+    tete.addEventListener('pointerdown', (e) => { if (e.target.closest('.pastille')) return; depart = e.clientY; });
+    const lacher = (e) => {
+      if (depart === null) return;
+      const dy = e.clientY - depart; depart = null;
+      if (Math.abs(dy) < 30) return;
+      plan.feuilleGlisse = true;
+      setTimeout(() => { plan.feuilleGlisse = false; }, 400);
+      deplacerFeuille(dy < 0 ? 1 : -1);
+    };
+    tete.addEventListener('pointerup', lacher);
+    tete.addEventListener('pointercancel', () => { depart = null; });
+  }
 }
+
+const HAUTEURS_FEUILLE = ['repliee', 'mi', 'deployee'];
+function deplacerFeuille(sens) {
+  const feuille = $('#feuille');
+  const actuelle = feuille ? feuille.dataset.hauteur : 'repliee';
+  const i = Math.min(2, Math.max(0, HAUTEURS_FEUILLE.indexOf(actuelle) + sens));
+  etat.ui.feuillePlan = HAUTEURS_FEUILLE[i];
+  rendre({ conserver: true });
+}
+
+function fermerPlan() {
+  if (plan.retour === 'back' && history.length > 1) history.back();
+  else location.hash = '#/';
+}
+
+let minuteurTaille = null;
+window.addEventListener('resize', () => {
+  if (etat.route.nom !== 'plan') return;
+  clearTimeout(minuteurTaille);
+  minuteurTaille = setTimeout(() => { plan.cible = ''; initialiserPlan(); }, 120);
+});
 
 // ---------------------------------------------------------------- données
 
@@ -585,6 +734,7 @@ async function demarrer() {
   stats.noter('ouverture', initial ? initial.source : 'aucune',
     `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}·${langue()}`);
   appliquerRoute();
+  demarre = true;
   enregistrerServiceWorker();
   versionServiceWorker().then((v) => { etat.versionSW = v; el.pied.innerHTML = piedDePage(etat); });
   rafraichisseur.demarrer();

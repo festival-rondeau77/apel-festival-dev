@@ -6,7 +6,7 @@
 // une fonction de l'état et rien d'autre.
 import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone } from './donnees.js';
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe } from './visite.js';
-import { disposerZones, placerSalles, etendue, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage } from './plan.js';
+import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, LANGUES, NOMS_LANGUES } from './i18n.js';
 
@@ -479,9 +479,8 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
 // ---------------------------------------------------------------- plan
 
 const COULEUR_ZONE = (numero) => `var(--z${((numero ?? 1) - 1) % 11 + 1})`;
-const co = (n) => Math.round(n * 100) / 100;
 
-// Le nom d'une Zone sur au plus deux lignes qui tiennent dans son rectangle.
+// Le nom d'une Zone sur au plus deux lignes qui tiennent dans une largeur donnée.
 export function couperNomZone(nom, maxCaracteres) {
   const mots = String(nom).split(/\s+/);
   const lignes = [''];
@@ -493,73 +492,64 @@ export function couperNomZone(nom, maxCaracteres) {
   return lignes.map((l) => (l.length > maxCaracteres ? `${l.slice(0, Math.max(1, Math.floor(maxCaracteres) - 1))}…` : l));
 }
 
-export function calculerPlan(modele, etage = null) {
-  const { salles, zones } = etage ? planDeLEtage(modele, etage) : { salles: modele.salles, zones: modele.zones };
-  const rects = disposerZones(zones);
-  const placements = placerSalles(salles, rects);
-  return { rects, placements, etendue: etendue(rects, placements) };
+// La vue du plan : « axo » (les étages empilés) ou le nom d'un étage ouvert à
+// plat. Une Salle cherchée ou touchée ouvre son étage toute seule (ADR-0013) ;
+// sinon c'est l'étage choisi par le Visiteur, sinon la vue d'ensemble.
+export function vuePlan(scene, ui, cible) {
+  if (cible) { const e = etageDeSalle(scene, cible); if (e) return e; }
+  if (ui.etagePlan && etagesPresents(scene).includes(ui.etagePlan)) return ui.etagePlan;
+  return 'axo';
 }
 
-// L'étage affiché : celui de la salle qu'on cherche ou qu'on vient de toucher,
-// sinon celui du village ouvert, sinon celui que le Visiteur a choisi. Chercher
-// « Salle 43 » depuis le rez-de-chaussée doit monter d'un étage tout seul —
-// sans quoi la recherche répond « rien trouvé » alors qu'elle a trouvé.
-export function etageAffiche(modele, ui, cible) {
-  const etages = etagesPresents(modele);
-  if (cible && cible.etage && etages.includes(cible.etage)) return cible.etage;
-  if (ui.etagePlan && etages.includes(ui.etagePlan)) return ui.etagePlan;
-  return etages[0];
+// Ce qu'une Pièce écrit sur elle : le mot du point d'intérêt, sinon le nom de
+// la Salle sans le mot « Salle », sinon le nom d'un repère extérieur. Une Pièce
+// hors festival n'écrit rien : fond discret, murs tracés, c'est tout.
+export function libellePiece(p) {
+  if (p.salle) return MOT_POINT[p.salle.typePoint] ? t(MOT_POINT[p.salle.typePoint]) : p.salle.nom.replace(/^salle\s+(?=\d)/i, '');
+  if (p.k === 'p') return t(p.nom);
+  return '';
+}
+
+// L'état de la feuille du bas : posé par le Visiteur (poignée), sinon à
+// mi-hauteur dès qu'il y a une fiche à lire, repliée sinon.
+export function hauteurFeuille(ui, aUneFiche) {
+  if (['repliee', 'mi', 'deployee'].includes(ui.feuillePlan)) return ui.feuillePlan;
+  return aUneFiche ? 'mi' : 'repliee';
 }
 
 export function ecranPlan(etat) {
   const { modele, ui } = etat;
+  const scene = construireScene(modele);
   const sallesVisite = sallesDeVisite(etat.visite, modele);
   const resultat = ui.recherchePlan ? rechercherSurPlan(modele, ui.recherchePlan) : null;
-  const allumee = resultat && resultat.salle ? resultat.salle.cle : (ui.salleAllumee ? normaliser(ui.salleAllumee) : null);
+  const allumee = resultat && resultat.salle ? resultat.salle.cle : (ui.salleAllumee ? (salleParNom(modele, ui.salleAllumee) || { cle: normaliser(ui.salleAllumee) }).cle : null);
   const salleAllumeeObj = allumee ? modele.salles.find((s) => s.cle === allumee) : null;
-  const etages = etagesPresents(modele);
-  const etage = etageAffiche(modele, ui, salleAllumeeObj);
-  const { rects, placements, etendue: dim } = calculerPlan(modele, etage);
-  // Une Zone explicitement touchée ouvre le panneau de la Zone ; une Salle
-  // touchée ouvre le panneau de cette Salle seule, et non de toute sa Zone.
+  const etages = etagesPresents(scene);
+  const vue = vuePlan(scene, ui, salleAllumeeObj);
   const zoneOuverte = ui.zoneOuverte !== null && ui.zoneOuverte !== undefined
     ? modele.zones.find((z) => String(z.numero ?? z.nom) === String(ui.zoneOuverte)) : null;
   const zoneActive = zoneOuverte || (salleAllumeeObj ? salleAllumeeObj.zone : null);
   const salleDemandee = ui.salleAllumee && !salleAllumeeObj ? ui.salleAllumee : null;
 
-  const svgZones = rects.map((r) => {
-    // Le nom démarre après le numéro : deux chiffres prennent plus de place qu'un,
-    // sans quoi « 10 » et « Orientation générale » se chevauchent.
-    const chiffres = r.zone.numero === null ? 0 : String(r.zone.numero).length;
-    const x0 = r.x + (chiffres ? 3.4 + chiffres * 2.2 : 2);
-    const lignes = couperNomZone(t(r.zone.nom), (r.x + r.w - 1 - x0) / 1.3);
-    return `<g class="zone-g">
-      <rect class="zone-rect${zoneActive === r.zone ? ' active' : ''}" x="${co(r.x)}" y="${co(r.y)}" width="${co(r.w)}" height="${co(r.h)}" rx="2.4" fill="${COULEUR_ZONE(r.zone.numero)}" data-action="zone" data-valeur="${attr(r.zone.numero ?? r.zone.nom)}" tabindex="0" role="button" aria-label="${r.zone.fonction ? '' : `${attr(t('Village'))} `}${attr(r.zone.numero ?? '')} ${attr(t(r.zone.nom))}"/>
-      <text class="zone-num" x="${co(r.x + 2.2)}" y="${co(r.y + 5)}">${h(r.zone.numero ?? '')}</text>
-      ${lignes.map((l, i) => `<text class="zone-nom" x="${co(x0)}" y="${co(r.y + 4.4 + i * 2.7)}">${h(l)}</text>`).join('')}
-    </g>`;
+  // Le squelette du SVG : un groupe par étage, un groupe par Pièce, sans aucune
+  // coordonnée — l'adaptateur les pose à chaque image (tourner, incliner, zoomer).
+  const svgEtages = scene.etages.map((e) => {
+    const pieces = e.pieces.map((p) => {
+      const label = libellePiece(p);
+      const classes = ['piece', `k-${p.k || 'salle'}`, p.salle ? 'salle' : '', p.salle && MOT_POINT[p.salle.typePoint] ? 'poi' : '', p.salle && allumee === p.salle.cle ? 'allumee' : '', p.salle && sallesVisite.has(p.salle.cle) ? 'visite' : '', zoneActive && p.salle && p.zone !== zoneActive ? 'hors' : '', label ? '' : 'muette'].filter(Boolean).join(' ');
+      const aria = p.salle ? `${label}${p.zone ? `, ${t('Village')} ${p.zone.numero ?? ''} ${t(p.zone.nom)}` : ''}, ${t(e.etage)}` : '';
+      return `<g class="${classes}" data-i="${p.i}"${p.zone ? ` style="--c:${COULEUR_ZONE(p.zone.numero)}"` : ''}${p.salle ? ` data-action="salle" data-valeur="${attr(p.salle.nom)}" tabindex="0" role="button" aria-label="${attr(aria.replace(/\s+/g, ' ').trim())}"` : ''}><g class="cotes"></g><polygon class="halo"/><polygon class="face-t"/><text class="lbl"><tspan></tspan><tspan></tspan></text><path class="marque" d=""/></g>`;
+    }).join('');
+    const { salles, zones } = planDeLEtage(scene, modele, e.etage);
+    const detail = `${tn('%s village', '%s villages', zones.length)} · ${tn('%s salle', '%s salles', salles.length)}`;
+    return `<g class="etage" data-etage="${attr(e.etage)}" data-action="etage" data-valeur="${attr(e.etage)}">${e.sol ? '<polygon class="sol"/>' : ''}<g class="tranches"></g><path class="dalle" fill-rule="evenodd"/>${e.trous.map(() => '<polygon class="vide"/>').join('')}<g class="pieces">${pieces}</g></g>
+      <g class="etiq-etage" data-etage="${attr(e.etage)}" data-action="etage" data-valeur="${attr(e.etage)}" tabindex="0" role="button" aria-label="${attr(t('Ouvrir le plan : %s', t(e.etage)))}"><line class="filet"/><text class="nom">${h(t(e.etage))}</text><text class="det">${h(detail)}</text></g>`;
   }).join('');
 
-  const svgSalles = placements.filter((p) => p.x !== null).map((p) => {
-    const s = p.salle;
-    const estPoi = Boolean(MOT_POINT[s.typePoint]);
-    const label = estPoi ? t(MOT_POINT[s.typePoint]) : s.nom.replace(/^salle\s+/i, 'S ');
-    const dansVisite = sallesVisite.has(s.cle);
-    const classes = ['salle-g', estPoi ? 'poi' : '', dansVisite ? 'visite' : '', allumee === s.cle ? 'allumee' : ''].filter(Boolean).join(' ');
-    const w = Math.max(6.4, label.length * 1.32 + 2.4), hh = 4.2;
-    return `<g class="${classes}" data-action="salle" data-valeur="${attr(s.nom)}" tabindex="0" role="button" aria-label="${attr(s.nom)}${p.estimee ? ` ${attr(t('(position estimée)'))}` : ''}">
-      ${allumee === s.cle ? `<rect class="halo" x="${co(p.x - w / 2)}" y="${co(p.y - hh / 2)}" width="${co(w)}" height="${hh}" rx="1.4"/>` : ''}
-      <rect class="salle-rect${p.estimee ? ' estimee' : ''}" x="${co(p.x - w / 2)}" y="${co(p.y - hh / 2)}" width="${co(w)}" height="${hh}" rx="1.2"/>
-      <text class="salle-txt" x="${co(p.x)}" y="${co(p.y + 0.75)}">${h(label)}</text>
-      ${dansVisite ? `<path class="salle-etoile" d="M${co(p.x + w / 2 - 0.2)} ${co(p.y - hh / 2 - 1.1)}v2.2m-1.1-1.1h2.2"/>` : ''}
-    </g>`;
-  }).join('');
-
+  // La feuille : ce qu'il y a à lire — un résultat de recherche, une Salle, un
+  // Village, sinon un résumé de la vue et la liste équivalente du plan.
   const contenu = zoneOuverte ? contenuZone(modele, zoneOuverte) : null;
   const contenuDeLaSalle = !zoneOuverte && salleAllumeeObj ? contenuSalle(modele, salleAllumeeObj) : null;
-  // Le nom de la Salle allumée n'est plus écrit qu'UNE fois — il l'était trois :
-  // dans le sous-titre, dans le guidage, puis dans le panneau. C'est le panneau
-  // qui parle, et il passe AVANT la carte, pour être lu sans faire défiler.
   const guidage = resultat && !(resultat.genre === 'salle' && salleAllumeeObj)
     ? `<section class="guidage" aria-live="polite"><h2>${h(resultat.genre === 'evenement' ? tt(resultat.libelle) : resultat.libelle)}</h2>
       <p><span class="ou">${h(resultat.nomSalle || t('salle à venir'))}</span> — ${h(resultat.phrase)}</p>
@@ -568,47 +558,59 @@ export function ecranPlan(etat) {
     : salleDemandee ? `<section class="guidage" aria-live="polite"><h2>${h(salleDemandee)}</h2><p>${h(phraseGuidage(null, salleDemandee))}</p></section>`
     : ui.recherchePlan && !resultat ? `<p class="vide">${h(t("Rien trouvé. Essayez le numéro de la salle ou le nom de l'école."))}</p>` : '';
 
+  const aLocaliser = salleAllumeeObj && !scene.parSalle.has(salleAllumeeObj.cle);
   const panneauSalle = contenuDeLaSalle ? `<section class="panneau-zone salle" aria-live="polite">
     <h2>${h(salleAllumeeObj.nom)}</h2>
-    <p class="salles-de-la-zone">${h(phraseGuidage(salleAllumeeObj))}</p>
+    <p class="salles-de-la-zone">${h(phraseGuidage(salleAllumeeObj))}${aLocaliser ? ` — ${h(t('salle à localiser'))}` : ''}</p>
     <p class="salles-de-la-zone">${h(contenuDeLaSalle.exposants.length ? tn('%s exposant ici', '%s exposants ici', contenuDeLaSalle.exposants.length) : t("Aucun exposant dans cette salle pour l'instant"))}</p>
     ${salleAllumeeObj.zone ? `<div class="boutons"><button class="bouton secondaire" type="button" data-action="zone" data-valeur="${attr(salleAllumeeObj.zone.numero ?? salleAllumeeObj.zone.nom)}">${h(t('Voir tout le village %s %s', salleAllumeeObj.zone.numero ?? '', t(salleAllumeeObj.zone.nom)))}</button></div>` : ''}
     ${contenuDeLaSalle.exposants.length ? `<ul class="liste">${contenuDeLaSalle.exposants.map((e) => ligneExposant(etat, e, { de: `plan:${salleAllumeeObj.nom}`, sansSalle: true })).join('')}</ul>` : ''}
     ${contenuDeLaSalle.evenements.length ? `<h3 class="titre-section">${h(t('Événements dans cette salle'))}</h3><ul class="liste">${contenuDeLaSalle.evenements.map((e) => ligneEvenement(etat, e, { de: `plan:${salleAllumeeObj.nom}` })).join('')}</ul>` : ''}
   </section>` : '';
 
-  const legende = `<div class="legende" aria-hidden="true">${rects.filter((r) => r.zone.numero !== null).map((r) => `<span style="--c:${COULEUR_ZONE(r.zone.numero)}">${h(r.zone.numero)} ${h(t(r.zone.nom))}</span>`).join('')}</div>`;
+  const panneauVillage = contenu ? `<section class="panneau-zone village" aria-live="polite">
+    <h2><span class="num">${h(zoneOuverte.numero ?? '')}</span>${h(t(zoneOuverte.nom))}</h2>
+    ${contenu.salles.length ? `<p class="salles-de-la-zone">${h(t('Salles'))} : ${contenu.salles.map((s) => `<a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a>`).join(', ')} — ${h(etagesDeZone(zoneOuverte).map((e) => t(e)).join(` ${t('et')} `).toLowerCase())}</p>` : `<p class="salles-de-la-zone">${h(t('Salles à venir.'))}</p>`}
+    ${contenu.exposants.length ? `<h3 class="titre-section">${h(t('Exposants'))}</h3><ul class="liste">${contenu.exposants.map((e) => ligneExposant(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
+    ${contenu.evenements.length ? `<h3 class="titre-section">${h(t('Événements'))}</h3><ul class="liste">${contenu.evenements.map((e) => ligneEvenement(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
+    ${!contenu.exposants.length && !contenu.evenements.length ? `<p class="vide">${h(t("Rien n'est encore affecté à ce village."))}</p>` : ''}
+  </section>` : '';
 
-  // Les onglets d'étage : deux niveaux, deux plans. On ne les affiche que si le
-  // tableur en connaît plus d'un — un festival de plain-pied n'a pas à choisir.
-  const onglets = etages.length > 1 ? `<div class="onglets etages" role="tablist" aria-label="${attr(t('Étage'))}">
-    ${etages.map((e) => `<button class="onglet" type="button" role="tab" aria-selected="${e === etage}" data-action="etage" data-valeur="${attr(e)}">${h(t(e))}</button>`).join('')}
-  </div>` : '';
-
-  const listeEtage = (e) => modele.zones.filter((z) => z.salles.some((s) => s.etage === e))
-    .map((z) => `<li class="ligne"><div class="heure">${h(z.numero ?? '·')}</div><div class="corps"><button class="filtre" type="button" data-action="zone" data-valeur="${attr(z.numero ?? z.nom)}">${h(t(z.nom))}</button><div class="meta"><span>${z.salles.filter((s) => s.etage === e).map((s) => h(s.nom)).join(', ') || h(t('salles à venir'))}</span></div></div><div></div></li>`).join('');
-  const equivalent = `<details class="equivalent"><summary>${h(t('Le plan en liste (villages et salles)'))}</summary>
+  // La liste équivalente : les villages et leurs salles par étage, puis les
+  // Salles que le relevé ne connaît pas (à localiser), pour qui n'utilise pas l'image.
+  const listeEtage = (e) => planDeLEtage(scene, modele, e).zones
+    .map((z) => `<li class="ligne"><div class="heure">${h(z.numero ?? '·')}</div><div class="corps"><button class="filtre" type="button" data-action="zone" data-valeur="${attr(z.numero ?? z.nom)}">${h(t(z.nom))}</button><div class="meta"><span>${z.salles.filter((s) => etageDeSalle(scene, s) === e && scene.parSalle.has(s.cle)).map((s) => h(s.nom)).join(', ') || h(t('salles à venir'))}</span></div></div><div></div></li>`).join('');
+  const equivalent = `<details class="equivalent"${vue === 'axo' && !guidage && !panneauSalle && !panneauVillage ? ' open' : ''}><summary>${h(t('Le plan en liste (villages et salles)'))}</summary>
     ${etages.map((e) => `<h3 class="titre-section">${h(t(e))}</h3><ul class="liste">${listeEtage(e) || `<li class="ligne"><div class="corps">${h(t("Rien à cet étage pour l'instant."))}</div></li>`}</ul>`).join('')}
+    ${scene.aLocaliser.length ? `<h3 class="titre-section">${h(t('Salles à localiser'))}</h3><ul class="liste">${scene.aLocaliser.map((s) => `<li class="ligne"><div class="heure">${h(s.zone ? s.zone.numero ?? '·' : '·')}</div><div class="corps"><a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a><div class="meta"><span>${h(phraseGuidage(s))}</span></div></div><div></div></li>`).join('')}</ul>` : ''}
   </details>`;
 
-  const villagesDuPlan = rects.filter((r) => r.zone.numero !== null).map((r) => `${r.zone.numero} ${t(r.zone.nom)}`).join(', ');
-  return `${entete(t('Plan du festival'), h(t('Touchez un village, ou cherchez une salle ou une école')))}
-  ${champRecherche('recherchePlan', ui.recherchePlan, t('Une salle, une école, un événement'))}
-  ${onglets}
-  <div class="plan-cote-a-cote">
-  ${guidage}
-  ${panneauSalle}
-  <div class="plan-carte">
-  <div class="plan-viewport" id="plan-viewport">
-    <svg viewBox="0 0 ${dim.largeur} ${dim.hauteur}" role="img" aria-labelledby="plan-titre plan-desc" preserveAspectRatio="xMidYMid meet">
-      <title id="plan-titre">${h(t("Plan stylisé de l'Ensemble Scolaire Maurice Rondeau — %s", t(etage)))}</title>
-      <desc id="plan-desc">${h(t(etage))} : ${h(villagesDuPlan)}. ${h(t('La liste équivalente est sous le plan.'))}</desc>
-      <g class="plan-monde" id="plan-monde" data-hauteur="${dim.hauteur}">
-        <rect x="0" y="0" width="${dim.largeur}" height="${dim.hauteur}" fill="transparent"/>
-        ${svgZones}
-        ${svgSalles}
-        ${etage === etages[0] ? `<text class="entree-txt" x="50" y="${co(dim.hauteur - 1.5)}">${h(t('Entrée'))}</text>` : ''}
-      </g>
+  const resume = vue === 'axo'
+    ? `<h2 class="feuille-titre">${h(t('Plan du festival'))}</h2><p class="feuille-sous">${h(t("Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir."))}</p>`
+    : `<h2 class="feuille-titre">${h(t(vue))}</h2><p class="feuille-sous">${h(planDeLEtage(scene, modele, vue).zones.map((z) => `${z.numero ?? ''} ${t(z.nom)}`.trim()).join(' · ') || t("Rien à cet étage pour l'instant."))}</p>`;
+  const fiche = guidage || panneauSalle || panneauVillage;
+  const hauteur = hauteurFeuille(ui, Boolean(fiche));
+
+  // Les pastilles des villages : toucher l'une allume son village sur les deux
+  // étages, retoucher l'éteint.
+  const villagesPresents = modele.zones.filter((z) => z.numero !== null && z.salles.length);
+  const pastilles = villagesPresents.map((z) => `<button class="pastille" type="button" data-action="zone" data-valeur="${attr(z.numero)}" aria-pressed="${zoneOuverte === z}" style="--c:${COULEUR_ZONE(z.numero)}"><span class="n">${h(z.numero)}</span>${h(nomCourt(z.nom))}</button>`).join('');
+
+  const libelleVue = vue === 'axo' ? t("Vue d'ensemble") : t(vue);
+  return `<div class="plan-plein" id="plan-plein" data-vue="${vue === 'axo' ? 'axo' : 'etage'}" data-nom="${attr(vue)}">
+  <div class="plan-rail">
+    ${champRecherche('recherchePlan', ui.recherchePlan, t('Une salle, une école, un événement'))}
+    <button class="plan-fermer" type="button" data-action="fermer-plan" aria-label="${attr(t('Fermer le plan'))}">${icone('fermer', 20)}</button>
+  </div>
+  <div class="onglets etages plan-onglets" role="tablist" aria-label="${attr(t('Étage'))}">
+    <button class="onglet" type="button" role="tab" aria-selected="${vue === 'axo'}" data-action="vue-ensemble">${h(t("Vue d'ensemble"))}</button>
+    ${[...etages].reverse().map((e) => `<button class="onglet" type="button" role="tab" aria-selected="${e === vue}" data-action="etage" data-valeur="${attr(e)}">${h(t(e))}</button>`).join('')}
+  </div>
+  <div class="plan-scene" id="plan-viewport" data-hauteur="${hauteur}">
+    <svg id="plan-svg" role="img" aria-labelledby="plan-titre plan-desc">
+      <title id="plan-titre">${h(t("Plan de l'Ensemble Scolaire Maurice Rondeau : %s", libelleVue))}</title>
+      <desc id="plan-desc">${h(t('La liste équivalente est dans la fiche, sous le plan.'))}</desc>
+      ${svgEtages}
     </svg>
     <div class="outils">
       <button type="button" data-action="zoom" data-valeur="1" aria-label="${attr(t('Zoomer'))}">${icone('plus', 17)}</button>
@@ -616,17 +618,17 @@ export function ecranPlan(etat) {
       <button type="button" data-action="recentrer" aria-label="${attr(t('Recentrer le plan'))}">${icone('recentrer', 17)}</button>
     </div>
   </div>
-  ${legende}
-  </div>
-  ${contenu ? `<section class="panneau-zone village" aria-live="polite">
-    <h2><span class="num">${h(zoneOuverte.numero ?? '')}</span>${h(t(zoneOuverte.nom))}</h2>
-    ${contenu.salles.length ? `<p class="salles-de-la-zone">${h(t('Salles'))} : ${contenu.salles.map((s) => `<a href="${lienPlanSalle(s.nom)}">${h(s.nom)}</a>`).join(', ')} — ${h(etagesDeZone(zoneOuverte).map((e) => t(e)).join(` ${t('et')} `).toLowerCase())}</p>` : `<p class="salles-de-la-zone">${h(t('Salles à venir.'))}</p>`}
-    ${contenu.exposants.length ? `<h3 class="titre-section">${h(t('Exposants'))}</h3><ul class="liste">${contenu.exposants.map((e) => ligneExposant(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
-    ${contenu.evenements.length ? `<h3 class="titre-section">${h(t('Événements'))}</h3><ul class="liste">${contenu.evenements.map((e) => ligneEvenement(etat, e, { de: `village:${zoneOuverte.numero ?? zoneOuverte.nom}` })).join('')}</ul>` : ''}
-    ${!contenu.exposants.length && !contenu.evenements.length ? `<p class="vide">${h(t("Rien n'est encore affecté à ce village."))}</p>` : ''}
-  </section>` : ''}
-  </div>
-  ${equivalent}`;
+  <aside class="feuille" id="feuille" data-hauteur="${hauteur}" aria-label="${attr(t('La fiche'))}">
+    <div class="feuille-tete">
+      <button class="poignee" type="button" data-action="feuille" aria-label="${attr(t('Agrandir ou réduire la fiche'))}"><span></span></button>
+      <div class="pastilles" role="group" aria-label="${attr(t('Villages'))}">${pastilles}</div>
+    </div>
+    <div class="feuille-corps">
+      ${fiche || resume}
+      ${equivalent}
+    </div>
+  </aside>
+  </div>`;
 }
 
 // ---------------------------------------------------------------- ma visite
@@ -742,9 +744,12 @@ export function ecranPreparer(etat, { seulementQuestions = false, typeQuestions 
 
 export function ecranAide(etat) {
   const i = etat.modele.infos;
-  const salleAccueil = salleParNom(etat.modele, 'Accueil');
-  const salleWc = salleParNom(etat.modele, 'Toilettes');
-  const salleFood = salleParNom(etat.modele, 'Foodtruck');
+  // Les points de base se trouvent par leur type : la Salle s'appelle comme sa
+  // porte (« Hall d'entrée », « Parvis »), pas comme sa fonction (ADR-0013).
+  const parType = (type) => etat.modele.salles.find((s) => s.typePoint === type) || salleParNom(etat.modele, type);
+  const salleAccueil = parType('Accueil');
+  const salleWc = parType('Toilettes');
+  const salleFood = parType('Foodtruck');
   const bloc = (ico, titre, texte) => `<div class="aide-bloc">${icone(ico, 21)}<div><h3>${h(titre)}</h3><p>${texte}</p></div></div>`;
   // Une question qui mène quelque part est une ligne entièrement touchable.
   const blocLien = (ico, titre, texte, lien) => `<a class="aide-bloc" href="${attr(lien)}">${icone(ico, 21)}<div><h3>${h(titre)}</h3><p>${h(texte)}</p></div>${icone('chevron', 18)}</a>`;
@@ -758,9 +763,9 @@ export function ecranAide(etat) {
   return `${entete(t("Besoin d'aide ?"), h(i.lieu || ''))}
   ${selecteurLangue()}
   <section class="carte">
-    ${blocLien('info', t("Où est l'accueil ?"), salleAccueil ? phraseGuidage(salleAccueil) : (tt(i.entree) || t("À l'entrée du lycée")), '#/plan?salle=Accueil')}
-    ${blocLien('toilettes', t('Où sont les toilettes ?'), salleWc ? phraseGuidage(salleWc) : t("Près de l'accueil"), '#/plan?salle=Toilettes')}
-    ${blocLien('cafe', t('Où prendre un café ?'), tt(i.restauration) || (salleFood ? phraseGuidage(salleFood) : t('Foodtruck')), salleFood ? '#/plan?salle=Foodtruck' : '#/plan')}
+    ${blocLien('info', t("Où est l'accueil ?"), salleAccueil ? phraseGuidage(salleAccueil) : (tt(i.entree) || t("À l'entrée du lycée")), lienPlanSalle(salleAccueil ? salleAccueil.nom : 'Accueil'))}
+    ${blocLien('toilettes', t('Où sont les toilettes ?'), salleWc ? phraseGuidage(salleWc) : t("Près de l'accueil"), lienPlanSalle(salleWc ? salleWc.nom : 'Toilettes'))}
+    ${blocLien('cafe', t('Où prendre un café ?'), tt(i.restauration) || (salleFood ? phraseGuidage(salleFood) : t('Foodtruck')), salleFood ? lienPlanSalle(salleFood.nom) : '#/plan')}
     ${blocLien('recherche', t('Comment retrouver une salle ?'), t("Tapez son numéro ou le nom de l'école dans le plan : la salle s'allume en orange."), '#/plan')}
     ${bloc('telephone', t('Qui contacter ?'), contact || h(t("L'équipe APEL à l'accueil, village 1")))}
   </section>

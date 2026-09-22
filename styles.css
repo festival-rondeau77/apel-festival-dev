@@ -43,6 +43,10 @@
   --display: 'Bricolage', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --texte: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
+  /* Les matières du plan (ADR-0013) : dalle, tranche, patio, sol, parvis, pelouse, voirie… */
+  --scene: #E7EBF1; --scene-2: #F6F8FB; --dalle: #FDFDFE; --dalle-cote: #C9D2DF; --vide: #D3DAE4;
+  --neutre: #E9EDF3; --circul: #F3F6FA; --sol: #DEE3EA; --parvis: #E9E5DC; --pelouse: #CBDFC3; --route: #C8CED8;
+  --arbre: #8FB884; --fantome: #D9DFE8; --contour: #AEB9C9; --mur: #7A8799; --ombre: #0A2647;
   --nav-h: 62px;
   --marge: 20px;
   --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu);
@@ -70,6 +74,9 @@
     --alerte-pale: #4A1026;
     --z1: #17304F; --z2: #4E1F35; --z3: #4B3717; --z4: #1F3557; --z5: #10424A;
     --z6: #175A63; --z7: #5E2440; --z8: #5C441C; --z9: #4B3717; --z10: #10424A; --z11: #1E3A5C;
+    --scene: #081E36; --scene-2: #0B2843; --dalle: #102A49; --dalle-cote: #071729; --vide: #040F1D;
+    --neutre: #152E4E; --circul: #11263F; --sol: #0C2038; --parvis: #182A40; --pelouse: #14352A; --route: #0A1A2E;
+    --arbre: #2E6B45; --fantome: #132B47; --contour: #2A4667; --mur: #5C7A9C; --ombre: #000814;
     --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu-clair);
   }
 }
@@ -477,51 +484,136 @@ span.salle.avenir { color: var(--encre-2); font-weight: 500; font-style: italic;
 .rappel { display: flex; gap: 9px; align-items: center; color: var(--encre-2); font-size: 0.88rem; margin: 22px 0 0; }
 .rappel svg { width: 17px; height: 17px; }
 
-/* ------------------------------------------------------------ le plan */
+/* ------------------------------------------------------------ le plan (ADR-0013) */
 
-.plan-viewport {
-  position: relative; aspect-ratio: 1 / 1.02; max-height: 62vh; border: 1.5px solid var(--trait);
-  border-radius: 4px 4px 20px 4px; overflow: hidden; background: var(--carte); touch-action: none; user-select: none; -webkit-user-select: none;
+/* Plein écran : le plan prend toute la fenêtre, la barre basse et le pied
+   disparaissent, la croix ferme. Dans la page, il piégeait le défilement. */
+body.plan-ouvert { overflow: hidden; }
+body.plan-ouvert .nav, body.plan-ouvert #pied, body.plan-ouvert .bandeau { display: none; }
+.plan-plein {
+  position: fixed; inset: 0; z-index: 30; background: var(--fond); display: flex; flex-direction: column; overflow: hidden;
+  padding-top: env(safe-area-inset-top);
 }
-.plan-viewport svg { width: 100%; height: 100%; }
-.plan-viewport .outils { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
-.plan-viewport .outils button {
+.plan-rail { display: flex; gap: 8px; align-items: center; padding: 8px var(--marge) 0; flex: none; }
+.plan-rail .recherche { flex: 1; min-width: 0; margin: 0; }
+.plan-fermer {
+  width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--trait); background: var(--carte); color: var(--encre);
+  display: grid; place-items: center; cursor: pointer; flex: none;
+}
+.plan-fermer svg { width: 20px; height: 20px; }
+.plan-onglets { padding: 0 var(--marge); margin: 8px 0 0; flex: none; }
+
+/* La scène : la caméra dessine dans ce cadre ; la feuille se pose par-dessus,
+   en bas, et l'adaptateur lui réserve la place quand il cadre. */
+.plan-scene {
+  position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+  background: radial-gradient(120% 90% at 50% 12%, var(--scene-2), var(--scene)); margin-top: 6px;
+}
+.plan-scene.attrape { cursor: grabbing; }
+.plan-scene svg { width: 100%; height: 100%; display: block; }
+.plan-scene .outils { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.plan-scene .outils button {
   width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--trait); background: var(--carte);
   cursor: pointer; display: grid; place-items: center; color: var(--encre); box-shadow: 0 2px 8px rgba(21, 15, 74, 0.08);
 }
-.plan-viewport .outils svg { width: 17px; height: 17px; }
-.plan-monde { cursor: grab; }
-.zone-rect { stroke: var(--encre); stroke-opacity: 0.18; stroke-width: 0.3; cursor: pointer; }
-.zone-rect:hover, .zone-rect:focus { stroke-opacity: 0.7; }
-.zone-rect.active { stroke: var(--bleu); stroke-opacity: 1; stroke-width: 0.7; }
-.zone-num { font-family: var(--display); font-size: 4.6px; font-weight: 800; fill: var(--encre); pointer-events: none; letter-spacing: -0.03em; }
-.zone-nom { font-family: var(--display); font-size: 2.5px; font-weight: 800; fill: var(--encre); fill-opacity: 0.68; pointer-events: none; letter-spacing: -0.01em; }
-.salle-rect { fill: var(--carte); stroke: var(--encre); stroke-opacity: 0.35; stroke-width: 0.25; cursor: pointer; }
-.salle-rect.estimee { stroke-dasharray: 0.7 0.5; }
-.salle-txt { font-size: 2.1px; font-weight: 700; fill: var(--encre); pointer-events: none; text-anchor: middle; font-family: var(--texte); }
-.salle-g.poi .salle-rect { fill: var(--carte); stroke: var(--orange); stroke-opacity: 0.85; stroke-width: 0.35; }
-.salle-g.poi .salle-txt { fill: var(--orange); }
-.salle-g.visite .salle-rect { stroke: var(--bleu); stroke-width: 0.5; stroke-opacity: 1; }
-.salle-g.allumee .salle-rect { fill: var(--orange); stroke: var(--orange); stroke-width: 0.5; stroke-opacity: 1; }
-.salle-g.allumee .salle-txt { fill: #fff; }
-.salle-etoile { fill: none; stroke: var(--bleu); stroke-width: 0.42; stroke-linecap: round; pointer-events: none; }
-.halo { fill: none; stroke: var(--orange); stroke-width: 0.5; opacity: 0.9; animation: halo 1.6s ease-out infinite; transform-origin: center; transform-box: fill-box; }
-@keyframes halo { 0% { transform: scale(0.75); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
-.entree-txt { font-family: var(--display); font-size: 2.6px; font-weight: 800; fill: var(--encre); fill-opacity: 0.55; text-anchor: middle; }
+.plan-scene .outils svg { width: 17px; height: 17px; }
 
-.legende { display: flex; flex-wrap: wrap; gap: 5px 14px; margin: 12px 0 0; font-size: 0.82rem; color: var(--encre-2); }
-.legende span { display: inline-flex; align-items: center; gap: 6px; }
-.legende span::before { content: ""; width: 11px; height: 11px; border-radius: 2px; background: var(--c); }
-.guidage { margin: 18px 0 0; padding: 16px 0 0; border-top: 3px solid var(--orange); }
+/* Les matières du bâtiment. Une Pièce hors festival : fond discret, murs tracés.
+   Une Salle du festival : la couleur de son Village (--c), posée par le rendu. */
+.sol { fill: var(--sol); }
+.tranches polygon { fill: var(--dalle-cote); }
+.dalle { fill: var(--dalle); stroke: var(--contour); stroke-width: 0.8; stroke-linejoin: round; cursor: pointer; }
+.vide { fill: var(--vide); }
+.etage { transition: opacity 0.18s; }
+.etage.eteint { pointer-events: none; }
+.piece { --m: var(--neutre); }
+.piece .face-t { fill: var(--m); stroke: var(--mur); stroke-width: 0.9; stroke-linejoin: round; }
+.piece .cotes polygon { fill: color-mix(in srgb, var(--m) var(--o, 70%), var(--ombre)); }
+.k-c, .k-e { --m: var(--circul); }
+.k-v { --m: var(--pelouse); }
+.k-r { --m: var(--route); }
+.k-s { --m: var(--parvis); }
+.k-a { --m: var(--arbre); }
+.k-g { --m: var(--fantome); }
+.k-v .face-t, .k-r .face-t, .k-s .face-t { stroke: none; }
+.k-a .face-t { stroke: none; }
+.k-g .face-t { stroke-dasharray: 3 2; }
+.k-e .face-t { stroke-dasharray: 1.5 1.5; }
+.k-p { --m: var(--carte); }
+.k-p .face-t { fill: color-mix(in srgb, var(--framboise) 32%, var(--carte)); stroke: var(--framboise); }
+.piece.salle { --m: var(--c, var(--carte)); cursor: pointer; }
+.piece.salle .face-t { stroke: var(--encre); stroke-opacity: 0.6; }
+.piece.salle.poi .face-t { stroke: var(--orange); stroke-opacity: 1; stroke-width: 1.2; }
+.piece.salle.visite .face-t { stroke: var(--bleu); stroke-opacity: 1; stroke-width: 1.4; }
+.piece.salle.allumee { --m: var(--ambre); }
+.piece.salle.allumee .face-t { stroke: var(--orange); stroke-opacity: 1; stroke-width: 1.4; }
+.piece.salle.allumee .lbl { fill: #2B1A00; }
+.piece.hors { opacity: 0.26; }
+.lbl { font-family: var(--texte); font-weight: 650; fill: var(--encre); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.k-p .lbl { fill: var(--framboise); font-weight: 700; }
+.piece.muette .lbl { display: none; }
+.halo { fill: none; stroke: var(--ambre); stroke-width: 3; stroke-linejoin: round; opacity: 0; }
+.piece.allumee .halo { animation: halo-plan 1.6s ease-out infinite; }
+@keyframes halo-plan { 0% { opacity: 0.9; stroke-width: 2; } 100% { opacity: 0; stroke-width: 9; } }
+.marque { fill: var(--bleu); stroke: var(--carte); stroke-width: 0.8; pointer-events: none; }
+.etiq-etage { cursor: pointer; }
+.etiq-etage .nom { font-family: var(--display); font-weight: 800; fill: var(--encre); font-size: 15px; letter-spacing: -0.01em; }
+.etiq-etage .det { font-family: var(--texte); font-weight: 500; fill: var(--encre-2); font-size: 11.5px; }
+.etiq-etage:hover .nom { fill: var(--bleu); }
+.etiq-etage .filet { stroke: var(--contour); stroke-width: 1; }
+.plan-scene g[tabindex]:focus-visible { outline: none; }
+.plan-scene g[tabindex]:focus-visible .face-t, .plan-scene g[tabindex]:focus-visible .nom { stroke: var(--bleu); stroke-width: 2.4; }
+
+/* La feuille du bas : trois hauteurs. Sa tête (poignée, pastilles des villages)
+   reste toujours visible ; son corps défile. */
+.feuille {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--carte); color: var(--encre);
+  border-radius: 18px 18px 0 0; box-shadow: 0 -6px 24px rgba(10, 38, 71, 0.14); display: flex; flex-direction: column;
+  max-height: 90%; transition: height 0.22s ease-out; padding-bottom: env(safe-area-inset-bottom);
+}
+.feuille[data-hauteur="repliee"] { height: auto; }
+.feuille[data-hauteur="repliee"] .feuille-corps { display: none; }
+.feuille[data-hauteur="mi"] { height: 46%; }
+.feuille[data-hauteur="deployee"] { height: 90%; }
+.feuille-tete { flex: none; padding: 0 12px 8px; border-bottom: 1px solid var(--trait); touch-action: none; }
+.poignee { display: block; width: 100%; height: 26px; background: none; border: 0; cursor: grab; padding: 0; }
+.poignee span { display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--trait); margin: 8px auto 0; }
+.pastilles { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.pastilles::-webkit-scrollbar { display: none; }
+.pastille {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 0.8rem; font-weight: 600; color: var(--encre);
+  background: var(--fond); border: 1px solid var(--trait); border-radius: 999px; padding: 4px 10px 4px 5px; cursor: pointer; white-space: nowrap; min-height: 32px;
+}
+.pastille .n { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--c); font-size: 0.72rem; font-weight: 700; }
+.pastille[aria-pressed="true"] { border-color: var(--marine); box-shadow: inset 0 0 0 1px var(--marine); background: var(--carte); }
+.feuille-corps { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px var(--marge) 20px; }
+.feuille-titre { font-size: 1.25rem; margin: 10px 0 4px; }
+.feuille-sous { color: var(--encre-2); margin: 0; font-size: 0.9rem; line-height: 1.4; }
+.feuille .guidage { margin: 8px 0 0; padding: 8px 0 0; border-top: 0; }
+.feuille .panneau-zone { margin: 10px 0 0; }
 .guidage h2 { font-size: 1.2rem; margin: 0 0 6px; }
 .guidage .ou { color: var(--orange); font-weight: 800; font-family: var(--display); font-size: 1.05rem; }
-.panneau-zone { margin: 22px 0 0; }
 .panneau-zone h2 { font-size: 1.3rem; margin: 0 0 4px; display: flex; align-items: baseline; gap: 9px; }
 .panneau-zone h2 .num { color: var(--orange); }
 .panneau-zone .salles-de-la-zone { color: var(--encre-2); font-size: 0.88rem; margin: 0 0 6px; }
 .panneau-zone .salles-de-la-zone a { color: var(--orange); font-weight: 650; text-decoration: none; }
-details.equivalent { margin: 24px 0 0; border-top: 1px solid var(--trait); }
+details.equivalent { margin: 18px 0 0; border-top: 1px solid var(--trait); }
 details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px; display: flex; align-items: center; color: var(--encre-2); font-size: 0.92rem; }
+
+/* Au large, la feuille devient un panneau à droite : même HTML, seule la place change. */
+@media (min-width: 900px) {
+  .plan-plein { display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-rows: auto auto minmax(0, 1fr); }
+  .plan-rail { grid-column: 1; grid-row: 1; }
+  .plan-onglets { grid-column: 1; grid-row: 2; }
+  .plan-scene { grid-column: 1; grid-row: 3; }
+  .feuille {
+    position: static; grid-column: 2; grid-row: 1 / 4; height: auto !important; max-height: none; border-radius: 0; box-shadow: none;
+    border-left: 1px solid var(--trait);
+  }
+  .feuille[data-hauteur="repliee"] .feuille-corps { display: block; }
+  .poignee { display: none; }
+  .pastilles { flex-wrap: wrap; padding-top: 12px; }
+}
 
 /* ------------------------------------------------------------ préparer, questions */
 
@@ -598,16 +690,6 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
 }
 @media (min-width: 1040px) {
   .appli { max-width: 960px; }
-  /* Le plan et son panneau tiennent ensemble à l'écran : on cesse de faire défiler
-     pour lire ce qu'on vient de toucher. */
-  /* La carte et son panneau tiennent ensemble : on cesse de faire défiler pour
-     lire ce qu'on vient de toucher. L'ordre du DOM garde le panneau AVANT la
-     carte — c'est ce qu'il faut sur un téléphone ; la grille le remet à droite. */
-  .plan-cote-a-cote:has(.panneau-zone) { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr); gap: 22px; align-items: start; }
-  .plan-cote-a-cote:has(.panneau-zone) .plan-carte { grid-column: 1; grid-row: 1; }
-  .plan-cote-a-cote:has(.panneau-zone) .panneau-zone,
-  .plan-cote-a-cote:has(.panneau-zone) .guidage { grid-column: 2; grid-row: 1; margin-top: 0; }
-  .plan-cote-a-cote:has(.panneau-zone) .panneau-zone.village ~ .panneau-zone { grid-row: 2; }
   .liste .ligne { padding-inline: 4px; }
 }
 
