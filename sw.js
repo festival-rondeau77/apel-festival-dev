@@ -1,7 +1,7 @@
 // Service worker : l'appli entière en cache à l'installation (cache d'abord,
 // réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
 // secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.09.22-85eb735';
+const VERSION = '2026.09.22-eb9a3ce';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
