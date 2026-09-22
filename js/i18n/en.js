@@ -50,7 +50,7 @@ export default {
   "Vue d'ensemble": 'Overview', 'Fermer le plan': 'Close the map', 'Ouvrir le plan : %s': 'Open the map: %s', 'La fiche': 'Details', 'Agrandir ou réduire la fiche': 'Expand or collapse the details', 'Villages': 'Villages',
   '%s village': '%s village', '%s villages': '%s villages', '%s salle': '%s room', '%s salles': '%s rooms', 'Salles à localiser': 'Rooms to be located',
   "Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.": 'Two floors stacked: tap a floor to open it, a room to see it.',
-  'Entrée élèves': 'Student entrance', 'Arrêt bus 26 · 44 · 46': 'Bus stop 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': 'Bus stop 26 (Bussy)', 'RER A': 'RER A',
+  'Arrêt bus 26 · 44 · 46': 'Bus stop 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': 'Bus stop 26 (Bussy)', 'RER A': 'RER A',
   'Zoomer': 'Zoom in', 'Dézoomer': 'Zoom out', 'Recentrer le plan': 'Re-centre the map', 'Salles': 'Rooms', 'et': 'and', 'Salles à venir.': 'Rooms to be announced.', 'Événements': 'Events',
   "Rien n'est encore affecté à ce village.": 'Nothing is assigned to this village yet.',
   "demandez à l'accueil": 'ask at the reception desk', 'salle à localiser': 'room to be located',

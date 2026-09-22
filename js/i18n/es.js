@@ -50,7 +50,7 @@ export default {
   "Vue d'ensemble": 'Vista general', 'Fermer le plan': 'Cerrar el plano', 'Ouvrir le plan : %s': 'Abrir el plano: %s', 'La fiche': 'La ficha', 'Agrandir ou réduire la fiche': 'Ampliar o reducir la ficha', 'Villages': 'Aldeas',
   '%s village': '%s aldea', '%s villages': '%s aldeas', '%s salle': '%s sala', '%s salles': '%s salas', 'Salles à localiser': 'Salas por localizar',
   "Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.": 'Dos plantas apiladas: toca una planta para abrirla, una sala para verla.',
-  'Entrée élèves': 'Entrada de alumnos', 'Arrêt bus 26 · 44 · 46': 'Parada de bus 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': 'Parada de bus 26 (Bussy)', 'RER A': 'RER A',
+  'Arrêt bus 26 · 44 · 46': 'Parada de bus 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': 'Parada de bus 26 (Bussy)', 'RER A': 'RER A',
   'Zoomer': 'Acercar', 'Dézoomer': 'Alejar', 'Recentrer le plan': 'Centrar el plano', 'Salles': 'Salas', 'et': 'y', 'Salles à venir.': 'Salas por asignar.', 'Événements': 'Eventos',
   "Rien n'est encore affecté à ce village.": 'Aún no hay nada asignado a esta aldea.',
   "demandez à l'accueil": 'pregunta en recepción', 'salle à localiser': 'sala por localizar',

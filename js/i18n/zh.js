@@ -50,7 +50,7 @@ export default {
   "Vue d'ensemble": '总览', 'Fermer le plan': '关闭地图', 'Ouvrir le plan : %s': '打开地图：%s', 'La fiche': '信息卡', 'Agrandir ou réduire la fiche': '展开或收起信息卡', 'Villages': '专区',
   '%s village': '%s 个专区', '%s villages': '%s 个专区', '%s salle': '%s 间教室', '%s salles': '%s 间教室', 'Salles à localiser': '待定位的教室',
   "Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.": '两层楼叠放：点击楼层打开，点击教室查看。',
-  'Entrée élèves': '学生入口', 'Arrêt bus 26 · 44 · 46': '公交站 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': '公交站 26（Bussy）', 'RER A': 'RER A 线',
+  'Arrêt bus 26 · 44 · 46': '公交站 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': '公交站 26（Bussy）', 'RER A': 'RER A 线',
   'Zoomer': '放大', 'Dézoomer': '缩小', 'Recentrer le plan': '重置地图', 'Salles': '教室', 'et': '和', 'Salles à venir.': '教室待定。', 'Événements': '活动',
   "Rien n'est encore affecté à ce village.": '此专区尚未安排内容。',
   "demandez à l'accueil": '请到接待处询问', 'salle à localiser': '教室待定位',
