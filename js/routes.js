@@ -1,5 +1,5 @@
 // Navigation par fragment d'URL : « #/programme », « #/evenement/<clé> »,
-// « #/exposant/<clé>?qr=1 », « #/plan?salle=Salle 12 ». Pure.
+// « #/exposant/<clé>?qr=1 », « #/exposant/<clé>?s=<secret> », « #/plan?salle=Salle 12 ». Pure.
 
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
@@ -23,8 +23,11 @@ export function analyserRoute(hash) {
   return { nom, params, chemin: segments.join('/') };
 }
 
-// L'URL profonde d'un Exposant, telle qu'encodée dans son QR code de Stand.
-export function urlExposant(base, cle, { qr = false } = {}) {
+// L'URL profonde d'un Exposant, telle qu'encodée dans un QR code : `qr` pour
+// celui des affiches (la fiche, sans point), `secret` pour celui du chevalet, qui
+// prouve le passage au stand (Grand Défi, ADR-0014).
+export function urlExposant(base, cle, { qr = false, secret = '' } = {}) {
   const b = String(base || '').replace(/\/+$/, '');
-  return `${b}/#/exposant/${encodeURIComponent(cle)}${qr ? '?qr=1' : ''}`;
+  const requete = secret ? `?s=${encodeURIComponent(secret)}` : (qr ? '?qr=1' : '');
+  return `${b}/#/exposant/${encodeURIComponent(cle)}${requete}`;
 }

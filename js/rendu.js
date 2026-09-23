@@ -8,7 +8,8 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { t, tn, tt, heure, locale, langue, definirLangue, LANGUES, NOMS_LANGUES } from './i18n.js';
+import { jauge, defisIci } from './passeport.js';
+import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 
 // ---------------------------------------------------------------- utilitaires
 
@@ -184,10 +185,12 @@ export function entete(titre, sous = '', retour = null) {
 
 // Le sélecteur de langue : quatre pastilles, chacune dans sa propre langue. Sur
 // l'accueil et dans « Besoin d'aide ? » — là où arrive un Visiteur qui ne lit pas
-// le français, et là où il cherche de l'aide.
+// le français, et là où il cherche de l'aide. Rien avec une seule langue proposée.
 export function selecteurLangue() {
+  const proposees = languesProposees();
+  if (proposees.length < 2) return '';
   return `<div class="langues" role="group" aria-label="${attr(t('Langue'))}">
-    ${LANGUES.map((l) => `<button class="langue" type="button" lang="${l}" data-action="langue" data-valeur="${l}" aria-pressed="${l === langue()}">${h(NOMS_LANGUES[l])}</button>`).join('')}
+    ${proposees.map((l) => `<button class="langue" type="button" lang="${l}" data-action="langue" data-valeur="${l}" aria-pressed="${l === langue()}">${h(NOMS_LANGUES[l])}</button>`).join('')}
   </div>`;
 }
 
@@ -244,6 +247,7 @@ export function ecranAccueil(etat) {
     ${bouton('#/aide', 'aide', t("Besoin d'aide ?"))}
     ${nb ? bouton('#/visite', 'visite', t('Ma visite'), { ton: 'construire', extra: `<span class="compte">${h(tn('%s élément', '%s éléments', nb))}</span>` }) : ''}
   </nav>
+  ${carteGrandDefi(etat)}
   ${prochain ? `<section class="prochain" aria-labelledby="prochain-titre">
     <p class="etiquette${prochain.enCours ? ' en-cours' : ''}">${h(prochain.enCours ? t('En ce moment') : (maintenant.jourJ ? t('Prochain événement') : t('Le festival commence par')))}</p>
     <div class="carte-prochain">
@@ -257,6 +261,44 @@ export function ecranAccueil(etat) {
     <p>${h(t("Choisis un domaine, on te montre son village et qui l'anime."))}</p>
     <div class="domaines-accueil">${ordonner(domaines, DOMAINES).map((s) => `<a class="puce" href="#/exposants?domaine=${encodeURIComponent(s)}">${h(t(s))}</a>`).join('')}</div>
   </section>` : ''}`;
+}
+
+// ---------------------------------------------------------------- Grand Défi
+
+// La jauge de l'accueil (grand-defi 01) : seulement pour qui a joué, et jamais
+// quand le jeu est coupé. Les points confirmés par le Worker, et à part ceux qui
+// attendent sa réponse.
+function carteGrandDefi(etat) {
+  const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
+  if (!j) return '';
+  const part = Math.min(100, Math.round((j.points / j.objectif) * 100));
+  return `<section class="grand-defi" aria-labelledby="grand-defi-titre">
+    <h2 id="grand-defi-titre">${h(t('Mon grand défi'))}</h2>
+    <p class="score"><strong>${h(j.points)}</strong> / ${h(j.objectif)}</p>
+    <div class="jauge" role="progressbar" aria-labelledby="grand-defi-titre" aria-valuemin="0" aria-valuemax="${attr(j.objectif)}" aria-valuenow="${attr(j.points)}"><span style="width:${part}%"></span></div>
+    ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
+  </section>`;
+}
+
+const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));
+const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé' };
+
+// Sur la fiche ouverte par le QR secret d'un chevalet (`?s=`) : les défis que cet
+// Exposant peut prouver. Le QR public des affiches (`?qr=1`) n'en propose aucun.
+function defisDeLaFiche(etat, ex) {
+  const secret = etat.route.params.s;
+  if (!secret) return '';
+  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle);
+  if (!ici.length) return '';
+  return `<section class="defis-ici" aria-labelledby="defis-ici-titre">
+    <h2 class="titre-section" id="defis-ici-titre">${h(t('Grand Défi'))}</h2>
+    <ul>${ici.map(({ defi, statut, validable }) => `<li>
+      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
+      ${validable
+        ? `<button class="bouton" type="button" data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}">${h(t('Valider'))}</button>`
+        : `<span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>`}
+    </li>`).join('')}</ul>
+  </section>`;
 }
 
 // L'Événement à mettre en avant : le jour J, celui en cours ou le prochain ; sinon le premier.
@@ -454,6 +496,7 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
     ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Vous venez de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
+    ${defisDeLaFiche(etat, ex)}
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       ${ex.type === 'Pro' && ex.organisation ? `<dt>${h(t('Entreprise'))}</dt><dd>${h(ex.organisation)}</dd>` : ''}
@@ -854,7 +897,7 @@ export function ecran(etat) {
     case 'programme': return ecranProgramme(etat);
     case 'evenement': return ecranEvenement(etat, route.params.cle);
     case 'exposants': return ecranExposants(etat);
-    case 'exposant': return ecranExposant(etat, route.params.cle, { qr: route.params.qr === '1' });
+    case 'exposant': return ecranExposant(etat, route.params.cle, { qr: route.params.qr === '1' || Boolean(route.params.s) });
     case 'plan': return ecranPlan(etat);
     case 'visite': return ecranVisite(etat);
     case 'preparer': return ecranPreparer(etat);

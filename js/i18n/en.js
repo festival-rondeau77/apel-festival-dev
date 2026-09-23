@@ -88,4 +88,5 @@ export default {
   'Date du festival inconnue : impossible de créer le rappel.': 'Festival date unknown: the reminder cannot be created.', 'Fermer': 'Close', 'Fermer ce message': 'Close this message',
   'Dans %s min': 'In %s min', 'Nouvelle version disponible.': 'New version available.', 'Recharger': 'Reload',
   'Version de recette : le programme et les salles sont en partie fictifs.': 'Test version: the schedule and rooms are partly fictional.',
+  'Mon grand défi': 'My big challenge', '+%s points en attente': '+%s points pending', 'Grand Défi': 'Big Challenge', 'Défi %s': 'Challenge %s', 'Valider': 'Validate', 'Validé': 'Validated', 'En attente': 'Pending', 'Refusé': 'Refused',
 };

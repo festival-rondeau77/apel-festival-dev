@@ -2,8 +2,9 @@
 // stockage et l'horloge sont injectés. Chaque opération renvoie un nouvel état.
 import { publicInclut } from './donnees.js';
 import { t, heure } from './i18n.js';
+import { etatJeuInitial, migrerJeu } from './passeport.js';
 
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 const DUREE_PAR_DEFAUT = 45; // minutes, quand un Événement n'a pas de fin
 const RAPPEL_MINUTES = 10;
 
@@ -11,7 +12,9 @@ export function etatInitial() {
   // `bandeauFerme` retient le message que le Visiteur a refermé, pour que le même
   // ne revienne pas et qu'un message DIFFÉRENT revienne (schéma 2 ; l'ancien
   // `bandeauVu` du schéma 1 disait « déjà notifié », ce qui n'a plus cours).
-  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauFerme: '' };
+  // `jeu` (schéma 3) est le Passeport du Grand Défi : validations gardées jusqu'à
+  // les voir traitées, points confirmés (passeport.js).
+  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauFerme: '', jeu: etatJeuInitial() };
 }
 
 // ---------------------------------------------------------------- entrées
@@ -221,6 +224,7 @@ function migrer(brut) {
   etat.niveau = typeof brut.niveau === 'string' ? brut.niveau : null;
   etat.questionsCochees = Array.isArray(brut.questionsCochees) ? brut.questionsCochees.filter((s) => typeof s === 'string') : [];
   etat.bandeauFerme = typeof brut.bandeauFerme === 'string' ? brut.bandeauFerme : '';
+  etat.jeu = migrerJeu(brut.jeu);
   return etat;
 }
 

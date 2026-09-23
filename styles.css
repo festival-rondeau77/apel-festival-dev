@@ -255,6 +255,35 @@ main { min-height: 60vh; }
 .carte-prochain h2 a { color: inherit; text-decoration: none; }
 .carte-prochain h2 a:hover { text-decoration: underline; }
 
+/* Le Grand Défi (grand-defi 01) : la jauge de l'accueil, même carte que le
+   prochain événement, filet ambre — la couleur des repères. Elle n'existe que
+   pour qui a joué. */
+.grand-defi {
+  margin: 26px 0 0; background: var(--carte); border: 1px solid var(--trait); border-left: 4px solid var(--ambre);
+  border-radius: 6px 6px 18px 6px; padding: 14px 16px;
+}
+.grand-defi h2 { font-size: 0.8rem; color: var(--encre-2); font-weight: 650; margin: 0; font-family: var(--texte); letter-spacing: 0; }
+.grand-defi .score { margin: 4px 0 10px; font-family: var(--display); font-size: 1.1rem; color: var(--encre-2); font-variant-numeric: tabular-nums; }
+.grand-defi .score strong { font-size: 1.8rem; font-weight: 800; color: var(--orange); letter-spacing: -0.02em; }
+.grand-defi .jauge { height: 10px; border-radius: 999px; background: var(--orange-pale); overflow: hidden; }
+.grand-defi .jauge span { display: block; height: 100%; background: var(--ambre); border-radius: inherit; }
+.grand-defi .attente { margin: 8px 0 0; font-size: 0.85rem; color: var(--encre-2); }
+
+/* Les défis que ce stand permet de valider, sur la fiche ouverte par le QR du chevalet. */
+.defis-ici { margin: 18px 0 0; }
+.defis-ici .titre-section { margin-top: 0; }
+.defis-ici ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.defis-ici li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px;
+  background: var(--orange-pale); border-radius: 4px 4px 14px 4px;
+}
+.defis-ici .nom { flex: 1 1 12em; font-weight: 650; }
+.defis-ici .points { font-family: var(--display); font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; }
+.defis-ici .bouton { min-height: 40px; padding: 8px 16px; }
+.defis-ici .etat { font-weight: 650; font-size: 0.9rem; color: var(--encre-2); }
+.defis-ici .etat.valide { color: var(--bleu); }
+.defis-ici .etat.refuse { color: var(--alerte); }
+
 .commencer { margin: 30px 0 0; }
 .commencer p { margin: 0 0 12px; color: var(--encre-2); }
 .domaines-accueil { display: flex; flex-wrap: wrap; gap: 7px; }

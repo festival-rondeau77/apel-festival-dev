@@ -88,4 +88,5 @@ export default {
   'Date du festival inconnue : impossible de créer le rappel.': '活动日期未知：无法创建提醒。', 'Fermer': '关闭', 'Fermer ce message': '关闭此消息',
   'Dans %s min': '%s 分钟后', 'Nouvelle version disponible.': '有新版本可用。', 'Recharger': '重新加载',
   'Version de recette : le programme et les salles sont en partie fictifs.': '测试版本：日程和教室部分为虚构。',
+  'Mon grand défi': '我的大挑战', '+%s points en attente': '+%s 分待确认', 'Grand Défi': '大挑战', 'Défi %s': '挑战 %s', 'Valider': '确认', 'Validé': '已确认', 'En attente': '待确认', 'Refusé': '未通过',
 };

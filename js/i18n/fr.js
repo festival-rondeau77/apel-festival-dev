@@ -95,4 +95,6 @@ export default [
   'Date du festival inconnue : impossible de créer le rappel.', 'Fermer', 'Fermer ce message',
   'Dans %s min', 'Nouvelle version disponible.', 'Recharger',
   'Version de recette : le programme et les salles sont en partie fictifs.',
+  // Grand Défi
+  'Mon grand défi', '+%s points en attente', 'Grand Défi', 'Défi %s', 'Valider', 'Validé', 'En attente', 'Refusé',
 ];

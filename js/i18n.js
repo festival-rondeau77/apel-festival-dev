@@ -22,13 +22,25 @@ export const CLE_STOCKAGE_LANGUE = 'festival.langue';
 const DICOS = { fr: {}, en, es, zh };
 
 let langueCourante = LANGUE_PAR_DEFAUT;
+// Les langues que l'appli PROPOSE (CONFIG.langues) : toutes par défaut dans ce module,
+// pour que les dictionnaires restent testés ; l'adaptateur les restreint au démarrage.
+let proposees = LANGUES.slice();
 let traductions = new Map(); // texte français → { en, es, zh }
 
 export function langue() { return langueCourante; }
+export function languesProposees() { return proposees.slice(); }
+
+// Restreint les langues offertes au Visiteur ; le français est toujours du nombre.
+export function definirLanguesProposees(liste) {
+  const connues = Array.isArray(liste) ? liste.filter((l) => LANGUES.includes(l)) : [];
+  proposees = [LANGUE_PAR_DEFAUT, ...connues.filter((l) => l !== LANGUE_PAR_DEFAUT)];
+  if (!proposees.includes(langueCourante)) langueCourante = LANGUE_PAR_DEFAUT;
+  return languesProposees();
+}
 export function locale() { return LOCALES[langueCourante] || LOCALES.fr; }
 
 export function definirLangue(l) {
-  langueCourante = LANGUES.includes(l) ? l : LANGUE_PAR_DEFAUT;
+  langueCourante = proposees.includes(l) ? l : LANGUE_PAR_DEFAUT;
   return langueCourante;
 }
 
@@ -44,15 +56,19 @@ export function langueDepuis(code) {
 
 // La langue à l'ouverture : le paramètre d'URL (`?lang=en` ou `#/…?lang=en`),
 // puis le choix mémorisé, puis la langue du téléphone, puis le français.
+// Seules comptent les langues proposées : avec le français seul, rien de tout cela
+// n'est même consulté.
 export function langueInitiale({ param = null, stockage = null, navigateur = null } = {}) {
-  const parUrl = langueDepuis(param);
+  if (proposees.length < 2) return LANGUE_PAR_DEFAUT;
+  const offerte = (code) => { const c = langueDepuis(code); return c && proposees.includes(c) ? c : null; };
+  const parUrl = offerte(param);
   if (parUrl) return parUrl;
   try {
-    const memorisee = stockage ? langueDepuis(stockage.getItem(CLE_STOCKAGE_LANGUE)) : null;
+    const memorisee = stockage ? offerte(stockage.getItem(CLE_STOCKAGE_LANGUE)) : null;
     if (memorisee) return memorisee;
   } catch { /* stockage indisponible */ }
   const langues = Array.isArray(navigateur) ? navigateur : [navigateur];
-  for (const l of langues) { const c = langueDepuis(l); if (c) return c; }
+  for (const l of langues) { const c = offerte(l); if (c) return c; }
   return LANGUE_PAR_DEFAUT;
 }
 

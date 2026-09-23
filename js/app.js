@@ -3,12 +3,13 @@
 import { CONFIG } from './config.js';
 import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
-import { creerStats, plateforme } from './stats.js';
+import { creerStats, plateforme, identifiantAleatoire } from './stats.js';
+import * as Passeport from './passeport.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
 import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
-import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, LANGUES } from './i18n.js';
+import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, definirLanguesProposees, languesProposees } from './i18n.js';
 import { dictionnaireDepuis } from './donnees.js';
 
 const journal = (...a) => { if (location.hostname === 'localhost' || location.search.includes('debug')) console.info('[festival]', ...a); };
@@ -24,6 +25,9 @@ const etat = {
   // Les deux sont affichées en pied de page : leur écart révèle un cache périmé.
   versionAppli: CONFIG.version, versionSW: null,
   visite: Visite.etatInitial(),
+  // Le Grand Défi tel que le Worker le publie (défis actifs, objectif), ou null :
+  // pas de Worker, ou jamais joint. Le Passeport, lui, vit dans etat.visite.jeu.
+  grandDefi: null,
   ui: {
     rechercheProgramme: '', filtreDomaineProgramme: '', filtreFormat: '', filtrePublic: '',
     rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
@@ -54,10 +58,11 @@ function appliquerLangue(l, { memoriser = false } = {}) {
   for (const [sel, texte] of Object.entries(squelette)) { const e = document.querySelector(sel); if (e) e.textContent = texte; }
   if (memoriser) { try { stockage.setItem(CLE_STOCKAGE_LANGUE, etat.langue); } catch { /* quota ou navigation privée */ } }
 }
+definirLanguesProposees(CONFIG.langues || ['fr']);
 appliquerLangue(langueInitiale({ param: parametreLangue(), stockage, navigateur: navigator.languages || navigator.language }));
 
 function changerLangue(l) {
-  if (!LANGUES.includes(l) || l === etat.langue) return;
+  if (!languesProposees().includes(l) || l === etat.langue) return;
   appliquerLangue(l, { memoriser: true });
   stats.noter('ecran', `langue:${l}`);
   rendre({ conserver: true });
@@ -163,7 +168,8 @@ function appliquerRoute() {
     if (p.domaine !== undefined) etat.ui.filtreDomaineExposants = p.domaine;
     else if (p.secteur !== undefined) etat.ui.filtreDomaineExposants = p.secteur;
   }
-  if (etat.route.nom === 'exposant' && p.qr === '1') stats.noter('qr_scan', p.cle || '');
+  // Le secret d'un chevalet ne part jamais dans les mesures : seule la clé de l'Exposant.
+  if (etat.route.nom === 'exposant' && (p.qr === '1' || p.s)) stats.noter('qr_scan', p.cle || '');
   if (etat.route.nom === 'exposant') stats.noter('fiche_exposant', p.cle || '');
   if (etat.route.nom === 'evenement') stats.noter('fiche_evenement', p.cle || '');
   stats.noter('ecran', etat.route.nom);
@@ -219,6 +225,57 @@ function ajouterAuCalendrier(cle) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
   stats.noter('calendrier', cle);
 }
+
+// ---------------------------------------------------------------- Grand Défi (ADR-0014, ADR-0016)
+
+// Le Worker du jeu : celui de config.js, ou celui que `npm run servir` sert à côté
+// de l'appli. Vide = pas de jeu du tout, l'appli d'avant le Grand Défi.
+const JEU_URL = Passeport.urlJeu(location.hostname, CONFIG.jeuUrl);
+const CLE_JEU = 'festival.jeu';
+// Sans Worker, le jeu gardé d'une visite précédente ne s'affiche pas : aucune trace.
+try { etat.grandDefi = JEU_URL ? Passeport.lireJeuPublic(JSON.parse(stockage.getItem(CLE_JEU) || 'null')) : null; } catch { etat.grandDefi = null; }
+
+async function chargerJeu() {
+  if (!JEU_URL) return;
+  const rep = await fetch(urlAction(JEU_URL, 'jeu'), { cache: 'no-store' });
+  if (!rep.ok) throw new Error(`jeu : HTTP ${rep.status}`);
+  const jeu = Passeport.lireJeuPublic(await rep.json());
+  if (!jeu) throw new Error('jeu : réponse illisible');
+  try { stockage.setItem(CLE_JEU, JSON.stringify(jeu)); } catch { /* quota ou navigation privée */ }
+  if (JSON.stringify(jeu) === JSON.stringify(etat.grandDefi)) return;
+  etat.grandDefi = jeu;
+  rendre({ conserver: true });
+}
+
+// La file d'envoi des validations : chacune reste dans le téléphone (Ma visite)
+// jusqu'à ce que la réponse du Worker la montre traitée. Seul un 400 (salve
+// refusée pour de bon) l'abandonne ; le reste, réseau compris, se renvoie.
+const fileJeu = Passeport.creerEnvoi({
+  obtenir: () => etat.visite.jeu,
+  modifier: (jeu) => modifierVisite({ ...etat.visite, jeu }),
+  envoyer: async (validations) => {
+    const rep = await fetch(urlAction(JEU_URL, 'stats'), {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ appareil: stats.appareil, origine: location.hostname.slice(0, 80), validations }),
+    });
+    if (rep.status === 400) return { ok: false, definitif: true };
+    if (!rep.ok) return { ok: false };
+    const corps = await rep.json();
+    return corps && corps.ok ? { ok: true, passeport: corps.passeport } : { ok: false };
+  },
+});
+// Sans Worker, rien ne part : les validations restent gardées dans le téléphone.
+const envoiJeu = { envoyer: () => (JEU_URL ? fileJeu.envoyer() : Promise.resolve()) };
+
+function validerDefi(defi, cle) {
+  const secret = etat.route.params.s;
+  if (!secret || !defi || !cle) return;
+  const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: cle, secret, t: Date.now() });
+  modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, v) });
+  envoiJeu.envoyer();
+}
+
+window.addEventListener('online', () => envoiJeu.envoyer());
 
 // ---------------------------------------------------------------- gestes
 
@@ -284,6 +341,7 @@ document.addEventListener('click', (e) => {
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
+    case 'valider-defi': validerDefi(cible.dataset.defi, cle); break;
     default: break;
   }
 });
@@ -638,8 +696,12 @@ const rafraichisseur = creerRafraichisseur({
   executer: async () => { try { await rafraichirDonnees(); } catch (e) { etat.reseau.enErreur = true; el.pied.innerHTML = piedDePage(etat); throw e; } },
 });
 
+const rafraichisseurJeu = creerRafraichisseur({
+  intervalle: CONFIG.intervalleJeu, visible: () => document.visibilityState === 'visible', journal, executer: chargerJeu,
+});
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rendre({ conserver: true }); }
+  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); rendre({ conserver: true }); }
   else envoyerStatsEnArrierePlan();
 });
 
@@ -738,9 +800,11 @@ async function demarrer() {
   enregistrerServiceWorker();
   versionServiceWorker().then((v) => { etat.versionSW = v; el.pied.innerHTML = piedDePage(etat); });
   rafraichisseur.demarrer();
+  if (JEU_URL) rafraichisseurJeu.demarrer();
+  envoiJeu.envoyer();
   verifierRappels();
   setInterval(verifierRappels, 30000);
-  window.__festival = { etat, rendre, stats, sources, changerLangue }; // pour le test de fumée et le débogage
+  window.__festival = { etat, rendre, stats, sources, changerLangue, chargerJeu }; // pour le test de fumée et le débogage
 }
 
 demarrer();

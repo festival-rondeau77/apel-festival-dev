@@ -12,15 +12,20 @@ export const CONFIG = {
   // ni transmise ni imprimée. bin/deploy.sh choisit par --cible ; l'appli ne lit jamais
   // ce bloc.
   cibles: {
-    prod: { owner: 'festival-rondeau77', repo: 'apel-festival' },
-    dev: { owner: 'festival-rondeau77', repo: 'apel-festival-dev' },
+    prod: { owner: 'festival-rondeau77', repo: 'apel-festival', jeu: 'https://festival-jeu.festival-e23.workers.dev' },
+    dev: { owner: 'festival-rondeau77', repo: 'apel-festival-dev', jeu: 'https://festival-jeu-dev.festival-e23.workers.dev' },
   },
+  // Le Worker du Grand Défi (ADR-0016, worker/). Celui de la PRODUCTION ici ;
+  // bin/deploy.sh --cible=dev y écrit celui du dev dans la seule copie servie, et
+  // --demo le vide. Vide = pas de jeu : l'appli d'avant le Grand Défi. Sur la
+  // machine (npm run servir), l'appli joue contre le Worker local, jamais celui-ci.
+  jeuUrl: 'https://festival-jeu-dev.festival-e23.workers.dev',
   // L'URL de la PRODUCTION, toujours : c'est elle que bin/qrcodes.mjs grave dans les
   // chevalets (ADR-domaine 0009). Un QR code n'encode jamais le dev ;
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.22-8cf7bc3',
+  version: '2026.09.23-6753e0e',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le
@@ -32,5 +37,16 @@ export const CONFIG = {
   // sans les relire : c'est le tiers le plus lourd de la charge, et retarder des
   // mesures ne coûte rien au Visiteur, qui ne les voit jamais.
   intervalleDonnees: 60000,
+  // Relecture des règles du Grand Défi (défis actifs, objectif) : cinq minutes.
+  // Le Passeport, lui, revient avec chaque validation. Le défi mystère (grand-defi
+  // 06) demandera une minute : c'est là qu'il faudra recompter les requêtes.
+  intervalleJeu: 300000,
   intervalleStats: 180000,
+  // Les langues proposées au Visiteur (ADR-0016, 2026-09-23). Français seul : sans
+  // traduction automatique, les textes du tableur resteraient en français sous des
+  // menus traduits, une interface à moitié traduite. Avec une seule langue, ni
+  // détection de la langue du téléphone, ni « ?lang= », ni sélecteur. Les
+  // dictionnaires de app/js/i18n/ restent en place : remettre
+  // ['fr', 'en', 'es', 'zh'] rallume tout, sans rien réécrire.
+  langues: ['fr'],
 };

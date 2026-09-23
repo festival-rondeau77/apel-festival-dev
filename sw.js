@@ -1,12 +1,12 @@
 // Service worker : l'appli entière en cache à l'installation (cache d'abord,
 // réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
 // secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.09.22-8cf7bc3';
+const VERSION = '2026.09.23-6753e0e';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
   './', './index.html', './styles.css', './manifest.webmanifest',
-  './js/app.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js',
+  './js/app.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js',
   './js/i18n.js', './js/i18n/fr.js', './js/i18n/en.js', './js/i18n/es.js', './js/i18n/zh.js',
   './icones/icone.svg', './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png', './icones/icone-180.png',
   './logos/apel.svg', './logos/ufa-maurice-rondeau.png', './logos/saint-colomban.png',
@@ -49,6 +49,7 @@ self.addEventListener('message', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin || e.request.method !== 'GET') return; // Google et le reste : jamais interceptés
+  if (url.pathname.endsWith('/jeu')) return; // le Worker local de npm run servir : jamais en cache
   if (url.pathname.endsWith('/data/snapshot.json')) {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE_DONNEES);
