@@ -86,7 +86,7 @@ export default [
   'Adresse', 'RER', 'Bus', 'Parking', 'Restauration', 'Wifi', "Ouvrir l'itinéraire", 'Et aussi',
   'Règlement du festival', 'Lire le règlement', 'Donner mon avis', "Deux minutes, pour nous aider à faire mieux l'an prochain.",
   'Le questionnaire de satisfaction sera disponible le jour du festival.', 'Vie privée',
-  "L'application ne collecte aucune donnée personnelle.",
+  "L'appli compte de façon anonyme les écrans consultés, pour préparer le festival de l'an prochain : aucun nom, aucun contact, aucune position. Ce que vous ajoutez à « Ma visite » reste sur votre téléphone.", "Statistiques anonymes", "Elles comptent les écrans consultés pour préparer le festival de l'an prochain. Aucun nom, aucun contact, aucune position.", "Désactivées sur ce téléphone : plus rien ne part.", "Ne pas envoyer de statistiques", "Réactiver les statistiques",
   // pied de page et messages
   'Mis à jour le %s à %s (%s)', 'tableur', 'classeur public', 'version embarquée', 'dernière version connue',
   'lecture en direct en échec, nouvel essai bientôt', 'source %s refusée (%s)', 'version %s', 'cache périmé %s',

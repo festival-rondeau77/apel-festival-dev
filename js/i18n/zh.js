@@ -79,7 +79,7 @@ export default {
   'Adresse': '地址', 'RER': 'RER 快线', 'Bus': '公交', 'Parking': '停车', 'Restauration': '餐饮', 'Wifi': '无线网络', "Ouvrir l'itinéraire": '查看路线', 'Et aussi': '其他',
   'Règlement du festival': '活动规则', 'Lire le règlement': '阅读规则', 'Donner mon avis': '提交反馈', "Deux minutes, pour nous aider à faire mieux l'an prochain.": '只需两分钟，帮助我们明年做得更好。',
   'Le questionnaire de satisfaction sera disponible le jour du festival.': '满意度问卷将在活动当天开放。', 'Vie privée': '隐私',
-  "L'application ne collecte aucune donnée personnelle.": '本应用不收集任何个人数据。',
+  "L'appli compte de façon anonyme les écrans consultés, pour préparer le festival de l'an prochain : aucun nom, aucun contact, aucune position. Ce que vous ajoutez à « Ma visite » reste sur votre téléphone.": "本应用以匿名方式统计浏览过的页面，用于筹备明年的活动：不记录姓名、联系方式或位置。您添加到“我的参观”中的内容只保存在您的手机上。", "Statistiques anonymes": "匿名统计", "Elles comptent les écrans consultés pour préparer le festival de l'an prochain. Aucun nom, aucun contact, aucune position.": "统计浏览过的页面，用于筹备明年的活动。不记录姓名、联系方式或位置。", "Désactivées sur ce téléphone : plus rien ne part.": "已在此手机上关闭：不再发送任何数据。", "Ne pas envoyer de statistiques": "不发送统计数据", "Réactiver les statistiques": "重新开启统计",
 
   'Mis à jour le %s à %s (%s)': '更新于 %s %s（%s）', 'tableur': '表格', 'classeur public': '公开表格', 'version embarquée': '内置副本', 'dernière version connue': '最近已知版本',
   'lecture en direct en échec, nouvel essai bientôt': '实时读取失败，稍后重试', 'source %s refusée (%s)': '数据源 %s 被拒绝（%s）', 'version %s': '版本 %s', 'cache périmé %s': '缓存过期 %s',

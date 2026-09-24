@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
-import { creerStats, plateforme, identifiantAleatoire } from './stats.js';
+import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APPAREIL } from './stats.js';
 import * as Passeport from './passeport.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
@@ -16,6 +16,7 @@ const journal = (...a) => { if (location.hostname === 'localhost' || location.se
 const stockage = (() => { try { localStorage.setItem('festival.test', '1'); localStorage.removeItem('festival.test'); return localStorage; } catch { return Visite.stockageMemoire(); } })();
 
 const etat = {
+  statsRefusees: false, // « Ne pas envoyer de statistiques » (Besoin d'aide ?), sécurité 05
   route: analyserRoute(location.hash),
   modele: construireModele({}), tables: null, version: null, source: null, derniereMaj: null, bandeau: '',
   // La langue affichée (ADR-0012) et les traductions du bandeau jointes à l'état
@@ -98,6 +99,27 @@ function urlMesures() {
   return JEU_URL ? urlAction(JEU_URL, 'mesures') : '';
 }
 const mesuresCoupees = () => /^(non|no|0|false|faux)$/i.test(String(etat.modele && etat.modele.infos && etat.modele.infos.stats_actives || '').trim());
+
+// Le Passeport du Grand Défi (ADR-0014) : un identifiant à lui, gardé tant que le
+// téléphone le garde. Il ne sert à rien d'autre ; les mesures ont le leur, renouvelé
+// chaque jour (sécurité 05, stats.js). Un téléphone qui jouait avant le 2026-09-24
+// retrouve ici son identifiant, donc ses points.
+const ID_PASSEPORT = (() => {
+  try {
+    let id = stockage.getItem(CLE_APPAREIL);
+    if (!id) { id = identifiantAleatoire(); stockage.setItem(CLE_APPAREIL, id); }
+    return id;
+  } catch { return identifiantAleatoire(); }
+})();
+
+// Le vocabulaire du festival : ce qu'une recherche a le droit d'envoyer (sécurité 05).
+function vocabulaire(m) {
+  return [
+    ...m.exposants.flatMap((e) => [e.nom, e.organisation, e.sousTitre, e.village, e.ville, ...(e.domaines || [])]),
+    ...m.evenements.flatMap((e) => [e.titre, e.format]),
+    ...m.zones.map((z) => z.nom), ...m.salles.map((s) => s.nom),
+  ].filter(Boolean);
+}
 
 const $ = (s) => document.querySelector(s);
 const el = { main: $('#ecran'), nav: $('#nav'), bandeau: $('#bandeau'), pied: $('#pied'), messages: $('#messages'), annonce: $('#annonce') };
@@ -270,7 +292,7 @@ const fileJeu = Passeport.creerEnvoi({
   envoyer: async (validations) => {
     const rep = await fetch(urlAction(JEU_URL, 'stats'), {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ appareil: stats.appareil, origine: location.hostname.slice(0, 80), validations }),
+      body: JSON.stringify({ appareil: ID_PASSEPORT, origine: location.hostname.slice(0, 80), validations }),
     });
     if (rep.status === 400) return { ok: false, definitif: true };
     if (!rep.ok) return { ok: false };
@@ -307,8 +329,8 @@ document.addEventListener('input', (e) => {
 });
 
 function noterRecherche(champ) {
-  const terme = normaliser(etat.ui[champ]);
-  if (!terme || terme.length < 2) return;
+  if (normaliser(etat.ui[champ]).length < 2) return;
+  const terme = termeDeRecherche(etat.ui[champ], vocabulaire(etat.modele));
   let n = 0;
   if (champ === 'rechercheProgramme') n = filtrerEvenements(etat.modele, etat.ui).length;
   else if (champ === 'rechercheExposants') n = filtrerExposants(etat.modele, etat.ui, typesPresents(etat.modele).includes(etat.ui.ongletExposants) ? etat.ui.ongletExposants : typesPresents(etat.modele)[0]).length;
@@ -352,6 +374,7 @@ document.addEventListener('click', (e) => {
     case 'suggestions': etat.ui.suggestionsOuvertes = !etat.ui.suggestionsOuvertes; rendre({ conserver: true }); break;
     case 'etape': etat.ui.etapePreparer = Number(valeur) || 0; rendre(); break;
     case 'avis': stats.noter('clic_avis'); break;
+    case 'refus-stats': if (stats.refusees()) stats.accepter(); else stats.refuser(); etat.statsRefusees = stats.refusees(); rendre({ conserver: true }); break;
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
@@ -810,6 +833,7 @@ async function demarrer() {
   // « installee·ios·fr », « navigateur·android·en »… : d'où vient la donnée en
   // cible, et en detail comment l'appli est ouverte, sur quelle famille d'appareil,
   // et dans quelle langue — ce qui dira combien de Visiteurs ne lisent pas le français.
+  etat.statsRefusees = stats.refusees();
   stats.noter('ouverture', initial ? initial.source : 'aucune',
     `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}·${langue()}`);
   appliquerRoute();

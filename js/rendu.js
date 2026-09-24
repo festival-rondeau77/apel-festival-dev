@@ -831,7 +831,10 @@ export function ecranAide(etat) {
     ${i.reglement_url ? blocLien('document', t('Règlement du festival'), t('Lire le règlement'), url(i.reglement_url)) : ''}
     ${i.avis_url ? `<a class="aide-bloc" href="${url(i.avis_url)}" target="_blank" rel="noopener" data-action="avis">${icone('avis', 21)}<div><h3>${h(t('Donner mon avis'))}</h3><p>${h(t("Deux minutes, pour nous aider à faire mieux l'an prochain."))}</p></div>${icone('chevron', 18)}</a>`
       : bloc('avis', t('Donner mon avis'), h(t('Le questionnaire de satisfaction sera disponible le jour du festival.')))}
-    ${bloc('prive', t('Vie privée'), h(tt(i.vie_privee) || t("L'application ne collecte aucune donnée personnelle.")))}
+    ${bloc('prive', t('Vie privée'), h(tt(i.vie_privee) || t("L'appli compte de façon anonyme les écrans consultés, pour préparer le festival de l'an prochain : aucun nom, aucun contact, aucune position. Ce que vous ajoutez à « Ma visite » reste sur votre téléphone.")))}
+    <div class="aide-bloc">${icone('prive', 21)}<div><h3>${h(t('Statistiques anonymes'))}</h3>
+      <p>${h(etat.statsRefusees ? t('Désactivées sur ce téléphone : plus rien ne part.') : t("Elles comptent les écrans consultés pour préparer le festival de l'an prochain. Aucun nom, aucun contact, aucune position."))}</p>
+      <button class="bouton secondaire" type="button" data-action="refus-stats" aria-pressed="${etat.statsRefusees ? 'true' : 'false'}">${h(etat.statsRefusees ? t('Réactiver les statistiques') : t('Ne pas envoyer de statistiques'))}</button></div></div>
   </section>`;
 }
 
