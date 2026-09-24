@@ -754,3 +754,8 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appe
 .aide-bloc { text-decoration: none; }
 .aide-bloc h3 { text-decoration: none; }
 .aide-bloc:hover h3 { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Rejouer depuis le début, pendant l'essai (grand-defi 11) : discret sous le scanner. */
+.grand-defi .rejouer-lien { display: inline-block; margin: 12px 0 0 14px; font-size: 0.85rem; color: var(--encre-2); text-decoration: underline; }
+.rejouer ul { margin: 12px 0 18px; padding-left: 1.2em; display: grid; gap: 6px; }
+.rejouer .note { margin-top: 16px; color: var(--encre-2); font-size: 0.9rem; }

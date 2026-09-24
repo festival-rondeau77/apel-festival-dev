@@ -8,7 +8,7 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci } from './passeport.js';
+import { jauge, defisIci, rejouerOuvert } from './passeport.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
@@ -275,7 +275,8 @@ export function ecranAccueil(etat) {
 // il vient seul, avec une phrase ; jeu coupé, rien.
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>`;
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>${rejouerOuvert(etat.modele.infos)
+    ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
   if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
     <h2 id="grand-defi-titre">${h(t('Grand Défi'))}</h2>
@@ -290,6 +291,31 @@ function carteGrandDefi(etat) {
     ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
     ${scanner}
   </section>`;
+}
+
+// Rejouer depuis le début, pendant l'essai seulement : ce que le bouton efface (le
+// Passeport de ce téléphone, ses points), ce qu'il garde (Ma visite). app.js tire
+// un nouveau Passeport ; les validations déjà reçues restent au Worker, sous l'ancien.
+function ecranRejouer(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  if (!rejouerOuvert(etat.modele.infos) || !etat.grandDefi || !etat.grandDefi.actif) {
+    return `${entete(t('Rejouer depuis le début'), '', retour)}
+    <p class="vide">${h(t("Rejouer n'est possible que pendant l'essai du Grand Défi."))}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  }
+  const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
+  const points = j ? j.points + j.attente : 0;
+  return `${entete(t('Rejouer depuis le début'), '', retour)}
+    <div class="rejouer">
+      <p>${h(t("Pour l'essai du Grand Défi : ce téléphone redevient un nouveau joueur, comme s'il ouvrait l'appli pour la première fois."))}</p>
+      <ul>
+        <li>${h(t('Les points de ce téléphone (%s) sont effacés.', points))}</li>
+        <li>${h(t('Les défis redeviennent à faire.'))}</li>
+        <li>${h(t('Ma visite et vos questions restent.'))}</li>
+      </ul>
+      <div class="boutons"><button class="bouton" type="button" data-action="rejouer">${h(t('Tout effacer et rejouer'))}</button><a class="bouton secondaire" href="#/">${h(t('Annuler'))}</a></div>
+      <p class="note">${h(t("Ce bouton n'existe que pendant l'essai : il disparaîtra avant le festival."))}</p>
+    </div>`;
 }
 
 // L'écran du scanner : le squelette, et le message de l'état (etat.ui.messageScanner,
@@ -948,6 +974,7 @@ export function ecran(etat) {
     case 'questions': return ecranPreparer(etat, { seulementQuestions: true, typeQuestions: route.params.type || null });
     case 'aide': return ecranAide(etat);
     case 'scanner': return ecranScanner(etat);
+    case 'rejouer': return ecranRejouer(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -955,7 +982,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début') }[etat.route.nom];
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   const fiche = ficheOuverte(etat.route, etat.modele);
   if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;

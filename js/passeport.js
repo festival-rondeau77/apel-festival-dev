@@ -136,3 +136,11 @@ export function creerEnvoi({ envoyer, obtenir, modifier, planifier = setTimeout,
 
   return { envoyer: envoyerMaintenant, delaiCourant: () => delai };
 }
+
+// Rejouer depuis le début (essai du Grand Défi, grand-defi 11) : seulement quand le
+// classeur servi le permet (`Infos.rejouer` = oui). Posé dans le classeur d'essai,
+// jamais dans Gestion : à la bascule, le bouton disparaît seul.
+export function rejouerOuvert(infos) {
+  return /^(oui|yes|1|vrai|true)$/i.test(String((infos && infos.rejouer) || '').trim());
+}
+

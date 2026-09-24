@@ -319,6 +319,17 @@ function validerDefi(defi, cle) {
   envoiJeu.envoyer();
 }
 
+// Rejouer depuis le début (essai, grand-defi 11) : ce téléphone oublie son Passeport
+// et ses validations, puis l'appli redémarre et en tire un nouveau (ID_PASSEPORT est
+// fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
+function rejouer() {
+  if (!Passeport.rejouerOuvert(etat.modele.infos)) return;
+  try { stockage.removeItem(CLE_APPAREIL); } catch { /* navigation privée : rien à oublier */ }
+  stockageVisite.sauver({ ...etat.visite, jeu: { validations: [], passeport: null } });
+  history.replaceState(null, '', '#/');
+  location.reload();
+}
+
 window.addEventListener('online', () => envoiJeu.envoyer());
 
 // ---------------------------------------------------------------- scanner (grand-defi 10, ADR-0017)
@@ -488,6 +499,7 @@ document.addEventListener('click', (e) => {
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
     case 'valider-defi': validerDefi(cible.dataset.defi, cle); break;
+    case 'rejouer': rejouer(); break;
     default: break;
   }
 });

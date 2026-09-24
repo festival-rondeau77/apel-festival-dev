@@ -45,7 +45,8 @@ export default [
   '%s à rencontrer', 'dans %s village', 'dans %s villages',
   'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.', 'La liste des exposants arrive bientôt.',
   'Exposant introuvable', "Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.", 'Voir les exposants',
-  'Carte pas encore attribuée', "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.",
+  'Carte pas encore attribuée',
+  "Rejouer depuis le début (essai)", "Rejouer depuis le début", "Rejouer n'est possible que pendant l'essai du Grand Défi.", "Pour l'essai du Grand Défi : ce téléphone redevient un nouveau joueur, comme s'il ouvrait l'appli pour la première fois.", "Les points de ce téléphone (%s) sont effacés.", "Les défis redeviennent à faire.", "Ma visite et vos questions restent.", "Tout effacer et rejouer", "Annuler", "Ce bouton n'existe que pendant l'essai : il disparaîtra avant le festival.", "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.",
   'Vous venez de scanner le QR code du stand', 'Formations', 'Métier', 'Métiers', 'Parcours',
   'Niveau', 'Ville', 'Présent', 'Formations présentées', 'Voir sur le plan', 'Intervient aussi',
   // plan

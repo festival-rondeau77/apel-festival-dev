@@ -39,6 +39,7 @@ export default {
   '%s à rencontrer': '共 %s 个参展方', 'dans %s village': '分布在 %s 个专区', 'dans %s villages': '分布在 %s 个专区',
   'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.': '没有符合条件的参展方。请放宽搜索或筛选条件。', 'La liste des exposants arrive bientôt.': '参展方名单即将发布。',
   'Exposant introuvable': '未找到该参展方', "Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.": '该参展方不在（或已不在）名单中，或链接不完整。', 'Voir les exposants': '查看参展方',
+  "Rejouer depuis le début (essai)": "从头再玩（测试）", "Rejouer depuis le début": "从头再玩", "Rejouer n'est possible que pendant l'essai du Grand Défi.": "只有在 Grand Défi 测试期间才能重新开始。", "Pour l'essai du Grand Défi : ce téléphone redevient un nouveau joueur, comme s'il ouvrait l'appli pour la première fois.": "用于 Grand Défi 测试：这部手机将成为新玩家，就像第一次打开应用一样。", "Les points de ce téléphone (%s) sont effacés.": "这部手机的积分（%s）将被清除。", "Les défis redeviennent à faire.": "所有挑战重新变为待完成。", "Ma visite et vos questions restent.": "“我的参观”和您的问题会保留。", "Tout effacer et rejouer": "全部清除并重新开始", "Annuler": "取消", "Ce bouton n'existe que pendant l'essai : il disparaîtra avant le festival.": "此按钮仅在测试期间存在：将在活动前消失。",
   'Carte pas encore attribuée': '卡片尚未分配', "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.": '这张卡片尚未分配给任何展位。组织者可以帮助您。',
   'Vous venez de scanner le QR code du stand': '你刚扫描了展位二维码', 'Formations': '专业', 'Métier': '职业', 'Métiers': '职业', 'Parcours': '经历',
   'Niveau': '学历层次', 'Ville': '城市', 'Présent': '在场时间', 'Formations présentées': '展示的专业', 'Voir sur le plan': '在地图上查看', 'Intervient aussi': '同时参与的活动',
