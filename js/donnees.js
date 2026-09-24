@@ -275,6 +275,43 @@ export function etagesDeZone(zone) {
 
 // ---------------------------------------------------------------- modèle
 
+// ---------------------------------------------------------------- Cartes du jeu (grand-defi 11, ADR-0018)
+
+// L'étiquette d'une Carte : `5-07` = lot du village 5, carte 7 ; `0-xx` = neutre.
+// Tapée à la main dans le tableur (« 5-7 », « 5–07 ») : on la remet en forme,
+// '' si ce n'en est pas une.
+export function etiquetteCanonique(valeur) {
+  const m = texte(valeur).match(/^(\d{1,2})\s*[-–—]\s*(\d{1,3})$/);
+  return m ? `${Number(m[1])}-${String(Number(m[2])).padStart(2, '0')}` : '';
+}
+
+// La Carte d'un Exposant (colonne `carte`), contrôlée : illisible, déjà attribuée
+// plus haut (la première ligne l'emporte, pour que le téléphone et le Worker
+// tombent sur le même Exposant) ou d'un autre village → signalée.
+function carteDe(brut, { village, dejaPrises, avertissements, ou }) {
+  if (!texte(brut)) return '';
+  const etiquette = etiquetteCanonique(brut);
+  if (!etiquette) { avertissements.push({ type: 'carte-illisible', valeur: texte(brut), ou }); return ''; }
+  if (dejaPrises.has(etiquette)) { avertissements.push({ type: 'carte-en-double', valeur: etiquette, ou }); return ''; }
+  dejaPrises.add(etiquette);
+  const lot = Number(etiquette.split('-')[0]);
+  const v = VILLAGES.find((x) => normaliser(x.nom) === normaliser(village));
+  if (lot !== 0 && v && v.numero !== lot) avertissements.push({ type: 'carte-autre-village', valeur: `${etiquette} : village ${v.numero}`, ou });
+  return etiquette;
+}
+
+// L'Exposant auquel une Carte est attribuée, ou null (carte pas encore attribuée).
+export function exposantDeCarte(modele, etiquette) {
+  const e = etiquetteCanonique(etiquette);
+  return (e && modele.exposants.find((x) => x.carte === e)) || null;
+}
+
+// Étiquette → clé de l'Exposant, depuis les tables du programme : ce que le
+// Worker lit pour savoir quel Stand une Carte prouve.
+export function attributionDesCartes(tables) {
+  return new Map(construireModele(tables).exposants.filter((e) => e.carte).map((e) => [e.carte, e.cle]));
+}
+
 export function construireModele(tables) {
   tables = tables || {};
   const avertissements = [];
@@ -314,6 +351,7 @@ export function construireModele(tables) {
   };
 
   const exposants = [];
+  const cartesPrises = new Set();
   for (const e of exposantsBruts) {
     const nom = texte(e.nom);
     if (!nom) continue;
@@ -331,8 +369,9 @@ export function construireModele(tables) {
     if (village && zone && normaliser(zone.nom) !== normaliser(village)) {
       avertissements.push({ type: 'village-en-desaccord', valeur: `${village} ≠ ${zone.nom} (${salle})`, ou });
     }
+    const carte = carteDe(e.carte, { village: zone ? zone.nom : village, dejaPrises: cartesPrises, avertissements, ou });
     exposants.push({
-      cle: cleExposant(type, nom), type, typeSlug: slugType(type), nom,
+      cle: cleExposant(type, nom), type, typeSlug: slugType(type), nom, carte,
       organisation: texte(e.organisation), village: zone ? zone.nom : village, villageConnu,
       domaines, domainesConnus: connus,
       sousTitre: texte(e.sous_titre), description: texte(e.description), niveau: texte(e.niveau),

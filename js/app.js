@@ -7,7 +7,7 @@ import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APP
 import * as Passeport from './passeport.js';
 import { routeDepuisScan } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
-import { analyserRoute } from './routes.js';
+import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
 import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
 import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, definirLanguesProposees, languesProposees } from './i18n.js';
@@ -180,7 +180,7 @@ function rendre({ conserver = false } = {}) {
 // retour ne restaurait donc rien, sur aucun écran. On ne restaure qu'au retour
 // d'une fiche — arriver sur une liste par la navigation doit montrer son début.
 const positions = new Map();
-const FICHES = ['exposant', 'evenement'];
+const FICHES = ['evenement', ...ROUTES_EXPOSANT];
 
 function appliquerRoute() {
   const precedente = etat.route.nom;
@@ -208,14 +208,17 @@ function appliquerRoute() {
     if (p.domaine !== undefined) etat.ui.filtreDomaineExposants = p.domaine;
     else if (p.secteur !== undefined) etat.ui.filtreDomaineExposants = p.secteur;
   }
-  // Le secret d'un chevalet ne part jamais dans les mesures : seule la clé de l'Exposant.
-  if (etat.route.nom === 'exposant' && (p.qr === '1' || p.s)) stats.noter('qr_scan', p.cle || '');
-  if (etat.route.nom === 'exposant') stats.noter('fiche_exposant', p.cle || '');
+  // Le jeton d'une Carte (ou le secret d'un ancien chevalet) ne part jamais dans
+  // les mesures : seule la clé de l'Exposant, ou l'étiquette d'une Carte pas encore attribuée.
+  const fiche = ficheOuverte(etat.route, etat.modele);
+  if (fiche && fiche.qr) stats.noter('qr_scan', fiche.cle || fiche.etiquette);
+  if (fiche && fiche.cle) stats.noter('fiche_exposant', fiche.cle);
   if (etat.route.nom === 'evenement') stats.noter('fiche_evenement', p.cle || '');
   stats.noter('ecran', etat.route.nom);
-  if (['evenement', 'exposant'].includes(etat.route.nom) && p.cle && Visite.contient(etat.visite, p.cle)) {
-    const entree = etat.visite.entrees.find((e) => e.cle === p.cle);
-    if (entree.alerte && !entree.alerte.vue) { setTimeout(() => { modifierVisite(Visite.marquerAlerteVue(etat.visite, p.cle)); }, 4000); }
+  const cleFiche = etat.route.nom === 'evenement' ? p.cle : fiche && fiche.cle;
+  if (cleFiche && Visite.contient(etat.visite, cleFiche)) {
+    const entree = etat.visite.entrees.find((e) => e.cle === cleFiche);
+    if (entree.alerte && !entree.alerte.vue) { setTimeout(() => { modifierVisite(Visite.marquerAlerteVue(etat.visite, cleFiche)); }, 4000); }
   }
   rendre();
 }
@@ -308,7 +311,8 @@ const fileJeu = Passeport.creerEnvoi({
 const envoiJeu = { envoyer: () => (JEU_URL ? fileJeu.envoyer() : Promise.resolve()) };
 
 function validerDefi(defi, cle) {
-  const secret = etat.route.params.s;
+  const fiche = ficheOuverte(etat.route, etat.modele);
+  const secret = fiche && fiche.cle === cle ? fiche.secret : '';
   if (!secret || !defi || !cle) return;
   const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: cle, secret, t: Date.now() });
   modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, v) });

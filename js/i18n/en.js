@@ -39,6 +39,7 @@ export default {
   '%s à rencontrer': '%s to meet', 'dans %s village': 'in %s village', 'dans %s villages': 'in %s villages',
   'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.': 'No exhibitor matches. Widen your search or filters.', 'La liste des exposants arrive bientôt.': 'The list of exhibitors is coming soon.',
   'Exposant introuvable': 'Exhibitor not found', "Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.": 'This exhibitor is not (or no longer) listed, or the link is incomplete.', 'Voir les exposants': 'See the exhibitors',
+  'Carte pas encore attribuée': 'Card not assigned yet', "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.": 'This card is not assigned to a stand yet. An organiser can help you.',
   'Vous venez de scanner le QR code du stand': 'You just scanned the QR code of the stand', 'Formations': 'Courses', 'Métier': 'Job', 'Métiers': 'Jobs', 'Parcours': 'Path',
   'Niveau': 'Level', 'Ville': 'City', 'Présent': 'Present', 'Formations présentées': 'Courses presented', 'Voir sur le plan': 'See on the map', 'Intervient aussi': 'Also speaking at',
 

@@ -10,6 +10,7 @@ import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDe
 import { icone } from './icones.js';
 import { jauge, defisIci } from './passeport.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
+import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
 // ---------------------------------------------------------------- utilitaires
 
@@ -311,10 +312,10 @@ function etatDuDefi(etat, ex, statut, chez) {
   return autre ? t('Déjà gagné chez %s', autre.nom) : t('Déjà gagné');
 }
 
-// Sur la fiche ouverte par le QR secret d'un chevalet (`?s=`) : les défis que cet
-// Exposant peut prouver. Le QR public des affiches (`?qr=1`) n'en propose aucun.
-function defisDeLaFiche(etat, ex) {
-  const secret = etat.route.params.s;
+// Sur la fiche ouverte par le QR d'une Carte du jeu (son jeton), ou d'un ancien
+// chevalet (`?s=`) : les défis que cet Exposant peut prouver. Un lien public
+// (`#/c/<étiquette>`, `?qr=1`) n'en propose aucun.
+function defisDeLaFiche(etat, ex, secret) {
   if (!secret) return '';
   const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle);
   if (!ici.length) return '';
@@ -507,7 +508,7 @@ export function ecranExposants(etat) {
 const QUESTIONS_POUR = { 'École': 'Questions à poser à une école', 'Pro': 'Questions à poser à un pro', 'Entreprise': 'Questions à poser à une entreprise', 'Ancien élève': 'Questions à poser à un ancien élève' };
 const POUR_TYPE = { 'École': 'Pour une école', 'Pro': 'Pour un pro', 'Entreprise': 'Pour une entreprise', 'Ancien élève': 'Pour un ancien élève' };
 
-export function ecranExposant(etat, cle, { qr = false } = {}) {
+export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   const { modele } = etat;
   const ex = modele.exposants.find((e) => e.cle === cle);
   if (!ex) return `${entete(t('Exposant introuvable'), '', retourDepuis(etat.route.params.de, { href: '#/exposants', libelle: t('Les exposants') }))}
@@ -524,7 +525,7 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
     ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Vous venez de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
-    ${defisDeLaFiche(etat, ex)}
+    ${defisDeLaFiche(etat, ex, secret)}
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       ${ex.type === 'Pro' && ex.organisation ? `<dt>${h(t('Entreprise'))}</dt><dd>${h(ex.organisation)}</dd>` : ''}
@@ -874,7 +875,7 @@ export function navigation(etat) {
   const alertes = alertesNonVues(etat.visite).length;
   const nom = etat.route.nom;
   const actif = {
-    accueil: nom === 'accueil', plan: nom === 'plan', exposants: nom === 'exposants' || nom === 'exposant',
+    accueil: nom === 'accueil', plan: nom === 'plan', exposants: nom === 'exposants' || ROUTES_EXPOSANT.includes(nom),
     programme: nom === 'programme' || nom === 'evenement', visite: ['visite', 'preparer', 'questions'].includes(nom),
   };
   const badge = nb ? `<span class="badge${alertes ? ' alerte' : ''}" aria-label="${attr(tn('%s élément', '%s éléments', nb))}${alertes ? `, ${attr(tn('%s changement', '%s changements', alertes))}` : ''}">${alertes ? '!' : nb}</span>` : '';
@@ -922,6 +923,13 @@ export function piedDePage(etat) {
 
 // ---------------------------------------------------------------- aiguillage
 
+// Une Carte du jeu que l'APEL n'a encore attribuée à aucun Stand (ADR-0018).
+function ecranCarteNonAttribuee() {
+  return `${entete(t('Carte pas encore attribuée'), '', { href: '#/exposants', libelle: t('Les exposants') })}
+    <p class="vide">${h(t("Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider."))}</p>
+    <div class="boutons"><a class="bouton" href="#/exposants">${h(t('Voir les exposants'))}</a></div>`;
+}
+
 export function ecran(etat) {
   poserLangue(etat);
   const { route } = etat;
@@ -930,7 +938,10 @@ export function ecran(etat) {
     case 'programme': return ecranProgramme(etat);
     case 'evenement': return ecranEvenement(etat, route.params.cle);
     case 'exposants': return ecranExposants(etat);
-    case 'exposant': return ecranExposant(etat, route.params.cle, { qr: route.params.qr === '1' || Boolean(route.params.s) });
+    case 'exposant': case 'carte': case 'cartePublique': {
+      const { cle, qr, secret } = ficheOuverte(route, etat.modele);
+      return cle || route.nom === 'exposant' ? ecranExposant(etat, cle, { qr, secret }) : ecranCarteNonAttribuee();
+    }
     case 'plan': return ecranPlan(etat);
     case 'visite': return ecranVisite(etat);
     case 'preparer': return ecranPreparer(etat);
@@ -946,6 +957,8 @@ export function titreDocument(etat) {
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
   const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR') }[etat.route.nom];
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
-  if (etat.route.nom === 'exposant') { const e = etat.modele.exposants.find((x) => x.cle === etat.route.params.cle); return `${e ? e.nom : t('Exposant')} · ${nomFestival}`; }
+  const fiche = ficheOuverte(etat.route, etat.modele);
+  if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;
+  if (fiche) { const e = etat.modele.exposants.find((x) => x.cle === fiche.cle); return `${e ? e.nom : t('Exposant')} · ${nomFestival}`; }
   return t2 ? `${t2} · ${nomFestival}` : nomFestival;
 }

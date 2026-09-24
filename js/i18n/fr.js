@@ -45,6 +45,7 @@ export default [
   '%s à rencontrer', 'dans %s village', 'dans %s villages',
   'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.', 'La liste des exposants arrive bientôt.',
   'Exposant introuvable', "Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.", 'Voir les exposants',
+  'Carte pas encore attribuée', "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.",
   'Vous venez de scanner le QR code du stand', 'Formations', 'Métier', 'Métiers', 'Parcours',
   'Niveau', 'Ville', 'Présent', 'Formations présentées', 'Voir sur le plan', 'Intervient aussi',
   // plan

@@ -39,6 +39,7 @@ export default {
   '%s à rencontrer': '%s por conocer', 'dans %s village': 'en %s aldea', 'dans %s villages': 'en %s aldeas',
   'Aucun exposant ne correspond. Élargissez la recherche ou les filtres.': 'Ningún expositor coincide. Amplía la búsqueda o los filtros.', 'La liste des exposants arrive bientôt.': 'La lista de expositores llegará pronto.',
   'Exposant introuvable': 'Expositor no encontrado', "Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet.": 'Este expositor no está (o ya no está) en la lista, o el enlace está incompleto.', 'Voir les exposants': 'Ver los expositores',
+  'Carte pas encore attribuée': 'Tarjeta aún no asignada', "Cette carte n'est pas encore attribuée à un stand. Un organisateur peut vous aider.": 'Esta tarjeta aún no está asignada a un stand. Un organizador puede ayudarle.',
   'Vous venez de scanner le QR code du stand': 'Acabas de escanear el código QR del estand', 'Formations': 'Formaciones', 'Métier': 'Oficio', 'Métiers': 'Oficios', 'Parcours': 'Trayectoria',
   'Niveau': 'Nivel', 'Ville': 'Ciudad', 'Présent': 'Presente', 'Formations présentées': 'Formaciones presentadas', 'Voir sur le plan': 'Ver en el plano', 'Intervient aussi': 'También interviene en',
 
