@@ -74,11 +74,17 @@ const stats = creerStats({
   // qu'on ait à le configurer, et il ne peut pas mentir sur la provenance.
   origine: location.hostname,
   envoyer: async (salve) => {
-    if (!CONFIG.scriptUrl) return { ok: false, definitif: true };
+    const url = urlMesures();
+    if (!url) return { ok: false, definitif: true };
+    // Coupe-circuit (sécurité 04) : `stats_actives` = non dans l'onglet Infos, on n'envoie
+    // plus rien et la file se vide — le Worker jetterait de toute façon.
+    if (mesuresCoupees()) return { ok: true };
     try {
-      const rep = await fetch(urlAction(CONFIG.scriptUrl, 'stats'), { method: 'POST', body: JSON.stringify(salve), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow', keepalive: true });
-      // Apps Script répond toujours HTTP 200 : le verdict est dans le corps ({ ok } ou { erreur, statut }).
-      if (!rep.ok) return { ok: false, definitif: false };
+      const rep = await fetch(url, { method: 'POST', body: JSON.stringify(salve), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow', keepalive: true });
+      // Le Worker répond avec le vrai code HTTP : 400 et 413 sont définitifs, le reste
+      // (403, 5xx, réseau) se renvoie. Apps Script, lui, répond toujours 200 et met le
+      // verdict dans le corps ({ ok } ou { erreur, statut }).
+      if (!rep.ok) return { ok: false, definitif: rep.status === 400 || rep.status === 413 };
       let corps = null;
       try { corps = await rep.json(); } catch { corps = null; }
       if (corps && corps.ok === true) return { ok: true };
@@ -86,6 +92,14 @@ const stats = creerStats({
     } catch { return { ok: false, definitif: false }; }
   },
 });
+
+// Les mesures vont au Worker (ticket 19, `?action=mesures`), à défaut au script.
+// Une fonction, pas une constante : JEU_URL est défini plus bas dans ce module.
+function urlMesures() {
+  if (JEU_URL) return urlAction(JEU_URL, 'mesures');
+  return CONFIG.scriptUrl ? urlAction(CONFIG.scriptUrl, 'stats') : '';
+}
+const mesuresCoupees = () => /^(non|no|0|false|faux)$/i.test(String(etat.modele && etat.modele.infos && etat.modele.infos.stats_actives || '').trim());
 
 const $ = (s) => document.querySelector(s);
 const el = { main: $('#ecran'), nav: $('#nav'), bandeau: $('#bandeau'), pied: $('#pied'), messages: $('#messages'), annonce: $('#annonce') };
@@ -721,9 +735,10 @@ function verifierRappels() {
 // ---------------------------------------------------------------- mesures
 
 function envoyerStatsEnArrierePlan() {
-  if (!CONFIG.scriptUrl || !navigator.sendBeacon || stats.taille() === 0) return;
+  const url = urlMesures();
+  if (!url || !navigator.sendBeacon || stats.taille() === 0 || mesuresCoupees()) return;
   const salve = stats.preleverSalve();
-  const ok = navigator.sendBeacon(urlAction(CONFIG.scriptUrl, 'stats'), new Blob([JSON.stringify(salve)], { type: 'text/plain;charset=utf-8' }));
+  const ok = navigator.sendBeacon(url, new Blob([JSON.stringify(salve)], { type: 'text/plain;charset=utf-8' }));
   if (!ok) stats.remettre(salve);
 }
 // Comme le rafraîchisseur de données, on n'appelle pas le réseau depuis un
