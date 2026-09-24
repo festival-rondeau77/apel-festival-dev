@@ -291,13 +291,14 @@ function carteGrandDefi(etat) {
   </section>`;
 }
 
-// L'écran du scanner : le squelette seulement. app.js y branche la caméra
-// (getUserMedia), lit les images (BarcodeDetector, sinon js/vendor/jsqr.js) et
-// écrit dans #scanner-etat ; aucun style en ligne (CSP, sécurité 06).
+// L'écran du scanner : le squelette, et le message de l'état (etat.ui.messageScanner,
+// une phrase française, clé de t()). app.js y branche la caméra (getUserMedia) et
+// lit les images (BarcodeDetector, sinon js/vendor/jsqr.js, ADR-0017) ; aucun
+// style en ligne (CSP, sécurité 06).
 export function ecranScanner(etat) {
   return `${entete(t('Scanner un QR'), '', retourDepuis(etat.route.params.de, { href: '#/', libelle: t('Accueil') }))}
   <div class="scanner"><video id="scanner-video" playsinline muted></video><div class="viseur" aria-hidden="true"></div></div>
-  <p class="scanner-etat" id="scanner-etat" role="status">${h(t('Visez le QR code du stand.'))}</p>`;
+  <p class="scanner-etat" id="scanner-etat" role="status">${h(t(etat.ui.messageScanner || 'Visez le QR code du stand.'))}</p>`;
 }
 
 const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));

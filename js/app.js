@@ -35,6 +35,7 @@ const etat = {
     rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
     recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, feuillePlan: null, suggestionsOuvertes: false,
     filtresOuverts: false, etapePreparer: 0, bandeauFerme: '',
+    messageScanner: '', // la phrase de l'écran scanner (grand-defi 10), clé de t()
   },
   reseau: { enErreur: false, refus: null },
   maintenant: { jourJ: false, minutes: 0 },
@@ -189,6 +190,7 @@ function appliquerRoute() {
     scrollAvant = positions.get(etat.route.nom);
   }
   const p = etat.route.params;
+  if (etat.route.nom === 'scanner' && precedente !== 'scanner') { scanner.bloque = false; etat.ui.messageScanner = ''; }
   if (etat.route.nom === 'plan') {
     etat.ui.salleAllumee = p.salle || null;
     // « village » et « zone » désignent la même chose : le second est l'ancien
@@ -315,18 +317,27 @@ function validerDefi(defi, cle) {
 
 window.addEventListener('online', () => envoiJeu.envoyer());
 
-// ---------------------------------------------------------------- scanner (grand-defi 10)
+// ---------------------------------------------------------------- scanner (grand-defi 10, ADR-0017)
 
-// Scanner DANS l'appli : le QR d'un chevalet ouvre sa fiche au même Passeport,
+// Scanner DANS l'appli : le QR d'un Chevalet ouvre sa fiche au même Passeport,
 // là où un lecteur de QR du téléphone ouvre souvent une fenêtre cloisonnée, avec
 // sa propre mémoire. Le navigateur lit les QR s'il sait (BarcodeDetector,
 // Chrome sur Android) ; sinon js/vendor/jsqr.js (Safari), chargé à la demande.
-// La caméra survit aux rendus (un rafraîchissement de données refait l'écran) :
-// le flux est rebranché sur la nouvelle <video>.
-const HOTES_APPLI = [location.host, new URL(CONFIG.urlPublique).host, ...Object.values(CONFIG.cibles || {}).map((c) => `${c.owner}.github.io`)];
-const scanner = { flux: null, minuteur: null, detecteur: undefined, jsQR: null, toile: null };
+// Le message affiché vit dans l'état (etat.ui.messageScanner), pas dans la page ;
+// la caméra, elle, vit ici, et survit aux rendus (le flux est rebranché sur la
+// nouvelle <video>). Chaque ouverture porte un numéro de session : arrêter en
+// change le numéro, et une boucle ou une ouverture d'une session finie s'éteint.
+// Les adresses de CETTE appli : la page qui scanne, et son urlPublique (celle du
+// dev sur le dev, réécrite par deploy.sh). Chemin compris : sur github.io, dev,
+// prod et maquettes partagent un hôte.
+const BASES_APPLI = [location.href, CONFIG.urlPublique];
+const scanner = { flux: null, session: 0, ouverture: false, minuteur: null, bloque: false, detecteur: undefined, jsQR: null, toile: null };
 
-function etatScanner(texte) { const p = $('#scanner-etat'); if (p) p.textContent = texte; }
+function messageScanner(cle) {
+  if (etat.ui.messageScanner === cle) return;
+  etat.ui.messageScanner = cle;
+  if (etat.route.nom === 'scanner') rendre({ conserver: true });
+}
 
 async function lecteurQR() {
   if (scanner.detecteur === undefined) {
@@ -334,12 +345,12 @@ async function lecteurQR() {
     try { if ('BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) scanner.detecteur = new BarcodeDetector({ formats: ['qr_code'] }); } catch { scanner.detecteur = null; }
   }
   if (scanner.detecteur || scanner.jsQR) return;
-  await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = './js/vendor/jsqr.js'; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
+  await new Promise((charge, echec) => { const s = document.createElement('script'); s.src = './js/vendor/jsqr.js'; s.onload = charge; s.onerror = echec; document.head.appendChild(s); });
   scanner.jsQR = window.jsQR;
 }
 
 async function lireImage(video) {
-  if (!video.videoWidth) return null;
+  if (!video || !video.videoWidth) return null;
   if (scanner.detecteur) { const r = await scanner.detecteur.detect(video); return r[0] ? r[0].rawValue : null; }
   const largeur = 480, hauteur = Math.round((video.videoHeight * largeur) / video.videoWidth);
   const toile = scanner.toile || (scanner.toile = document.createElement('canvas'));
@@ -350,49 +361,61 @@ async function lireImage(video) {
   return code ? code.data : null;
 }
 
+// Appelé à chaque rendu de l'écran scanner : ouvre la caméra la première fois,
+// la rebranche ensuite. Après un refus, on ne redemande pas à chaque rendu :
+// il faut revenir sur l'écran (appliquerRoute remet `bloque` à faux).
 async function demarrerScanner() {
   const video = $('#scanner-video');
-  if (!video) return;
-  if (scanner.flux === 'ouverture') return;
+  if (!video || scanner.bloque) return;
   if (scanner.flux) { if (video.srcObject !== scanner.flux) { video.srcObject = scanner.flux; video.play().catch(() => {}); } return; }
-  scanner.flux = 'ouverture';
-  etatScanner(t('Ouverture de la caméra…'));
+  if (scanner.ouverture) return;
+  scanner.ouverture = true;
+  const moi = ++scanner.session;
+  const encore = () => scanner.session === moi && etat.route.nom === 'scanner';
+  messageScanner('Ouverture de la caméra…');
+  let flux = null;
   try {
+    await lecteurQR(); // le lecteur d'abord : s'il manque, la caméra n'est même pas allumée
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('caméra'), { name: 'NotFoundError' });
-    const [flux] = await Promise.all([navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }), lecteurQR()]);
-    if (scanner.flux !== 'ouverture') { flux.getTracks().forEach((p) => p.stop()); return; } // quitté pendant l'ouverture
-    scanner.flux = flux;
+    flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
   } catch (e) {
-    scanner.flux = null;
-    etatScanner(e && e.name === 'NotAllowedError' ? t('Caméra refusée : autorisez-la dans les réglages du navigateur.') : t('Pas de caméra disponible sur cet appareil.'));
+    if (flux) flux.getTracks().forEach((p) => p.stop());
+    if (!encore()) return;
+    scanner.ouverture = false; scanner.bloque = true;
+    messageScanner(e && e.name === 'NotAllowedError' ? 'Caméra refusée : autorisez-la dans les réglages du navigateur.' : 'Pas de caméra disponible sur cet appareil.');
     return;
   }
+  if (!encore()) { flux.getTracks().forEach((p) => p.stop()); return; } // quitté pendant l'ouverture
+  scanner.ouverture = false;
+  scanner.flux = flux;
   const courante = $('#scanner-video');
-  if (!courante) { arreterScanner(); return; }
-  courante.srcObject = scanner.flux;
-  courante.play().catch(() => {});
-  etatScanner(t('Visez le QR code du stand.'));
-  // Vibrer n'est permis qu'après un geste sur la page (sinon le navigateur le refuse et le dit en console).
+  if (courante) { courante.srcObject = flux; courante.play().catch(() => {}); }
+  messageScanner('Visez le QR code du stand.');
   const tour = async () => {
-    if (!scanner.flux || typeof scanner.flux === 'string') return;
+    if (scanner.session !== moi) return;
     let texte = null;
-    try { texte = await lireImage($('#scanner-video') || courante); } catch { texte = null; }
-    if (texte) {
-      const route = routeDepuisScan(texte, HOTES_APPLI);
-      if (route) { arreterScanner(); if (navigator.vibrate && navigator.userActivation?.hasBeenActive) navigator.vibrate(60); location.replace(route); return; }
-      etatScanner(t('Ce QR code n’est pas celui d’un stand du festival.'));
-      scanner.minuteur = setTimeout(tour, 1500);
+    try { texte = await lireImage($('#scanner-video')); } catch { texte = null; }
+    if (scanner.session !== moi) return; // arrêté pendant la lecture : cette boucle s'éteint
+    const route = texte ? routeDepuisScan(texte, BASES_APPLI) : null;
+    if (route) {
+      arreterScanner();
+      // Vibrer n'est permis qu'après un geste sur la page (sinon le navigateur le refuse et le dit en console).
+      if (navigator.vibrate && navigator.userActivation?.hasBeenActive) navigator.vibrate(60);
+      location.replace(route);
       return;
     }
-    scanner.minuteur = setTimeout(tour, 150);
+    if (texte) messageScanner('Ce QR code n’est pas celui d’un stand du festival.');
+    scanner.minuteur = setTimeout(tour, texte ? 1500 : 150);
   };
   tour();
 }
 
 function arreterScanner() {
   clearTimeout(scanner.minuteur); scanner.minuteur = null;
-  if (scanner.flux && typeof scanner.flux !== 'string') scanner.flux.getTracks().forEach((p) => p.stop());
-  scanner.flux = null; // pendant l'ouverture aussi : demarrerScanner le voit et rend la caméra
+  if (scanner.flux) scanner.flux.getTracks().forEach((p) => p.stop());
+  scanner.flux = null;
+  scanner.ouverture = false;
+  scanner.session++; // toute boucle ou ouverture en cours devient caduque
 }
 
 // ---------------------------------------------------------------- gestes
