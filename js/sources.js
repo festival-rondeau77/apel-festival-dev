@@ -1,5 +1,7 @@
 // Module Sources : la chaîne de lecture des données (ADR-0004).
-//   1. script Apps Script (`etat` : version + bandeau ; `donnees` : six tables)
+//   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) — ou, sans lui, le script
+//      Apps Script (`scriptUrl`) : même contrat, `etat` : version + bandeau ;
+//      `donnees` : six tables. Les mesures, elles, vont encore au script (ticket 19).
 //   2. classeur « Festival — Export public » via gviz, onglet par onglet
 //   3. snapshot embarqué au déploiement
 // À chaque succès, les tables sont mises en cache local avec version et heure.
@@ -101,7 +103,7 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     return rep.text();
   }
 
-  const urlScript = (action) => urlAction(config.scriptUrl, action);
+  const urlScript = (action) => urlAction(config.programmeUrl || config.scriptUrl, action);
 
   async function etatScript() {
     const rep = JSON.parse(await requete(urlScript('etat'), { redirect: 'follow' }));

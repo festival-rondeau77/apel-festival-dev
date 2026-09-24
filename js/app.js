@@ -785,7 +785,9 @@ async function enregistrerServiceWorker() {
 async function demarrer() {
   // Le snapshot embarqué est lu avant le premier rendu (instantané une fois en cache) ;
   // chargerInitial() choisit entre lui et le cache local, le plus récent gagne.
-  sources = creerSources({ config: CONFIG, fetch: (u, o) => fetch(u, o), stockage, snapshot: await chargerSnapshot(), journal });
+  // Le programme vient du Worker (ticket 20) : celui du jeu, le même programme (ADR-0016),
+  // local sous ./jeu sur la machine de développement.
+  sources = creerSources({ config: { ...CONFIG, programmeUrl: JEU_URL }, fetch: (u, o) => fetch(u, o), stockage, snapshot: await chargerSnapshot(), journal });
   const initial = sources.chargerInitial();
   if (initial) installerTables(initial.tables, initial.version, initial.sourceOrigine || initial.source, { heure: initial.heure || Date.now(), silencieux: true });
   else etat.derniereMaj = null;

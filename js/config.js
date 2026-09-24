@@ -12,7 +12,7 @@ export const CONFIG = {
   // un autre festival quand le script ralentissait (37 s mesurées ce soir-là).
   // Le jour où la cellule classeur_recette est vidée, revenir à l'Export public
   // (et retirer `onglets`), comme le Worker du jeu (docs/tableur.md).
-  sheetId: '1waAyEKXe1-lP8IkOIqAofdN5aiHEY86r0h5rOab6N_4',
+  sheetId: '1JQLl1_DQ8H14_b_LPByCnGSYNrYC9SOIWUced_E7u6Q',
   onglets: { exposants: 'Export Exposants', evenements: 'Export Événements', salles: 'Export Salles', preparation: 'Export Préparation', infos: 'Export Infos', traductions: 'Traductions' },
   // Hébergement GitHub Pages, deux plateformes (ADR-domaine 0007) : la prod sert le
   // domaine de l'association, le dev garde une URL github.io laide pour qu'elle ne soit
@@ -20,9 +20,12 @@ export const CONFIG = {
   // ce bloc.
   cibles: {
     prod: { owner: 'festival-rondeau77', repo: 'apel-festival', jeu: 'https://festival-jeu.festival-e23.workers.dev' },
-    dev: { owner: 'festival-rondeau77', repo: 'apel-festival-dev', jeu: 'https://festival-jeu-dev.festival-e23.workers.dev' },
+    // `classeur` : le secours gviz de la copie servie en dev (le classeur de dev, fictif,
+    // mêmes onglets « Export … »), écrit par bin/deploy.sh --cible=dev.
+    dev: { owner: 'festival-rondeau77', repo: 'apel-festival-dev', jeu: 'https://festival-jeu-dev.festival-e23.workers.dev', classeur: '1JQLl1_DQ8H14_b_LPByCnGSYNrYC9SOIWUced_E7u6Q' },
   },
-  // Le Worker du Grand Défi (ADR-0016, worker/). Celui de la PRODUCTION ici ;
+  // Le Worker (ADR-0016, worker/) : le Grand Défi ET, depuis le ticket 20, le programme
+  // (etat, donnees) à la place du script. Celui de la PRODUCTION ici ;
   // bin/deploy.sh --cible=dev y écrit celui du dev dans la seule copie servie, et
   // --demo le vide. Vide = pas de jeu : l'appli d'avant le Grand Défi. Sur la
   // machine (npm run servir), l'appli joue contre le Worker local, jamais celui-ci.
@@ -32,7 +35,7 @@ export const CONFIG = {
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.24-5966d6e',
+  version: '2026.09.24-c3ab369',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le
