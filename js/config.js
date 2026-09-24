@@ -5,8 +5,15 @@ export const CONFIG = {
   // Vide tant que bin/wizard-apps-script.sh n'a pas été joué : l'appli passe alors
   // directement au classeur Export public puis au snapshot.
   scriptUrl: 'https://script.google.com/macros/s/AKfycbwSZkZMUmp63P8wU40x8mJXXqYQHJeHEwV4vUT92_OcoosJ46F9PcFUZN-IWzQsVl_x/exec',
-  // Classeur « Festival — Export public (lu par l'appli) », lu via gviz (ADR-0003).
-  sheetId: '1-1TURF3X40DQ1NvMUavUbyc7ZNsOl4rGTLqMgRsQFqc',
+  // Le classeur lu en secours via gviz quand le script ne répond pas (ADR-0003, 0004).
+  // Depuis le 2026-09-23 : « Festival — Données du site (production) » (l'ancienne
+  // Recette, en lecture publique), celui que le script sert — l'Export public
+  // (1-1TURF3X…) est alimenté par le maître, pas par lui, et le secours y affichait
+  // un autre festival quand le script ralentissait (37 s mesurées ce soir-là).
+  // Le jour où la cellule classeur_recette est vidée, revenir à l'Export public
+  // (et retirer `onglets`), comme le Worker du jeu (docs/tableur.md).
+  sheetId: '1waAyEKXe1-lP8IkOIqAofdN5aiHEY86r0h5rOab6N_4',
+  onglets: { exposants: 'Export Exposants', evenements: 'Export Événements', salles: 'Export Salles', preparation: 'Export Préparation', infos: 'Export Infos', traductions: 'Traductions' },
   // Hébergement GitHub Pages, deux plateformes (ADR-domaine 0007) : la prod sert le
   // domaine de l'association, le dev garde une URL github.io laide pour qu'elle ne soit
   // ni transmise ni imprimée. bin/deploy.sh choisit par --cible ; l'appli ne lit jamais
@@ -25,7 +32,7 @@ export const CONFIG = {
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.23-6753e0e',
+  version: '2026.09.24-5966d6e',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le

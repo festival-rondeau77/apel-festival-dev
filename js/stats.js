@@ -18,6 +18,17 @@ function tronquer(v, n) {
   return t.length > n ? t.slice(0, n) : t;
 }
 
+// Le script refuse une salve entière si une cible ou un détail ressemble à une
+// formule de tableur (sécurité 02 : script/Code.js, texteSur). Une recherche
+// tapée « =maths » ou « -bts » ferait donc perdre toutes les mesures qui
+// l'accompagnent : on la ramène ici à ce que le script accepte. Ce n'est PAS la
+// protection (un attaquant n'utilise pas l'appli), seulement de quoi ne rien perdre.
+const HORS_TEXTE = /[^\p{L}\p{M}\p{N} .,:;'’·&()\/?!«»"#%+@_-]/gu;
+export function nettoyer(v, n) {
+  const t = v === null || v === undefined ? '' : String(v);
+  return tronquer(t.replace(HORS_TEXTE, '').replace(/^[\s=+\-@]+/, ''), n);
+}
+
 // La plateforme, en trois seaux et rien de plus : c'est ce qui décide s'il faudra
 // un jour une application native, et laquelle en premier. On ne garde ni la version
 // du système, ni le modèle, ni rien qui rapprocherait deux visites — un seau parmi
@@ -58,7 +69,7 @@ export function creerStats({ stockage, horloge = () => Date.now(), envoyer, alea
 
   function noter(action, cible = '', detail = '') {
     if (!action) return;
-    file.push({ t: horloge(), action: tronquer(action, 40), cible: tronquer(cible, LONGUEUR_CIBLE), detail: tronquer(detail, LONGUEUR_DETAIL) });
+    file.push({ t: horloge(), action: tronquer(action, 40), cible: nettoyer(cible, LONGUEUR_CIBLE), detail: nettoyer(detail, LONGUEUR_DETAIL) });
     if (file.length > plafond) file = file.slice(file.length - plafond);
     persister();
   }

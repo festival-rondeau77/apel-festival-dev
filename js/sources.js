@@ -64,6 +64,17 @@ export function motifDeRefus(candidat, reference, { seuilChute = SEUIL_CHUTE } =
   return null;
 }
 
+// Le contrôle de déploiement (ticket sécurité 03) : la source retenue pour le
+// snapshot est la première complète, le script d'ordinaire. Mais si le script
+// tombe le jour J, les téléphones liront le SECOURS (gviz) : un secours vide ou en
+// retrait serait refusé par la barrière ci-dessus, et l'appli resterait figée sur
+// sa dernière version — survivable, mais c'est au déploiement qu'on veut le savoir.
+// Renvoie null si le secours vaut la source retenue, sinon le motif.
+export function motifSecoursInsuffisant(secours, retenu, { seuilChute = SEUIL_CHUTE } = {}) {
+  if (!secours) return 'secours injoignable';
+  return motifDeRefus(secours, retenu, { seuilChute });
+}
+
 // L'URL d'un point d'entrée du script (le scriptUrl peut déjà porter une requête).
 export function urlAction(scriptUrl, action) {
   if (!scriptUrl) throw new Error('script Apps Script non configuré');
@@ -71,7 +82,10 @@ export function urlAction(scriptUrl, action) {
 }
 
 export function urlGviz(sheetId, onglet) {
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(onglet)}`;
+  // headers=1 : sans lui, gviz DEVINE le nombre de lignes d'en-tête et, quand une
+  // colonne numérique commence par des cases vides (capacite des Salles), fusionne
+  // les premières lignes de données dans l'en-tête — deux salles disparaissaient.
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(onglet)}`;
 }
 
 export function creerSources({ config = {}, fetch, stockage, horloge = () => Date.now(), snapshot = null, attendre = attendreParDefaut, delaiMax = DELAI_MAX, seuilChute = SEUIL_CHUTE, journal = () => {} } = {}) {
@@ -104,7 +118,9 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
   async function donneesGviz() {
     if (!config.sheetId) throw new Error('classeur Export public non configuré');
     const tables = {};
-    for (const [nom, onglet] of Object.entries(ONGLETS_GVIZ)) {
+    // Les noms d'onglets du classeur lu : ceux de l'Export public par défaut, ceux
+    // d'un classeur de données (« Export Exposants »…) quand la configuration les donne.
+    for (const [nom, onglet] of Object.entries(config.onglets || ONGLETS_GVIZ)) {
       try { tables[nom] = tablesDepuisGviz(await requete(urlGviz(config.sheetId, onglet))); }
       catch (e) { if (!TABLES_FACULTATIVES.includes(nom)) throw e; tables[nom] = []; journal('gviz : onglet facultatif absent', onglet, e.message); }
     }
