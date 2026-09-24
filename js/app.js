@@ -5,7 +5,7 @@ import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
 import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APPAREIL } from './stats.js';
 import * as Passeport from './passeport.js';
-import { routeDepuisScan } from './scan.js';
+import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
@@ -364,16 +364,21 @@ async function lecteurQR() {
   scanner.jsQR = window.jsQR;
 }
 
+// Seulement le QR visé : celui du cadre blanc, pas son voisin sur la table (scan.js).
 async function lireImage(video) {
   if (!video || !video.videoWidth) return null;
-  if (scanner.detecteur) { const r = await scanner.detecteur.detect(video); return r[0] ? r[0].rawValue : null; }
+  const boiteL = video.clientWidth || video.videoWidth, boiteH = video.clientHeight || video.videoHeight;
+  if (scanner.detecteur) {
+    const zone = zoneVisee(video.videoWidth, video.videoHeight, boiteL, boiteH);
+    const r = await scanner.detecteur.detect(video);
+    return codeVise(r.map((c) => ({ texte: c.rawValue, centre: { x: c.boundingBox.x + c.boundingBox.width / 2, y: c.boundingBox.y + c.boundingBox.height / 2 } })), zone);
+  }
   const largeur = 480, hauteur = Math.round((video.videoHeight * largeur) / video.videoWidth);
   const toile = scanner.toile || (scanner.toile = document.createElement('canvas'));
   toile.width = largeur; toile.height = hauteur;
   const ctx = toile.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(video, 0, 0, largeur, hauteur);
-  const code = scanner.jsQR(ctx.getImageData(0, 0, largeur, hauteur).data, largeur, hauteur, { inversionAttempts: 'dontInvert' });
-  return code ? code.data : null;
+  return lireAvecJsQR(scanner.jsQR, ctx.getImageData(0, 0, largeur, hauteur).data, largeur, hauteur, zoneVisee(largeur, hauteur, boiteL, boiteH));
 }
 
 // Appelé à chaque rendu de l'écran scanner : ouvre la caméra la première fois,
