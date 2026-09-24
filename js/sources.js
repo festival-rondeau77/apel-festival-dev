@@ -1,7 +1,6 @@
 // Module Sources : la chaîne de lecture des données (ADR-0004).
-//   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) — ou, sans lui, le script
-//      Apps Script (`scriptUrl`) : même contrat, `etat` : version + bandeau ;
-//      `donnees` : six tables. Les mesures, elles, vont encore au script (ticket 19).
+//   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) : `etat` : version + bandeau ;
+//      `donnees` : six tables (le contrat qu'avait le script Apps Script).
 //   2. classeur « Festival — Export public » via gviz, onglet par onglet
 //   3. snapshot embarqué au déploiement
 // À chaque succès, les tables sont mises en cache local avec version et heure.
@@ -77,10 +76,10 @@ export function motifSecoursInsuffisant(secours, retenu, { seuilChute = SEUIL_CH
   return motifDeRefus(secours, retenu, { seuilChute });
 }
 
-// L'URL d'un point d'entrée du script (le scriptUrl peut déjà porter une requête).
-export function urlAction(scriptUrl, action) {
-  if (!scriptUrl) throw new Error('script Apps Script non configuré');
-  return `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=${action}`;
+// L'URL d'un point d'entrée du Worker (l'adresse peut déjà porter une requête).
+export function urlAction(base, action) {
+  if (!base) throw new Error('Worker non configuré');
+  return `${base}${base.includes('?') ? '&' : '?'}action=${action}`;
 }
 
 export function urlGviz(sheetId, onglet) {
@@ -103,7 +102,7 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     return rep.text();
   }
 
-  const urlScript = (action) => urlAction(config.programmeUrl || config.scriptUrl, action);
+  const urlScript = (action) => urlAction(config.programmeUrl, action);
 
   async function etatScript() {
     const rep = JSON.parse(await requete(urlScript('etat'), { redirect: 'follow' }));

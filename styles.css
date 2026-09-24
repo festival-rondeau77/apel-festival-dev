@@ -570,6 +570,18 @@ body.plan-ouvert .nav, body.plan-ouvert #pied, body.plan-ouvert .bandeau { displ
 .k-e .face-t { stroke-dasharray: 1.5 1.5; }
 .k-p { --m: var(--carte); }
 .k-p .face-t { fill: color-mix(in srgb, var(--framboise) 32%, var(--carte)); stroke: var(--framboise); }
+/* La couleur de chaque Village, par classe (sécurité 06 : pas de style en ligne). */
+.zone-1 { --c: var(--z1); }
+.zone-2 { --c: var(--z2); }
+.zone-3 { --c: var(--z3); }
+.zone-4 { --c: var(--z4); }
+.zone-5 { --c: var(--z5); }
+.zone-6 { --c: var(--z6); }
+.zone-7 { --c: var(--z7); }
+.zone-8 { --c: var(--z8); }
+.zone-9 { --c: var(--z9); }
+.zone-10 { --c: var(--z10); }
+.zone-11 { --c: var(--z11); }
 .piece.salle { --m: var(--c, var(--carte)); cursor: pointer; }
 .piece.salle .face-t { stroke: var(--encre); stroke-opacity: 0.6; }
 .piece.salle.poi .face-t { stroke: var(--orange); stroke-opacity: 1; stroke-width: 1.2; }

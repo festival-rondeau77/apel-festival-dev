@@ -82,8 +82,7 @@ const stats = creerStats({
     try {
       const rep = await fetch(url, { method: 'POST', body: JSON.stringify(salve), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow', keepalive: true });
       // Le Worker répond avec le vrai code HTTP : 400 et 413 sont définitifs, le reste
-      // (403, 5xx, réseau) se renvoie. Apps Script, lui, répond toujours 200 et met le
-      // verdict dans le corps ({ ok } ou { erreur, statut }).
+      // (403, 5xx, réseau) se renvoie.
       if (!rep.ok) return { ok: false, definitif: rep.status === 400 || rep.status === 413 };
       let corps = null;
       try { corps = await rep.json(); } catch { corps = null; }
@@ -93,11 +92,10 @@ const stats = creerStats({
   },
 });
 
-// Les mesures vont au Worker (ticket 19, `?action=mesures`), à défaut au script.
+// Les mesures vont au Worker (ticket 19, `?action=mesures`) ; sans Worker, nulle part.
 // Une fonction, pas une constante : JEU_URL est défini plus bas dans ce module.
 function urlMesures() {
-  if (JEU_URL) return urlAction(JEU_URL, 'mesures');
-  return CONFIG.scriptUrl ? urlAction(CONFIG.scriptUrl, 'stats') : '';
+  return JEU_URL ? urlAction(JEU_URL, 'mesures') : '';
 }
 const mesuresCoupees = () => /^(non|no|0|false|faux)$/i.test(String(etat.modele && etat.modele.infos && etat.modele.infos.stats_actives || '').trim());
 
@@ -132,6 +130,8 @@ function rendre({ conserver = false } = {}) {
   const y = window.scrollY;
   calculerMaintenant();
   el.main.innerHTML = ecran(etat);
+  // La largeur de la jauge du Grand Défi, par le CSSOM : la CSP refuse l'attribut style (sécurité 06).
+  for (const s of el.main.querySelectorAll('[data-part]')) s.style.width = `${Number(s.dataset.part) || 0}%`;
   el.nav.innerHTML = navigation(etat);
   el.pied.innerHTML = piedDePage(etat);
   document.title = titreDocument(etat);

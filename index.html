@@ -2,6 +2,11 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <!-- Sécurité 06 : seconde ligne de défense derrière l'échappement du rendu (innerHTML).
+       Ni script ni style en ligne ; le réseau ne va qu'au site, aux deux Workers et au
+       classeur public (secours gviz). GitHub Pages n'émet aucun en-tête : d'où la balise. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://festival-jeu.festival-e23.workers.dev https://festival-jeu-dev.festival-e23.workers.dev https://docs.google.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Festival de l'Orientation</title>
   <meta name="description" content="Programme, plan, exposants et visite personnelle du Festival de l'Orientation, Ensemble Scolaire Maurice Rondeau, Bussy-Saint-Georges.">
@@ -28,18 +33,7 @@
   <div id="messages" class="messages" aria-live="polite"></div>
   <div id="annonce" class="visuellement-cache" aria-live="assertive"></div>
   <noscript><p class="appli">Cette application a besoin de JavaScript.</p></noscript>
-  <!-- Le diagnostic se lit sur le téléphone, sans câble : une erreur qui empêche le
-       premier affichage remplace « Chargement… » par son message et sa ligne. -->
-  <script>
-    (function () {
-      var montre = function (texte) {
-        var m = document.querySelector('#ecran .maj');
-        if (m && /^(Chargement|Loading|Cargando|加载)/.test(m.textContent)) { m.textContent = 'Erreur au démarrage : ' + texte; m.className = 'maj erreur'; }
-      };
-      window.addEventListener('error', function (e) { montre((e.message || 'inconnue') + (e.filename ? ' — ' + e.filename.split('/').pop() + ':' + e.lineno : '')); });
-      window.addEventListener('unhandledrejection', function (e) { montre(String(e.reason && e.reason.message || e.reason || 'promesse rejetée')); });
-    })();
-  </script>
+  <script src="./js/erreurs.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>

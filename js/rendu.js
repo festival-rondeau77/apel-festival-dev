@@ -275,7 +275,7 @@ function carteGrandDefi(etat) {
   return `<section class="grand-defi" aria-labelledby="grand-defi-titre">
     <h2 id="grand-defi-titre">${h(t('Mon grand défi'))}</h2>
     <p class="score"><strong>${h(j.points)}</strong> / ${h(j.objectif)}</p>
-    <div class="jauge" role="progressbar" aria-labelledby="grand-defi-titre" aria-valuemin="0" aria-valuemax="${attr(j.objectif)}" aria-valuenow="${attr(j.points)}"><span style="width:${part}%"></span></div>
+    <div class="jauge" role="progressbar" aria-labelledby="grand-defi-titre" aria-valuemin="0" aria-valuemax="${attr(j.objectif)}" aria-valuenow="${attr(j.points)}"><span data-part="${attr(part)}"></span></div>
     ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
   </section>`;
 }
@@ -521,7 +521,9 @@ export function ecranExposant(etat, cle, { qr = false } = {}) {
 
 // ---------------------------------------------------------------- plan
 
-const COULEUR_ZONE = (numero) => `var(--z${((numero ?? 1) - 1) % 11 + 1})`;
+// La couleur d'un Village, par une classe (`zone-1` … `zone-11`, styles.css) et non par un
+// attribut style : la CSP (sécurité 06) refuse tout style en ligne.
+const CLASSE_ZONE = (numero) => `zone-${((numero ?? 1) - 1) % 11 + 1}`;
 
 // Le nom d'une Zone sur au plus deux lignes qui tiennent dans une largeur donnée.
 export function couperNomZone(nom, maxCaracteres) {
@@ -581,7 +583,7 @@ export function ecranPlan(etat) {
       const label = libellePiece(p);
       const classes = ['piece', `k-${p.k || 'salle'}`, p.salle ? 'salle' : '', p.salle && MOT_POINT[p.salle.typePoint] ? 'poi' : '', p.salle && allumee === p.salle.cle ? 'allumee' : '', p.salle && sallesVisite.has(p.salle.cle) ? 'visite' : '', zoneActive && p.salle && p.zone !== zoneActive ? 'hors' : '', label ? '' : 'muette'].filter(Boolean).join(' ');
       const aria = p.salle ? `${label}${p.zone ? `, ${t('Village')} ${p.zone.numero ?? ''} ${t(p.zone.nom)}` : ''}, ${t(e.etage)}` : '';
-      return `<g class="${classes}" data-i="${p.i}"${p.zone ? ` style="--c:${COULEUR_ZONE(p.zone.numero)}"` : ''}${p.salle ? ` data-action="salle" data-valeur="${attr(p.salle.nom)}" tabindex="0" role="button" aria-label="${attr(aria.replace(/\s+/g, ' ').trim())}"` : ''}><g class="cotes"></g><polygon class="halo"/><polygon class="face-t"/><text class="lbl"><tspan></tspan><tspan></tspan></text><path class="marque" d=""/></g>`;
+      return `<g class="${classes}${p.zone ? ` ${CLASSE_ZONE(p.zone.numero)}` : ''}" data-i="${p.i}"${p.salle ? ` data-action="salle" data-valeur="${attr(p.salle.nom)}" tabindex="0" role="button" aria-label="${attr(aria.replace(/\s+/g, ' ').trim())}"` : ''}><g class="cotes"></g><polygon class="halo"/><polygon class="face-t"/><text class="lbl"><tspan></tspan><tspan></tspan></text><path class="marque" d=""/></g>`;
     }).join('');
     const { salles, zones } = planDeLEtage(scene, modele, e.etage);
     const detail = `${tn('%s village', '%s villages', zones.length)} · ${tn('%s salle', '%s salles', salles.length)}`;
@@ -637,7 +639,7 @@ export function ecranPlan(etat) {
   // Les pastilles des villages : toucher l'une allume son village sur les deux
   // étages, retoucher l'éteint.
   const villagesPresents = modele.zones.filter((z) => z.numero !== null && z.salles.length);
-  const pastilles = villagesPresents.map((z) => `<button class="pastille" type="button" data-action="zone" data-valeur="${attr(z.numero)}" aria-pressed="${zoneOuverte === z}" style="--c:${COULEUR_ZONE(z.numero)}"><span class="n">${h(z.numero)}</span>${h(nomCourt(z.nom))}</button>`).join('');
+  const pastilles = villagesPresents.map((z) => `<button class="pastille ${CLASSE_ZONE(z.numero)}" type="button" data-action="zone" data-valeur="${attr(z.numero)}" aria-pressed="${zoneOuverte === z}"><span class="n">${h(z.numero)}</span>${h(nomCourt(z.nom))}</button>`).join('');
 
   const libelleVue = vue === 'axo' ? t("Vue d'ensemble") : t(vue);
   return `<div class="plan-plein" id="plan-plein" data-vue="${vue === 'axo' ? 'axo' : 'etage'}" data-nom="${attr(vue)}">

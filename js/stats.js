@@ -19,7 +19,7 @@ function tronquer(v, n) {
 }
 
 // Le script refuse une salve entière si une cible ou un détail ressemble à une
-// formule de tableur (sécurité 02 : script/Code.js, texteSur). Une recherche
+// formule de tableur (sécurité 02 : worker/src/mesures.js, texteSur). Une recherche
 // tapée « =maths » ou « -bts » ferait donc perdre toutes les mesures qui
 // l'accompagnent : on la ramène ici à ce que le script accepte. Ce n'est PAS la
 // protection (un attaquant n'utilise pas l'appli), seulement de quoi ne rien perdre.
