@@ -5,6 +5,7 @@ import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
 import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APPAREIL } from './stats.js';
 import * as Passeport from './passeport.js';
+import { routeDepuisScan } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
@@ -168,6 +169,7 @@ function rendre({ conserver = false } = {}) {
   document.body.classList.toggle('plan-ouvert', etat.route.nom === 'plan');
   if (etat.route.nom === 'plan') initialiserPlan();
   else { if (plan.anim) cancelAnimationFrame(plan.anim); plan.anim = null; plan.cam = null; plan.cible = ''; plan.noeuds = []; }
+  if (etat.route.nom === 'scanner') demarrerScanner(); else arreterScanner();
 }
 
 // ---------------------------------------------------------------- navigation
@@ -312,6 +314,86 @@ function validerDefi(defi, cle) {
 }
 
 window.addEventListener('online', () => envoiJeu.envoyer());
+
+// ---------------------------------------------------------------- scanner (grand-defi 10)
+
+// Scanner DANS l'appli : le QR d'un chevalet ouvre sa fiche au même Passeport,
+// là où un lecteur de QR du téléphone ouvre souvent une fenêtre cloisonnée, avec
+// sa propre mémoire. Le navigateur lit les QR s'il sait (BarcodeDetector,
+// Chrome sur Android) ; sinon js/vendor/jsqr.js (Safari), chargé à la demande.
+// La caméra survit aux rendus (un rafraîchissement de données refait l'écran) :
+// le flux est rebranché sur la nouvelle <video>.
+const HOTES_APPLI = [location.host, new URL(CONFIG.urlPublique).host, ...Object.values(CONFIG.cibles || {}).map((c) => `${c.owner}.github.io`)];
+const scanner = { flux: null, minuteur: null, detecteur: undefined, jsQR: null, toile: null };
+
+function etatScanner(texte) { const p = $('#scanner-etat'); if (p) p.textContent = texte; }
+
+async function lecteurQR() {
+  if (scanner.detecteur === undefined) {
+    scanner.detecteur = null;
+    try { if ('BarcodeDetector' in window && (await BarcodeDetector.getSupportedFormats()).includes('qr_code')) scanner.detecteur = new BarcodeDetector({ formats: ['qr_code'] }); } catch { scanner.detecteur = null; }
+  }
+  if (scanner.detecteur || scanner.jsQR) return;
+  await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = './js/vendor/jsqr.js'; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
+  scanner.jsQR = window.jsQR;
+}
+
+async function lireImage(video) {
+  if (!video.videoWidth) return null;
+  if (scanner.detecteur) { const r = await scanner.detecteur.detect(video); return r[0] ? r[0].rawValue : null; }
+  const largeur = 480, hauteur = Math.round((video.videoHeight * largeur) / video.videoWidth);
+  const toile = scanner.toile || (scanner.toile = document.createElement('canvas'));
+  toile.width = largeur; toile.height = hauteur;
+  const ctx = toile.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, largeur, hauteur);
+  const code = scanner.jsQR(ctx.getImageData(0, 0, largeur, hauteur).data, largeur, hauteur, { inversionAttempts: 'dontInvert' });
+  return code ? code.data : null;
+}
+
+async function demarrerScanner() {
+  const video = $('#scanner-video');
+  if (!video) return;
+  if (scanner.flux === 'ouverture') return;
+  if (scanner.flux) { if (video.srcObject !== scanner.flux) { video.srcObject = scanner.flux; video.play().catch(() => {}); } return; }
+  scanner.flux = 'ouverture';
+  etatScanner(t('Ouverture de la caméra…'));
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('caméra'), { name: 'NotFoundError' });
+    const [flux] = await Promise.all([navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }), lecteurQR()]);
+    if (scanner.flux !== 'ouverture') { flux.getTracks().forEach((p) => p.stop()); return; } // quitté pendant l'ouverture
+    scanner.flux = flux;
+  } catch (e) {
+    scanner.flux = null;
+    etatScanner(e && e.name === 'NotAllowedError' ? t('Caméra refusée : autorisez-la dans les réglages du navigateur.') : t('Pas de caméra disponible sur cet appareil.'));
+    return;
+  }
+  const courante = $('#scanner-video');
+  if (!courante) { arreterScanner(); return; }
+  courante.srcObject = scanner.flux;
+  courante.play().catch(() => {});
+  etatScanner(t('Visez le QR code du stand.'));
+  // Vibrer n'est permis qu'après un geste sur la page (sinon le navigateur le refuse et le dit en console).
+  const tour = async () => {
+    if (!scanner.flux || typeof scanner.flux === 'string') return;
+    let texte = null;
+    try { texte = await lireImage($('#scanner-video') || courante); } catch { texte = null; }
+    if (texte) {
+      const route = routeDepuisScan(texte, HOTES_APPLI);
+      if (route) { arreterScanner(); if (navigator.vibrate && navigator.userActivation?.hasBeenActive) navigator.vibrate(60); location.replace(route); return; }
+      etatScanner(t('Ce QR code n’est pas celui d’un stand du festival.'));
+      scanner.minuteur = setTimeout(tour, 1500);
+      return;
+    }
+    scanner.minuteur = setTimeout(tour, 150);
+  };
+  tour();
+}
+
+function arreterScanner() {
+  clearTimeout(scanner.minuteur); scanner.minuteur = null;
+  if (scanner.flux && typeof scanner.flux !== 'string') scanner.flux.getTracks().forEach((p) => p.stop());
+  scanner.flux = null; // pendant l'ouverture aussi : demarrerScanner le voit et rend la caméra
+}
 
 // ---------------------------------------------------------------- gestes
 
@@ -739,7 +821,7 @@ const rafraichisseurJeu = creerRafraichisseur({
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); rendre({ conserver: true }); }
-  else envoyerStatsEnArrierePlan();
+  else { envoyerStatsEnArrierePlan(); arreterScanner(); } // la caméra ne tourne pas dans une poche ; le retour la rouvre
 });
 
 // ---------------------------------------------------------------- rappels

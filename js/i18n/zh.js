@@ -89,4 +89,5 @@ export default {
   'Dans %s min': '%s 分钟后', 'Nouvelle version disponible.': '有新版本可用。', 'Recharger': '重新加载',
   'Version de recette : le programme et les salles sont en partie fictifs.': '测试版本：日程和教室部分为虚构。',
   'Mon grand défi': '我的大挑战', '+%s points en attente': '+%s 分待确认', 'Grand Défi': '大挑战', 'Défi %s': '挑战 %s', 'Valider': '确认', 'Validé': '已确认', 'En attente': '待确认', 'Refusé': '未通过',
+  'Scanner un QR': '扫描二维码', 'Scannez les QR des stands pour gagner des points.': '扫描展位的二维码即可获得积分。', 'Visez le QR code du stand.': '请对准展位的二维码。', 'Déjà gagné chez %s': '已在 %s 获得', 'Déjà gagné': '已获得', 'Ouverture de la caméra…': '正在打开相机…', 'Caméra refusée : autorisez-la dans les réglages du navigateur.': '相机被拒绝：请在浏览器设置中允许。', 'Pas de caméra disponible sur cet appareil.': '此设备没有可用的相机。', 'Ce QR code n’est pas celui d’un stand du festival.': '此二维码不属于本次活动的展位。',
 };

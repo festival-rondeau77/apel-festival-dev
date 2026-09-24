@@ -81,13 +81,15 @@ export function statutDefi(etat, defi) {
 
 // Sur une fiche ouverte par le QR d'un chevalet : les défis que cet Exposant peut
 // prouver. Un défi refusé sur ce stand-ci n'y est pas reproposé (le Worker
-// refuserait encore) ; un autre stand peut le valider.
+// refuserait encore) ; un autre stand peut le valider. `chez` : l'Exposant où un
+// défi validé a été gagné (la fiche d'une 2e école le dit, au lieu de « Validé »).
 export function defisIci(jeu, etat, exposant) {
   if (!jeu || !jeu.actif) return [];
   return jeu.defis.filter((d) => proposable(d, exposant)).map((defi) => {
     const statut = statutDefi(etat, defi.id);
     const refuseIci = etat.validations.some((v) => v.defi === defi.id && v.exposant === exposant && v.statut === 'refus');
-    return { defi, statut, validable: statut === 'a-faire' || (statut === 'refuse' && !refuseIci) };
+    const gagnee = etat.validations.find((v) => v.defi === defi.id && v.statut === 'ok');
+    return { defi, statut, validable: statut === 'a-faire' || (statut === 'refuse' && !refuseIci), chez: gagnee ? gagnee.exposant || null : null };
   });
 }
 

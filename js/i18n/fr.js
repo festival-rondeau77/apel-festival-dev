@@ -97,4 +97,6 @@ export default [
   'Version de recette : le programme et les salles sont en partie fictifs.',
   // Grand Défi
   'Mon grand défi', '+%s points en attente', 'Grand Défi', 'Défi %s', 'Valider', 'Validé', 'En attente', 'Refusé',
+  // Grand Défi : scanner depuis l'appli (grand-defi 10)
+  'Scanner un QR', 'Scannez les QR des stands pour gagner des points.', 'Visez le QR code du stand.', 'Déjà gagné chez %s', 'Déjà gagné', 'Ouverture de la caméra…', 'Caméra refusée : autorisez-la dans les réglages du navigateur.', 'Pas de caméra disponible sur cet appareil.', 'Ce QR code n’est pas celui d’un stand du festival.',
 ];

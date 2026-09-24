@@ -268,20 +268,47 @@ export function ecranAccueil(etat) {
 // La jauge de l'accueil (grand-defi 01) : seulement pour qui a joué, et jamais
 // quand le jeu est coupé. Les points confirmés par le Worker, et à part ceux qui
 // attendent sa réponse.
+// Le bouton « Scanner un QR » (grand-defi 10) l'accompagne dès que le jeu est
+// ouvert : scanner DANS l'appli garde le même Passeport, là où un lecteur de QR du
+// téléphone ouvre souvent une fenêtre cloisonnée. Avant la première validation,
+// il vient seul, avec une phrase ; jeu coupé, rien.
 function carteGrandDefi(etat) {
+  if (!etat.grandDefi || !etat.grandDefi.actif) return '';
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
-  if (!j) return '';
+  if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
+    <h2 id="grand-defi-titre">${h(t('Grand Défi'))}</h2>
+    <p>${h(t('Scannez les QR des stands pour gagner des points.'))}</p>
+    ${scanner}
+  </section>`;
   const part = Math.min(100, Math.round((j.points / j.objectif) * 100));
   return `<section class="grand-defi" aria-labelledby="grand-defi-titre">
     <h2 id="grand-defi-titre">${h(t('Mon grand défi'))}</h2>
     <p class="score"><strong>${h(j.points)}</strong> / ${h(j.objectif)}</p>
     <div class="jauge" role="progressbar" aria-labelledby="grand-defi-titre" aria-valuemin="0" aria-valuemax="${attr(j.objectif)}" aria-valuenow="${attr(j.points)}"><span data-part="${attr(part)}"></span></div>
     ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
+    ${scanner}
   </section>`;
+}
+
+// L'écran du scanner : le squelette seulement. app.js y branche la caméra
+// (getUserMedia), lit les images (BarcodeDetector, sinon js/vendor/jsqr.js) et
+// écrit dans #scanner-etat ; aucun style en ligne (CSP, sécurité 06).
+export function ecranScanner(etat) {
+  return `${entete(t('Scanner un QR'), '', retourDepuis(etat.route.params.de, { href: '#/', libelle: t('Accueil') }))}
+  <div class="scanner"><video id="scanner-video" playsinline muted></video><div class="viseur" aria-hidden="true"></div></div>
+  <p class="scanner-etat" id="scanner-etat" role="status">${h(t('Visez le QR code du stand.'))}</p>`;
 }
 
 const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));
 const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé' };
+// « Validé » ici ; gagné sur un autre stand, on dit lequel : sur la fiche d'une
+// 2e école, « Validé » laissait croire qu'on venait de le valider là.
+function etatDuDefi(etat, ex, statut, chez) {
+  if (statut !== 'valide' || !chez || chez === ex.cle) return t(ETAT_DEFI[statut]);
+  const autre = etat.modele.exposants.find((e) => e.cle === chez);
+  return autre ? t('Déjà gagné chez %s', autre.nom) : t('Déjà gagné');
+}
 
 // Sur la fiche ouverte par le QR secret d'un chevalet (`?s=`) : les défis que cet
 // Exposant peut prouver. Le QR public des affiches (`?qr=1`) n'en propose aucun.
@@ -292,11 +319,11 @@ function defisDeLaFiche(etat, ex) {
   if (!ici.length) return '';
   return `<section class="defis-ici" aria-labelledby="defis-ici-titre">
     <h2 class="titre-section" id="defis-ici-titre">${h(t('Grand Défi'))}</h2>
-    <ul>${ici.map(({ defi, statut, validable }) => `<li>
+    <ul>${ici.map(({ defi, statut, validable, chez }) => `<li>
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
       ${validable
         ? `<button class="bouton" type="button" data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}">${h(t('Valider'))}</button>`
-        : `<span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>`}
+        : `<span class="etat ${attr(statut)}">${h(etatDuDefi(etat, ex, statut, chez))}</span>`}
     </li>`).join('')}</ul>
   </section>`;
 }
@@ -908,6 +935,7 @@ export function ecran(etat) {
     case 'preparer': return ecranPreparer(etat);
     case 'questions': return ecranPreparer(etat, { seulementQuestions: true, typeQuestions: route.params.type || null });
     case 'aide': return ecranAide(etat);
+    case 'scanner': return ecranScanner(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -915,7 +943,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?") }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR') }[etat.route.nom];
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   if (etat.route.nom === 'exposant') { const e = etat.modele.exposants.find((x) => x.cle === etat.route.params.cle); return `${e ? e.nom : t('Exposant')} · ${nomFestival}`; }
   return t2 ? `${t2} · ${nomFestival}` : nomFestival;

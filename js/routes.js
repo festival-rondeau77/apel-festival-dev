@@ -4,6 +4,7 @@
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
   ['plan', 'plan'], ['visite', 'visite'], ['preparer', 'preparer'], ['questions', 'questions'], ['aide', 'aide'],
+  ['scanner', 'scanner'],
 ];
 
 export function analyserRoute(hash) {

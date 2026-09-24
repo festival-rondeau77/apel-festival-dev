@@ -89,4 +89,5 @@ export default {
   'Dans %s min': 'En %s min', 'Nouvelle version disponible.': 'Nueva versión disponible.', 'Recharger': 'Recargar',
   'Version de recette : le programme et les salles sont en partie fictifs.': 'Versión de prueba: el programa y las salas son en parte ficticios.',
   'Mon grand défi': 'Mi gran reto', '+%s points en attente': '+%s puntos pendientes', 'Grand Défi': 'Gran Reto', 'Défi %s': 'Reto %s', 'Valider': 'Validar', 'Validé': 'Validado', 'En attente': 'Pendiente', 'Refusé': 'Rechazado',
+  'Scanner un QR': 'Escanear un QR', 'Scannez les QR des stands pour gagner des points.': 'Escanea los QR de los stands para ganar puntos.', 'Visez le QR code du stand.': 'Apunta al código QR del stand.', 'Déjà gagné chez %s': 'Ya ganado en %s', 'Déjà gagné': 'Ya ganado', 'Ouverture de la caméra…': 'Abriendo la cámara…', 'Caméra refusée : autorisez-la dans les réglages du navigateur.': 'Cámara bloqueada: autorízala en los ajustes del navegador.', 'Pas de caméra disponible sur cet appareil.': 'No hay cámara disponible en este dispositivo.', 'Ce QR code n’est pas celui d’un stand du festival.': 'Este código QR no es de un stand del festival.',
 };
