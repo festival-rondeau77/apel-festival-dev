@@ -481,7 +481,7 @@ function ecranMesDefis(etat) {
     <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a></div>`;
 }
 
-// Une question (grand-defi 04, le défi 7 à la sortie), ouverte par son QR spécial
+// Une question (grand-defi 04, le défi 7, QR affiché à l’entrée et à la sortie), ouverte par son QR spécial
 // (`#/question/<défi>/<jeton>`) : la question, ses choix, « essai 1 sur 2 ». Un choix
 // touché part par son numéro avec le jeton ; le verdict vient du Worker, qui seul
 // connaît la bonne réponse. Sans le jeton, pas de choix, sauf si le défi ne demande
