@@ -9,7 +9,7 @@ import { contient as visiteContient, matinee, suggestions, questionsPour, texteA
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
 import { jauge, defisIci, mesDefis, rejouerOuvert } from './passeport.js';
-import { standCorrespond } from './defis.js';
+import { standCorrespond, paliersDe, chancesBadgeDe } from './defis.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
@@ -276,12 +276,18 @@ export function ecranAccueil(etat) {
 // il vient seul, avec une phrase ; jeu coupé, rien.
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a>${rejouerOuvert(etat.modele.infos)
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Règle du jeu'))}</a>${rejouerOuvert(etat.modele.infos)
     ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
   if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
     <h2 id="grand-defi-titre">${h(t('Grand Défi'))}</h2>
     <p>${h(t('Scannez les QR des stands pour gagner des points.'))}</p>
+    ${scanner}
+  </section>`;
+  if (j.auTirage) return `<section class="grand-defi" aria-labelledby="grand-defi-titre">
+    <h2 id="grand-defi-titre">${h(t('Mon grand défi'))}</h2>
+    ${scoreChances(etat.grandDefi, j)}
+    ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
     ${scanner}
   </section>`;
   const part = Math.min(100, Math.round((j.points / j.objectif) * 100));
@@ -292,6 +298,49 @@ function carteGrandDefi(etat) {
     ${j.attente ? `<p class="attente">${h(t('+%s points en attente', j.attente))}</p>` : ''}
     ${scanner}
   </section>`;
+}
+
+// Au-delà du premier Palier (grand-defi 03), la jauge compte des Chances : 100 points
+// font entrer au Tirage, ils ne font rien gagner. Ni les points ni le total possible
+// ne s'affichent ; la barre avance d'un Palier au suivant, pleine après le dernier.
+function scoreChances(jeu, j) {
+  const chances = tn('%s chance', '%s chances', j.chances);
+  const bas = [...paliersDe(jeu)].reverse().find((p) => p <= j.points) || 0;
+  const part = j.manque === null ? 100 : Math.round(((j.points - bas) / (j.points + j.manque - bas)) * 100);
+  const bonus = chancesBadgeDe(jeu);
+  return `<p class="score">${h(t('Au tirage'))} · <strong>${h(chances)}</strong></p>
+    <div class="jauge" role="progressbar" aria-labelledby="grand-defi-titre" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${attr(part)}" aria-valuetext="${attr(chances)}"><span data-part="${attr(part)}"></span></div>
+    ${j.manque === null ? '' : `<p class="prochaine">${h(tn('Prochaine chance : plus que %s point', 'Prochaine chance : plus que %s points', j.manque))}</p>`}
+    ${j.badge ? `<p class="badge-explorateur">${h(t('Badge Explorateur 100 %'))}${bonus ? ` · ${h(tn('+%s chance', '+%s chances', bonus))}` : ''}</p>` : ''}`;
+}
+
+// La Règle du jeu (grand-defi 03) : trois idées, ultra simples, tirées des mêmes
+// données que le jeu (ADR-0015) — le premier Palier, les Paliers et leurs Chances,
+// celles du badge, l'heure du Tirage (`Infos.heure_tirage`, écrite telle quelle).
+// Le détail est au règlement : `Infos.reglement_jeu_url`, à défaut celui du festival.
+function ecranRegle(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  const jeu = etat.grandDefi;
+  if (!jeu || !jeu.actif) return `${entete(t('Règle du jeu'), '', retour)}
+    <p class="vide">${h(t('Le Grand Défi n’est pas ouvert.'))}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  const i = etat.modele.infos || {};
+  const paliers = paliersDe(jeu);
+  const bonus = chancesBadgeDe(jeu);
+  const heure = String(i.heure_tirage || '').trim();
+  const reglement = i.reglement_jeu_url || i.reglement_url;
+  return `${entete(t('Règle du jeu'), '', retour)}
+    <ol class="regle">
+      <li class="idee">${icone('qr', 28)}<div><p>${h(t('Scannez les QR des chevalets pour gagner des points.'))}</p></div></li>
+      <li class="idee">${icone('visite', 28)}<div>
+        <p>${h(heure ? t('À %s points, vous êtes au tirage de %s.', paliers[0], heure) : t('À %s points, vous êtes au tirage.', paliers[0]))} ${h(t('Plus de points, plus de chances.'))}</p>
+        <ul class="paliers">${paliers.map((p, k) => `<li><strong>${h(p)}</strong> <span>${h(tn('%s chance', '%s chances', k + 1))}</span></li>`).join('')}${bonus
+          ? `<li><strong>${h(t('Tous les défis'))}</strong> <span>${h(tn('+%s chance', '+%s chances', bonus))}</span></li>` : ''}</ul>
+      </div></li>
+      <li class="idee">${icone('cloche', 28)}<div><p>${h(t('Soyez vigilant : plus de chances de gagner avec les instants gagnants, le défi mystère et les autres annonces.'))}</p></div></li>
+    </ol>
+    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>${reglement
+      ? `<a class="bouton secondaire" href="${url(reglement)}" target="_blank" rel="noopener">${icone('document', 19)}${h(t('Lire le règlement du jeu'))}</a>` : ''}</div>`;
 }
 
 // Rejouer depuis le début, pendant l'essai seulement : ce que le bouton efface (le
@@ -411,8 +460,8 @@ function ecranMesDefis(etat) {
     <p class="vide">${h(t('Le Grand Défi n’est pas ouvert.'))}</p>
     <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   const j = jauge(etat.grandDefi, jeu);
-  const points = j ? j.points : 0;
-  return `${entete(t('Mes défis'), h(`${points} / ${etat.grandDefi.objectif}`), retour)}
+  const sous = j && j.auTirage ? `${t('Au tirage')} · ${tn('%s chance', '%s chances', j.chances)}` : `${j ? j.points : 0} / ${etat.grandDefi.objectif}`;
+  return `${entete(t('Mes défis'), h(sous), retour)}
     <ul class="mes-defis">${liste.map(({ defi, statut }) => `<li>
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
       <span class="comment">${h(commentProuver(etat, defi))}</span>
@@ -1042,6 +1091,7 @@ export function ecran(etat) {
     case 'scanner': return ecranScanner(etat);
     case 'rejouer': return ecranRejouer(etat);
     case 'defis': return ecranMesDefis(etat);
+    case 'regle': return ecranRegle(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1049,7 +1099,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu') }[etat.route.nom];
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   const fiche = ficheOuverte(etat.route, etat.modele);
   if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;

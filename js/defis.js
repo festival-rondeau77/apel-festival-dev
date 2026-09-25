@@ -6,6 +6,7 @@
 import { tablesEnObjets, normaliser, slugType, typeExposantCanonique, TYPES_EXPOSANT } from './donnees.js';
 
 export const OBJECTIF_PAR_DEFAUT = 100;
+export const CHANCES_BADGE_PAR_DEFAUT = 1;
 const ID = /^[a-z0-9-]{1,20}$/i;
 const OUI = ['oui', 'vrai', 'true', 'x', '1'];
 const NON = ['non', 'faux', 'false', '0'];
@@ -97,9 +98,24 @@ function lireChoix(valeur) {
   return { choix };
 }
 
-function lireObjectif(valeur) {
-  const premier = Number(texte(valeur).split(/[;,\s]+/)[0]);
-  return Number.isInteger(premier) && premier > 0 ? premier : OBJECTIF_PAR_DEFAUT;
+// `paliers` : « 100, 130, 160 » (virgules, points-virgules ou espaces), rangés dans
+// l'ordre ; le premier est l'objectif de la jauge. Vide : 100. Illisible : 100 aussi,
+// et le motif, pour l'onglet État.
+function lirePaliers(valeur) {
+  const brut = texte(valeur);
+  if (!brut) return { paliers: [OBJECTIF_PAR_DEFAUT] };
+  const nombres = brut.split(/[;,\s]+/).filter(Boolean).map(Number);
+  if (!nombres.every((n) => Number.isInteger(n) && n > 0 && n <= 10000)) return { paliers: [OBJECTIF_PAR_DEFAUT], motif: `paliers illisibles : « ${brut} »` };
+  return { paliers: [...new Set(nombres)].sort((a, b) => a - b) };
+}
+
+// `chances_badge` : les Chances qu'ajoute le badge « Explorateur 100 % ». Vide : 1.
+function lireChancesBadge(valeur) {
+  const brut = texte(valeur);
+  if (!brut) return { chances: CHANCES_BADGE_PAR_DEFAUT };
+  const n = Number(brut);
+  if (!Number.isInteger(n) || n < 0 || n > 100) return { chances: CHANCES_BADGE_PAR_DEFAUT, motif: `chances_badge illisible : « ${brut} »` };
+  return { chances: n };
 }
 
 // Les onglets `Défis` et `Infos` (tables brutes, première ligne = en-têtes) → le jeu.
@@ -108,7 +124,11 @@ function lireObjectif(valeur) {
 export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
   const infos = {};
   for (const l of tablesEnObjets(tableInfos)) infos[normaliser(l.cle).replace(/-/g, '_')] = l.valeur;
-  const jeu = { actif: oui(infos.grand_defi), objectif: lireObjectif(infos.paliers), defis: [], invalides: [] };
+  const { paliers, motif: motifPaliers } = lirePaliers(infos.paliers);
+  const { chances: chancesBadge, motif: motifBadge } = lireChancesBadge(infos.chances_badge);
+  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, defis: [], invalides: [] };
+  if (motifPaliers) jeu.invalides.push({ id: 'paliers', motif: motifPaliers });
+  if (motifBadge) jeu.invalides.push({ id: 'chances_badge', motif: motifBadge });
   const entetes = Array.isArray(tableDefis) && Array.isArray(tableDefis[0]) ? tableDefis[0].map((e) => normaliser(e).replace(/-/g, '_')) : [];
   // gviz rend la PREMIÈRE feuille quand l'onglet demandé n'existe pas : sans ces
   // en-têtes, ce n'est pas l'onglet Défis, et il n'y a pas de jeu.
@@ -156,7 +176,7 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
 // défi actif, pas de jeu à l'écran.
 export function jeuPublic(jeu) {
   const defis = jeu.defis.filter((d) => d.actif).map(({ actif, ...d }) => d);
-  return { actif: jeu.actif && defis.length > 0, objectif: jeu.objectif, defis };
+  return { actif: jeu.actif && defis.length > 0, objectif: jeu.objectif, paliers: jeu.paliers, chances_badge: jeu.chances_badge, defis };
 }
 
 // Le QR de cet exposant concerne-t-il ce défi ? (Pour quels défis une fiche
@@ -200,4 +220,25 @@ export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(sca
 export function pointsDe(idsValides, jeu) {
   const parId = new Map(jeu.defis.map((d) => [d.id, d.points]));
   return [...new Set(idsValides)].reduce((s, id) => s + (parId.get(id) || 0), 0);
+}
+
+// Les Paliers et les Chances du badge d'un jeu, ou leurs valeurs par défaut (un jeu
+// d'avant grand-defi 03 n'a que son objectif).
+export const paliersDe = (jeu) => (jeu.paliers && jeu.paliers.length ? jeu.paliers : [jeu.objectif || OBJECTIF_PAR_DEFAUT]);
+export const chancesBadgeDe = (jeu) => (Number.isInteger(jeu.chances_badge) ? jeu.chances_badge : CHANCES_BADGE_PAR_DEFAUT);
+
+// Les Chances d'un Passeport au Tirage (grand-defi 03) : une par Palier atteint, et
+// celles du badge « Explorateur 100 % » quand tous les défis ACTIFS sont validés (un
+// défi désactivé sort de la condition). Rien avant le premier Palier : 100 points
+// font entrer au Tirage, le badge seul non. `manque` : les points jusqu'au prochain
+// Palier, null au-delà du dernier. `jeu` : le jeu lu ou le jeu public.
+export function chancesDe(points, idsValides, jeu) {
+  const paliers = paliersDe(jeu);
+  const faits = new Set(idsValides);
+  const actifs = jeu.defis.filter((d) => d.actif !== false);
+  const badge = actifs.length > 0 && actifs.every((d) => faits.has(d.id));
+  const auTirage = points >= paliers[0];
+  const chances = auTirage ? paliers.filter((p) => p <= points).length + (badge ? chancesBadgeDe(jeu) : 0) : 0;
+  const prochain = paliers.find((p) => p > points);
+  return { auTirage, chances, badge, manque: prochain === undefined ? null : prochain - points };
 }

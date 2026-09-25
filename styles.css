@@ -293,7 +293,7 @@ main { min-height: 60vh; }
 .carnet .titre-section { margin-top: 0; }
 .carnet textarea { width: 100%; box-sizing: border-box; min-height: 5.5em; padding: 10px 12px; border: 1px solid var(--trait); border-radius: 10px; font: inherit; background: var(--carte); color: inherit; resize: vertical; }
 .carnet .note { margin: 6px 0 0; color: var(--encre-2); font-size: 0.88rem; }
-.grand-defi .mes-defis-lien { display: inline-block; margin: 12px 0 0 14px; font-weight: 650; }
+.grand-defi .mes-defis-lien, .grand-defi .regle-lien { display: inline-block; margin: 12px 0 0 14px; font-weight: 650; }
 .mes-defis { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
 .mes-defis li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
 .mes-defis .nom { font-weight: 650; }
@@ -301,6 +301,23 @@ main { min-height: 60vh; }
 .mes-defis .comment { color: var(--encre-2); font-size: 0.92rem; }
 .mes-defis .etat { font-weight: 650; font-size: 0.9rem; color: var(--encre-2); text-align: right; }
 .mes-defis .etat.attente { color: var(--orange); }
+
+/* grand-defi 03 : au-delà du premier Palier, la jauge compte des Chances ; la Règle du jeu en trois idées. */
+.grand-defi .prochaine { margin: 8px 0 0; font-size: 0.92rem; font-weight: 600; }
+.grand-defi .badge-explorateur { display: inline-block; margin: 10px 0 0; padding: 4px 10px; border-radius: 999px; background: var(--bleu-pale); color: var(--bleu); font-weight: 700; font-size: 0.88rem; }
+.regle { list-style: none; counter-reset: idee; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.regle .idee {
+  counter-increment: idee; position: relative; display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px 16px 16px 18px; background: var(--carte); border: 1px solid var(--trait); border-left: 4px solid var(--ambre); border-radius: 6px 6px 18px 6px;
+}
+.regle .idee::before { content: counter(idee); position: absolute; top: -10px; left: -6px; width: 26px; height: 26px; border-radius: 50%; background: var(--ambre); color: #fff; font: 800 0.95rem/26px var(--display); text-align: center; }
+.regle .idee > svg { flex: none; color: var(--orange); margin-top: 2px; }
+.regle .idee p { margin: 0; font-size: 1.05rem; line-height: 1.4; }
+.regle .paliers { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.regle .paliers li { display: flex; flex-direction: column; align-items: center; min-width: 4.5em; padding: 6px 10px; border-radius: 10px; background: var(--orange-pale); }
+.regle .paliers strong { font-family: var(--display); font-weight: 800; font-size: 1.2rem; color: var(--orange); }
+.regle .paliers span { font-size: 0.82rem; color: var(--encre-2); }
+.regle + .boutons { margin-top: 18px; }
 
 /* Le scanner (grand-defi 10) : l'invitation de l'accueil, le bouton sous la jauge, l'écran caméra. */
 .grand-defi.invitation p { margin: 6px 0 12px; color: var(--encre-2); }

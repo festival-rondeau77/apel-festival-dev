@@ -5,7 +5,7 @@
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
 //   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut }], passeport: { points, defis } | null }
 // statut : attente | ok | deja | refus.
-import { proposable, motifIci, OBJECTIF_PAR_DEFAUT } from './defis.js';
+import { proposable, motifIci, chancesDe, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus'];
 const texte = (v) => typeof v === 'string';
@@ -37,7 +37,11 @@ export function lireJeuPublic(rep) {
   if (!rep || typeof rep !== 'object' || !Array.isArray(rep.defis)) return null;
   const defis = rep.defis.filter((d) => d && texte(d.id) && texte(d.titre) && Number.isFinite(d.points) && texte(d.type_preuve) && d.params && typeof d.params === 'object')
     .map((d) => ({ ...d, question: texte(d.question) ? d.question : '', choix: Array.isArray(d.choix) && d.choix.every(texte) ? d.choix : [] }));
-  return { actif: rep.actif === true, objectif: Number(rep.objectif) > 0 ? Number(rep.objectif) : OBJECTIF_PAR_DEFAUT, defis };
+  const objectif = Number(rep.objectif) > 0 ? Number(rep.objectif) : OBJECTIF_PAR_DEFAUT;
+  // Un Worker d'avant les Paliers (grand-defi 03), ou des Paliers abîmés : l'objectif seul.
+  const paliersLisibles = Array.isArray(rep.paliers) && rep.paliers.length && rep.paliers.every((p, i) => Number.isInteger(p) && p > 0 && (i === 0 || p > rep.paliers[i - 1]));
+  const chancesBadge = Number.isInteger(rep.chances_badge) && rep.chances_badge >= 0 ? rep.chances_badge : CHANCES_BADGE_PAR_DEFAUT;
+  return { actif: rep.actif === true, objectif, paliers: paliersLisibles ? rep.paliers : [objectif], chances_badge: chancesBadge, defis };
 }
 
 // L'adresse du Worker. Devant `npm run servir` (la machine, ou un téléphone du
@@ -114,12 +118,13 @@ export function mesDefis(jeu, etat) {
 
 // La jauge de l'accueil, ou null : pas de jeu, ou pas encore joué (un Visiteur
 // qui ne joue pas voit l'appli ordinaire). `attente` = les points des défis
-// envoyés et pas encore confirmés.
+// envoyés et pas encore confirmés. Les Chances (chancesDe) se comptent sur ce que
+// le Worker a confirmé, comme les points.
 export function jauge(jeu, etat) {
   if (!jeu || !jeu.actif || !etat.validations.length) return null;
   const points = etat.passeport ? etat.passeport.points : 0;
   const attente = jeu.defis.filter((d) => statutDefi(etat, d.id) === 'attente').reduce((s, d) => s + d.points, 0);
-  return { points, attente, objectif: jeu.objectif };
+  return { points, attente, objectif: jeu.objectif, ...chancesDe(points, etat.passeport ? etat.passeport.defis : [], jeu) };
 }
 
 // La file d'envoi. `envoyer(lot)` → { ok, passeport } | { ok: false, definitif }.
