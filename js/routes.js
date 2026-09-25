@@ -1,12 +1,12 @@
 // Navigation par fragment d'URL : « #/programme », « #/evenement/<clé> »,
 // « #/exposant/<clé>?qr=1 », « #/carte/<étiquette>/<jeton> », « #/c/<étiquette> »,
-// « #/question/<défi>/<jeton> », « #/vote/<défi> », « #/plan?salle=Salle 12 ». Pure.
+// « #/question/<défi>/<jeton> », « #/vote/<défi> », « #/gagne », « #/plan?salle=Salle 12 ». Pure.
 import { exposantDeCarte, etiquetteCanonique } from './donnees.js';
 
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
   ['plan', 'plan'], ['visite', 'visite'], ['preparer', 'preparer'], ['questions', 'questions'], ['aide', 'aide'],
-  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'], ['question', 'question'], ['vote', 'vote'],
+  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'], ['question', 'question'], ['vote', 'vote'], ['gagne', 'gagne'],
 ];
 
 // Les routes qui ouvrent la fiche d'un Exposant (voir ficheOuverte).

@@ -23,11 +23,14 @@ export function bandeauDe(tables) {
   return '';
 }
 
-// Les annonces que le Worker joint à l'état (grand-defi 06) : les id des défis
-// annoncés en ce moment. { annonces } s'il en parle, {} sinon (un Worker d'avant).
-function lireAnnonces(rep) {
-  if (!Array.isArray(rep.annonces)) return {};
-  return { annonces: rep.annonces.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,20}$/i.test(id)) };
+// Ce que le Worker joint à l'état pour le Grand Défi : les annonces (grand-defi 06), les
+// id des défis annoncés en ce moment, et la marque du dernier Tirage (grand-defi 07),
+// '' avant tout Tirage. Seulement ce dont il parle : {} pour un Worker d'avant.
+function lireSignauxDuJeu(rep) {
+  const s = {};
+  if (Array.isArray(rep.annonces)) s.annonces = rep.annonces.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,20}$/i.test(id));
+  if (typeof rep.tirage === 'string' && /^[0-9-]{0,40}$/.test(rep.tirage)) s.tirage = rep.tirage;
+  return s;
 }
 
 // Les traductions du bandeau que le script joint à l'état ({ en, es, zh }), ou null.
@@ -114,7 +117,7 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
   async function etatScript() {
     const rep = JSON.parse(await requete(urlScript('etat'), { redirect: 'follow' }));
     if (!rep || typeof rep.version !== 'string') throw new Error('etat : réponse invalide');
-    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '', bandeaux: bandeauxDe(rep), ...lireAnnonces(rep) };
+    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '', bandeaux: bandeauxDe(rep), ...lireSignauxDuJeu(rep) };
   }
 
   async function donneesScript() {
@@ -184,12 +187,12 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     };
     try {
       const etat = await etatScript();
-      const annonces = lireAnnonces(etat);
-      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, bandeaux: etat.bandeaux, source: 'script', version: etat.version, ...annonces };
+      const signaux = lireSignauxDuJeu(etat);
+      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, bandeaux: etat.bandeaux, source: 'script', version: etat.version, ...signaux };
       const d = await donneesScript();
       if (acceptable(d)) {
         memoriser(d);
-        return { change: true, bandeau: d.bandeau ?? etat.bandeau, bandeaux: d.bandeaux || etat.bandeaux, source: 'script', tables: d.tables, version: d.version, ...annonces };
+        return { change: true, bandeau: d.bandeau ?? etat.bandeau, bandeaux: d.bandeaux || etat.bandeaux, source: 'script', tables: d.tables, version: d.version, ...signaux };
       }
     } catch (e) { erreurs.push(e); journal('script indisponible', e); }
     try {

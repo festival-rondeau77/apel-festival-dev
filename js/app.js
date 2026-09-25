@@ -7,6 +7,7 @@ import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APP
 import * as Passeport from './passeport.js';
 import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
+import { nouveauJeton, empreinteDe, afficherCode, JETON } from './gains.js';
 import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, bandeauAnnonces, h as echapper } from './rendu.js';
 import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
@@ -297,6 +298,8 @@ function ajouterAuCalendrier(cle) {
 // Le Worker du jeu : celui de config.js, ou celui que `npm run servir` sert à côté
 // de l'appli. Vide = pas de jeu du tout, l'appli d'avant le Grand Défi.
 const JEU_URL = Passeport.urlJeu(location.hostname, CONFIG.jeuUrl);
+// Le Worker local de `npm run servir` et de la fumée : rien à étaler, rien à attendre.
+const JEU_LOCAL = JEU_URL === './jeu';
 const CLE_JEU = 'festival.jeu';
 // Sans Worker, le jeu gardé d'une visite précédente ne s'affiche pas : aucune trace.
 try { etat.grandDefi = JEU_URL ? Passeport.lireJeuPublic(JSON.parse(stockage.getItem(CLE_JEU) || 'null')) : null; } catch { etat.grandDefi = null; }
@@ -332,6 +335,56 @@ const fileJeu = Passeport.creerEnvoi({
 });
 // Sans Worker, rien ne part : les validations restent gardées dans le téléphone.
 const envoiJeu = { envoyer: () => (JEU_URL ? fileJeu.envoyer() : Promise.resolve()) };
+
+// Gagner (grand-defi 07). Le jeton privé de ce téléphone, tiré ici au premier besoin et
+// gardé avec le Passeport : seule son empreinte part au Worker ; lui-même ne sort que
+// dans le QR de l'écran « Vous avez gagné », que scanne l'Organisateur.
+const CLE_JETON = 'festival.jeton';
+const JETON_GAIN = (() => {
+  try {
+    let j = stockage.getItem(CLE_JETON);
+    if (!j || !JETON.test(j)) { j = nouveauJeton(); stockage.setItem(CLE_JETON, j); }
+    return j;
+  } catch { return nouveauJeton(); }
+})();
+// L'adresse absolue du Worker (./jeu en local) : c'est elle que porte le QR.
+etat.remise = { worker: JEU_URL ? new URL(JEU_URL, location.href).href.replace(/\/+$/, '') : '', jeton: JETON_GAIN };
+
+// Les gains de ce Passeport (`?action=gain`), demandés quand l'état annonce un Tirage
+// pas encore vu (passeport.gainsARelire) : après un temps tiré entre 0 et 20 s, pour que
+// 600 téléphones ne frappent pas le Worker à la même seconde ; tout de suite pour un
+// gagnant qui attend sa Remise, et sur la machine. Un échec se retente au prochain état (une minute).
+let demandeGains = null;
+function demanderGains(marque) {
+  if (demandeGains) return;
+  const nouveau = Boolean(marque) && marque !== etat.visite.jeu.tirageVu;
+  demandeGains = setTimeout(async () => {
+    try {
+      const rep = await fetch(urlAction(JEU_URL, 'gain'), {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ appareil: ID_PASSEPORT, empreinte: await empreinteDe(JETON_GAIN) }),
+      });
+      if (!rep.ok) throw new Error(`gain : HTTP ${rep.status}`);
+      modifierVisite({ ...etat.visite, jeu: Passeport.appliquerGains(etat.visite.jeu, await rep.json(), marque) });
+    } catch (e) { journal('gains indisponibles', e); }
+    finally { demandeGains = null; }
+  }, nouveau && !JEU_LOCAL ? Math.random() * 20_000 : 0);
+}
+
+// « Copier le message » (le mail d'un absent), quand le lien mailto ne mène à rien.
+async function copierMessage(code) {
+  const g = (etat.visite.jeu.gains || []).find((x) => x.code === code);
+  if (!g) return;
+  const i = etat.modele.infos || {};
+  const adresse = String(i.contact_email || '').trim();
+  const { sujet, corps } = Passeport.messageAbsent(g, { email: adresse, festival: i.nom || undefined });
+  try {
+    await navigator.clipboard.writeText(`${adresse ? `${adresse}\n` : ''}${sujet}\n\n${corps}`);
+    message(echapper(adresse ? t('Message copié : collez-le dans un mail à %s.', adresse) : t('Message copié : collez-le dans un mail à l’école.')));
+  } catch {
+    message(echapper(t('Copie impossible : écrivez à l’école avec votre code %s.', afficherCode(code))), { classe: 'orange' });
+  }
+}
 
 // `choix` : le numéro du choix touché (défi à choix), qui part avec la preuve.
 function validerDefi(defi, cle, choix) {
@@ -375,8 +428,8 @@ function voter(defi, choix) {
 // fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
 function rejouer() {
   if (!Passeport.rejouerOuvert(etat.modele.infos)) return;
-  try { stockage.removeItem(CLE_APPAREIL); } catch { /* navigation privée : rien à oublier */ }
-  stockageVisite.sauver({ ...etat.visite, jeu: { validations: [], passeport: null } });
+  try { stockage.removeItem(CLE_APPAREIL); stockage.removeItem(CLE_JETON); } catch { /* navigation privée : rien à oublier */ }
+  stockageVisite.sauver({ ...etat.visite, jeu: Passeport.etatJeuInitial() });
   history.replaceState(null, '', '#/');
   location.reload();
 }
@@ -566,6 +619,7 @@ document.addEventListener('click', (e) => {
     case 'repondre': repondre(cible.dataset.defi, cible.dataset.choix); break;
     case 'voter': voter(cible.dataset.defi, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
+    case 'copier-message': copierMessage(cible.dataset.code); break;
     default: break;
   }
 });
@@ -925,6 +979,8 @@ async function rafraichirDonnees() {
     // tout de suite, sans attendre les cinq minutes du jeu (grand-defi 06).
     if (Array.isArray(r.annonces)) etat.annonces = r.annonces;
     if (JEU_URL && Passeport.jeuARecharger(etat.grandDefi, r.annonces)) chargerJeu().catch((e) => journal('jeu indisponible', e));
+    // Un Tirage a eu lieu (grand-defi 07) : ce téléphone a-t-il gagné ?
+    if (JEU_URL && Passeport.gainsARelire(etat.visite.jeu, r.tirage)) demanderGains(r.tirage);
     if (r.change) installerTables(r.tables, r.version, r.source);
     else { etat.derniereMaj = Date.now(); etat.source = r.source; }
   }

@@ -3,10 +3,15 @@
 // Worker CONFIRME : une validation reste « en attente » jusqu'à ce que la réponse
 // du Worker la montre traitée, et la file la renvoie jusque-là.
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
-//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai?, moment? }], passeport: { points, defis } | null }
+//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai?, moment? }], passeport: { points, defis } | null,
+//     gains: [{ code, sorte, lot, remis }], tirageVu, jetonReconnu }
+// `gains` : ce que le Worker dit que ce téléphone a gagné (grand-defi 07), `tirageVu` la
+// marque du dernier Tirage pour lequel il a demandé, `jetonReconnu` : le Worker connaît
+// l'empreinte de son jeton (sinon, pas de QR : le code public seul).
 // `essai` : une mauvaise réponse à une question, dite par le Worker (grand-defi 04).
 // `moment` : avant | apres, la fenêtre où le Worker a compté un vote (grand-defi 05).
 // statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
+import { lireGain, afficherCode } from './gains.js';
 import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, MOMENTS_VOTE, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
@@ -15,7 +20,7 @@ const marqueDe = (m) => (m === 'essai' ? { essai: true } : MOMENTS_VOTE.includes
 const texte = (v) => typeof v === 'string';
 
 export function etatJeuInitial() {
-  return { validations: [], passeport: null };
+  return { validations: [], passeport: null, gains: [], tirageVu: '', jetonReconnu: true };
 }
 
 // La preuve qui part au Worker : le secret du QR, et le numéro d'un choix. Rien
@@ -33,8 +38,13 @@ export function migrerJeu(brut) {
     .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente', ...(v.essai === true ? { essai: true } : {}), ...marqueDe(v.moment) }));
   const p = brut.passeport;
   if (p && typeof p === 'object') e.passeport = { points: Number(p.points) || 0, defis: (Array.isArray(p.defis) ? p.defis : []).filter(texte) };
+  e.gains = lireGains(brut.gains);
+  if (texte(brut.tirageVu)) e.tirageVu = brut.tirageVu;
+  if (brut.jetonReconnu === false) e.jetonReconnu = false;
   return e;
 }
+
+const lireGains = (g) => (Array.isArray(g) ? g.map(lireGain).filter(Boolean) : []);
 
 // Le jeu public reçu du Worker (ou du cache local), vérifié avant d'être cru.
 export function lireJeuPublic(rep) {
@@ -74,6 +84,7 @@ export function appliquerReponse(etat, passeport) {
   if (!passeport || !Array.isArray(passeport.traitees)) return etat;
   const traitees = new Map(passeport.traitees.filter((x) => Array.isArray(x) && STATUTS.includes(x[1])).map(([id, statut, marque]) => [id, { statut, ...marqueDe(marque) }]));
   return {
+    ...etat,
     validations: etat.validations.map((v) => (traitees.has(v.id) ? { ...v, ...traitees.get(v.id) } : v)),
     passeport: { points: Number(passeport.points) || 0, defis: (passeport.defis || []).filter(texte) },
   };
@@ -234,6 +245,48 @@ export function jauge(jeu, etat) {
   const points = etat.passeport ? etat.passeport.points : 0;
   const attente = jeu.defis.filter((d) => statutDuDefi(d, etat) === 'attente').reduce((s, d) => s + d.points, 0);
   return { points, attente, objectif: jeu.objectif, ...chancesDe(points, etat.passeport ? etat.passeport.defis : [], jeu) };
+}
+
+// Faut-il demander ses gains au Worker (`?action=gain`, grand-defi 07) ? Quand l'état
+// porte la marque d'un Tirage que ce téléphone n'a pas encore vue, s'il a joué (qui n'a
+// rien validé n'a rien pu gagner : 600 téléphones ne demandent pas pour rien) ; et, tant
+// qu'un lot n'est pas remis, à chaque état : l'écran dira « Lot remis ».
+export function gainsARelire(jeu, marque) {
+  if (!jeu) return false;
+  if ((jeu.gains || []).some((g) => !g.remis)) return true;
+  return Boolean(marque) && marque !== jeu.tirageVu && jeu.validations.length > 0;
+}
+
+// La réponse du Worker ({ gains, jeton_reconnu }) gardée avec la marque du Tirage vu.
+export function appliquerGains(jeu, rep, marque) {
+  return { ...jeu, gains: lireGains(rep && rep.gains), tirageVu: texte(marque) ? marque : jeu.tirageVu || '', jetonReconnu: !rep || rep.jeton_reconnu !== false };
+}
+
+export const gainsARemettre = (jeu) => ((jeu && jeu.gains) || []).filter((g) => !g.remis);
+
+// Le nom du lot dans le mail à l'école : en français, quelle que soit la langue de l'appli.
+const nomDuLotPourLEcole = (g) => (g.sorte === 'flash' ? 'Lot flash' : `Grand lot n° ${g.lot}`);
+const ADRESSE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
+// « Je suis déjà parti » : le mail à l'école (Infos.contact_email), en français (c'est
+// l'école qui le lit), avec le code public, jamais le jeton. Le gagnant ajoute son nom
+// et un moyen de le joindre. `mailto` vide sans adresse lisible : on copie le message.
+// Les espaces en %20 (encodeURIComponent) : certains clients lisent un + tel quel.
+export function messageAbsent(gain, { email = '', festival = "Festival de l'Orientation" } = {}) {
+  const code = afficherCode(gain.code);
+  const sujet = `Grand Défi : mon lot (code ${code})`;
+  const corps = `Bonjour,
+
+J'ai gagné au Grand Défi du ${festival} (${nomDuLotPourLEcole(gain)}), et j'étais déjà parti.
+Mon code : ${code}
+
+Mon nom :
+Pour me joindre (mail ou téléphone) :
+
+Merci !`;
+  const adresse = String(email || '').trim();
+  const mailto = ADRESSE.test(adresse) ? `mailto:${adresse}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}` : '';
+  return { sujet, corps, mailto };
 }
 
 // La file d'envoi. `envoyer(lot)` → { ok, passeport } | { ok: false, definitif }.

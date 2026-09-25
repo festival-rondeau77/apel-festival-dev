@@ -113,4 +113,6 @@ export default [
   "Bientôt", "Pas votre stand mystère", "Heure limite passée", "QR de votre stand : %s, jusqu’à %s", "Révélé en cours de matinée", "%s !", "Votre stand : %s",
   // Accueil : qui organise
   "Organisé par %s",
+  // Grand Défi : gagner et remettre (grand-defi 07)
+  "Vous avez gagné !", "Voir mon lot", "Grand lot n° %s", "Lot flash", "Pas de lot sur ce téléphone.", "Lot remis · %s", "QR à montrer à l’accueil", "Montrez ce QR à l’accueil : un organisateur le scanne et vous remet votre lot.", "Montrez ce code à l’accueil : un organisateur le saisit et vous remet votre lot.", "Votre code : %s", "Si le QR ne se lit pas, donnez ce code à l’organisateur.", "Déjà parti ?", "Votre lot reste réservé. Écrivez à l’école avec votre code, votre nom et un moyen de vous joindre. Moins de 15 ans : demandez à un parent.", "Je suis déjà parti", "Copier le message", "Message copié : collez-le dans un mail à %s.", "Message copié : collez-le dans un mail à l’école.", "Copie impossible : écrivez à l’école avec votre code %s.",
 ];

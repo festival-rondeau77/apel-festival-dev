@@ -30,7 +30,9 @@ function lireStand(brut) {
 // cellule heure telle que gviz la rend ([12, 45, 0, 0]). null si illisible.
 function lireHeure(v) {
   if (Array.isArray(v)) return Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] < 24 && v[1] < 60 ? v[0] * 60 + v[1] : null;
-  return heureEnMinutes(v);
+  // « 12:45:00 » : Sheets affiche parfois les secondes d'une cellule heure.
+  const sec = /^(\d{1,2}:\d{2}):\d{2}$/.exec(String(v ?? '').trim());
+  return heureEnMinutes(sec ? sec[1] : v);
 }
 
 // Un Type de preuve : lire ses paramètres dans la ligne (ou dire ce qui cloche),
@@ -322,6 +324,16 @@ function lireChancesBadge(valeur) {
   return { chances: n };
 }
 
+// `grands_lots` : le nombre de Grands lots du Tirage final (grand-defi 07). Vide : 0,
+// et bin/jeu.sh tirer refuse de tirer.
+function lireGrandsLots(valeur) {
+  const brut = texte(valeur);
+  if (!brut) return { lots: 0 };
+  const n = Number(brut);
+  if (!Number.isInteger(n) || n < 0 || n > 100) return { lots: 0, motif: `grands_lots illisible : « ${brut} »` };
+  return { lots: n };
+}
+
 // Les onglets `Défis` et `Infos` (tables brutes, première ligne = en-têtes) → le jeu.
 // `defis` garde aussi les défis désactivés (leurs points comptent toujours) ;
 // `invalides` liste ce qui a été écarté, avec le motif.
@@ -330,9 +342,11 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
   for (const l of tablesEnObjets(tableInfos)) infos[normaliser(l.cle).replace(/-/g, '_')] = l.valeur;
   const { paliers, motif: motifPaliers } = lirePaliers(infos.paliers);
   const { chances: chancesBadge, motif: motifBadge } = lireChancesBadge(infos.chances_badge);
-  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, defis: [], invalides: [] };
+  const { lots: grandsLots, motif: motifLots } = lireGrandsLots(infos.grands_lots);
+  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, grands_lots: grandsLots, defis: [], invalides: [] };
   if (motifPaliers) jeu.invalides.push({ id: 'paliers', motif: motifPaliers });
   if (motifBadge) jeu.invalides.push({ id: 'chances_badge', motif: motifBadge });
+  if (motifLots) jeu.invalides.push({ id: 'grands_lots', motif: motifLots });
   const entetes = Array.isArray(tableDefis) && Array.isArray(tableDefis[0]) ? tableDefis[0].map((e) => normaliser(e).replace(/-/g, '_')) : [];
   // gviz rend la PREMIÈRE feuille quand l'onglet demandé n'existe pas : sans ces
   // en-têtes, ce n'est pas l'onglet Défis, et il n'y a pas de jeu.

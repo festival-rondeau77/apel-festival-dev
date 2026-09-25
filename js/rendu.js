@@ -8,8 +8,10 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, annoncesEnCours } from './passeport.js';
-import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe } from './defis.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, annoncesEnCours, gainsARemettre, messageAbsent, etatJeuInitial } from './passeport.js';
+import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis } from './defis.js';
+import { afficherCode, urlRemise } from './gains.js';
+import { encoderQR, qrEnSvg } from './qr.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
@@ -424,11 +426,58 @@ const nomDuStand = (etat, s) => { const e = exposantDuStand(etat, s); return e ?
 export function bandeauAnnonces(etat) {
   poserLangue(etat);
   const jeu = (etat.visite && etat.visite.jeu) || { validations: [], passeport: null };
-  return annoncesEnCours(etat.grandDefi, jeu, { appareil: etat.appareil, maintenant: maintenantMs(etat), annonces: etat.annonces || [] }).map(({ defi, stand, jusqua }) => {
+  return bandeauGain(etat, jeu) + annoncesEnCours(etat.grandDefi, jeu, { appareil: etat.appareil, maintenant: maintenantMs(etat), annonces: etat.annonces || [] }).map(({ defi, stand, jusqua }) => {
     const e = exposantDuStand(etat, stand);
     const corps = `<strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Votre stand : %s', nomDuStand(etat, stand)))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span>`;
     return e ? `<a class="annonce-defi" href="${lienExposant(e.cle)}">${corps}</a>` : `<p class="annonce-defi">${corps}</p>`;
   }).join('');
+}
+
+// « Vous avez gagné ! » (grand-defi 07), en tête des annonces, jusqu'à la Remise : un
+// lien vers l'écran du lot, sauf sur cet écran-là.
+function bandeauGain(etat, jeu) {
+  const [g] = gainsARemettre(jeu);
+  if (!g || etat.route.nom === 'gagne') return '';
+  return `<a class="annonce-gain" href="#/gagne"><strong>${h(t('Vous avez gagné !'))}</strong> <span>${h(nomDuLot(g))} · ${h(t('Voir mon lot'))}</span></a>`;
+}
+
+// Un trou dans une phrase traduite, comblé de HTML après échappement.
+const TROU = '\u0001';
+const nomDuLot = (g) => (g.sorte === 'flash' ? t('Lot flash') : t('Grand lot n° %s', g.lot));
+
+// L'écran « Vous avez gagné » (grand-defi 07) : pour chaque lot, le QR à montrer à
+// l'accueil (la page de remise du Worker, avec le code et le jeton privé de ce téléphone,
+// app.js les pose dans `etat.remise`) et le code public, qui suffit si le QR ne se lit
+// pas ; puis « Je suis déjà parti » : un mail à l'école avec le code, jamais le jeton,
+// et « Copier le message » en secours. Remis : l'heure, plus rien à montrer.
+// Le jeton n'apparaît que dans les modules du QR, jamais en texte.
+function ecranGagne(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  const jeu = (etat.visite && etat.visite.jeu) || etatJeuInitial();
+  const gains = jeu.gains || [];
+  if (!gains.length) return `${entete(t('Grand Défi'), '', retour)}
+    <p class="vide">${h(t('Pas de lot sur ce téléphone.'))}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  const i = etat.modele.infos || {};
+  const { worker = '', jeton = '' } = etat.remise || {};
+  const qr = jeu.jetonReconnu !== false && worker && jeton;
+  const lot = (g) => {
+    if (g.remis) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ok">${h(t('Lot remis · %s', heure(minutesAParis(g.remis))))}</p></section>`;
+    const mail = messageAbsent(g, { email: i.contact_email, festival: i.nom || undefined });
+    return `<section class="gagne">
+      <p class="lot">${h(nomDuLot(g))}</p>
+      ${qr ? `<div class="qr-gain" role="img" aria-label="${attr(t('QR à montrer à l’accueil'))}">${qrEnSvg(encoderQR(urlRemise(worker, g.code, jeton), 'M'), { marge: 4, echelle: 6 })}</div>
+      <p>${h(t('Montrez ce QR à l’accueil : un organisateur le scanne et vous remet votre lot.'))}</p>`
+        : `<p>${h(t('Montrez ce code à l’accueil : un organisateur le saisit et vous remet votre lot.'))}</p>`}
+      <p class="code-gain">${h(t('Votre code : %s', TROU)).replace(TROU, `<strong>${h(afficherCode(g.code))}</strong>`)}</p>
+      ${qr ? `<p class="note">${h(t('Si le QR ne se lit pas, donnez ce code à l’organisateur.'))}</p>` : ''}
+      <h3>${h(t('Déjà parti ?'))}</h3>
+      <p>${h(t('Votre lot reste réservé. Écrivez à l’école avec votre code, votre nom et un moyen de vous joindre. Moins de 15 ans : demandez à un parent.'))}</p>
+      <div class="boutons">${mail.mailto ? `<a class="bouton secondaire" href="${url(mail.mailto)}">${icone('document', 19)}${h(t('Je suis déjà parti'))}</a>` : ''}<button class="bouton secondaire" type="button" data-action="copier-message" data-code="${attr(g.code)}">${h(t('Copier le message'))}</button></div>
+    </section>`;
+  };
+  return `${entete(t('Vous avez gagné !'), '', retour)}
+    ${gains.map(lot).join('')}`;
 }
 
 const domainesDans = (modele) => (cle) => { const e = modele.exposants.find((x) => x.cle === cle); return e ? e.domaines : []; };
@@ -1223,6 +1272,7 @@ export function ecran(etat) {
     case 'regle': return ecranRegle(etat);
     case 'question': return ecranQuestion(etat);
     case 'vote': return ecranVote(etat);
+    case 'gagne': return ecranGagne(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1230,7 +1280,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu'), gagne: t('Vous avez gagné !') }[etat.route.nom];
   if (etat.route.nom === 'question' || etat.route.nom === 'vote') {
     const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
     return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;

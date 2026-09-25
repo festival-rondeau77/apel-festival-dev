@@ -127,6 +127,12 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 }
 .annonce-defi strong { font-weight: 800; }
 .annonce-defi .limite { white-space: nowrap; }
+/* « Vous avez gagné ! » (grand-defi 07) : en orange, au-dessus des annonces, jusqu'à la Remise. */
+.annonce-gain {
+  display: block; margin: 0; background: var(--orange); color: #fff; text-align: center; text-decoration: none;
+  padding: 10px var(--marge); font-size: 0.95rem; line-height: 1.35;
+}
+.annonce-gain strong { font-weight: 800; }
 
 .entete { padding: 26px 0 14px; }
 /* Le sélecteur de langue : quatre pastilles discrètes, alignées à droite, chacune
@@ -358,6 +364,18 @@ main { min-height: 60vh; }
 .vote-defi .fenetre .etat { font-weight: 650; font-size: 0.95rem; color: var(--encre-2); }
 .vote-defi .fenetre .etat.valide { color: var(--bleu); }
 .vote-defi .fenetre .etat.attente { color: var(--orange); }
+
+/* L'écran « Vous avez gagné » (grand-defi 07) : le QR en grand, noir sur blanc dans
+   les deux thèmes (il se scanne), le code public lisible à un mètre. */
+.gagne { margin: 14px 0 0; padding: 16px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
+.gagne .lot { margin: 0 0 12px; font-size: 1.2rem; font-weight: 800; }
+.gagne .qr-gain { display: grid; place-items: center; margin: 0 0 12px; }
+.gagne .qr-gain svg { width: min(17rem, 78vw); height: auto; border-radius: 8px; }
+.gagne .code-gain { font-size: 1.1rem; }
+.gagne .code-gain strong { font-size: 1.6rem; letter-spacing: 0.08em; white-space: nowrap; }
+.gagne h3 { margin: 18px 0 4px; font-size: 1rem; }
+.gagne .verdict.ok { margin: 0; font-weight: 700; color: var(--bleu); }
+.gagne .note { color: var(--encre-2); font-size: 0.92rem; }
 .vote-defi .fenetre.fermee .etat { color: var(--alerte); }
 .vote-defi .choix { display: grid; gap: 8px; }
 .vote-defi .choix .bouton { min-height: 48px; font-size: 1.05rem; }
