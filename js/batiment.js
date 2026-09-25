@@ -52,6 +52,8 @@ export const BATIMENT = [
       { nom: "Rue", k: 'r', poly: [[-6, -8], [8, -8], [8, 168], [-6, 168]] },
       { nom: "Rue", k: 'r', poly: [[182, 2], [196, 2], [196, 168], [182, 168]] },
       { nom: "Parvis", k: 's', poly: [[86, 36], [124, 43], [124, 57], [86, 50]] },
+      // garé sur le parvis (2026-09-25) ; l'emplacement exact est à relever sur place
+      { nom: "Foodtruck", h: 0.7, poly: rect(93, 41, 8, 4) },
       { nom: "Pelouse", k: 'v', poly: [[70, 22], [86, 25], [86, 40], [70, 36]] },
       { nom: "Pelouse", k: 'v', poly: [[124, 22], [178, 24], [178, 36], [124, 34]] },
       { nom: "Pelouse", k: 'v', poly: [[124, 40], [178, 41], [178, 56], [124, 54]] },
