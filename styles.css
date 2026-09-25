@@ -209,6 +209,9 @@ main { min-height: 60vh; }
 .affiche h1 .t2 { color: var(--turquoise); display: block; }
 .affiche .quand { margin: 10px 0 0; font-weight: 650; font-size: 0.96rem; line-height: 1.35; color: var(--framboise); }
 .affiche .quand span { display: block; color: var(--encre-2); font-weight: 500; }
+/* Qui organise (Infos.organisateur) : plus petit que la date, une ligne par morceau. */
+.affiche .organise { margin: 4px 0 0; font-size: 0.84rem; line-height: 1.35; color: var(--encre-2); }
+.affiche .organise span { display: block; text-wrap: balance; }
 .affiche .slogan {
   margin: 9px 0 0; font-family: var(--display); font-weight: 800; font-size: 0.98rem;
   line-height: 1.15; color: var(--turquoise); max-width: 26ch; font-style: italic;

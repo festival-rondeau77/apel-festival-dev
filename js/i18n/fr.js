@@ -109,4 +109,6 @@ export default [
   // Grand Défi : les votes de la table ronde (grand-defi 05)
   "Voter avant et après : %s", "Voter", "Ce défi n’est pas un vote.", "Vos deux votes sont comptés !", "Vote envoyé : le verdict arrive.", "Défi fermé : le vote « avant » n’a pas été donné à temps.", "Voté : %s", "Vote envoyé", "Fermé", "Pas encore ouvert", "Avant", "Après", "jusqu’à %s", "à partir de %s", "Chaque vote est compté sans lien avec votre téléphone.",
   "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.",
+  // Accueil : qui organise
+  "Organisé par %s",
 ];

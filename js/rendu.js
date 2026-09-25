@@ -214,8 +214,9 @@ export function titreAffiche(nom) {
 
 // Les logos de l'affiche (logos-accueil 01, planche E du canevas
 // https://claude.ai/artifact/FWvLaJPy3tLGKYoeWuvxYv) : la fleur de l'APEL en
-// filigrane, et les deux écoles en sceaux posés sur le filet. Deux règles de
-// l'APEL : les deux écoles ont la même taille, et rien ne dit qui organise.
+// filigrane, et les deux écoles en sceaux posés sur le filet. Les deux écoles ont la
+// même taille (règle de l'APEL). Qui organise : `Infos.organisateur`, sous la date
+// (demandé le 2026-09-25, remplace la règle « rien ne dit qui organise »).
 function fleurApel() {
   return '<img class="fleur" src="./logos/apel-fleur.webp" alt="" aria-hidden="true" width="250" height="290">';
 }
@@ -232,6 +233,10 @@ export function ecranAccueil(etat) {
   const prochain = prochainEvenement(modele, maintenant);
   const domaines = new Set(modele.exposants.flatMap((e) => e.domaines).filter(Boolean));
   const nb = compte(etat.visite);
+  // « Organisé par » + `Infos.organisateur` (des noms, jamais traduits) ; un point-virgule
+  // y coupe la ligne. Il remplace le lieu sous la date : le lieu reste l'adresse (Besoin d'aide ?).
+  const [qui, ...suite] = String(infos.organisateur || '').split(';').map((x) => x.trim()).filter(Boolean);
+  const organise = qui ? `<p class="organise"><span>${h(t('Organisé par %s', qui))}</span>${suite.map((l) => `<span>${h(l)}</span>`).join('')}</p>` : '';
   const horaires = infos.heure_debut && infos.heure_fin ? t('%s à %s', heureTexte(infos.heure_debut), heureTexte(infos.heure_fin)) : '';
   // Les quatre verbes de l'affiche portent chacun une couleur ; les six boutons
   // s'y rangent, de sorte que l'appli et l'affiche se reconnaissent.
@@ -243,7 +248,8 @@ export function ecranAccueil(etat) {
   <section class="affiche">
     <div class="filigrane">${fleurApel()}</div>
     <h1>${titreAffiche(tt(infos.nom || "Festival de l'Orientation"))}</h1>
-    <p class="quand">${h(dateLongue(infos.date) || t('Date à confirmer'))}${horaires ? `<span>${h(horaires)}</span>` : ''}${infos.lieu ? `<span>${h(infos.lieu)}</span>` : ''}</p>
+    <p class="quand">${h(dateLongue(infos.date) || t('Date à confirmer'))}${horaires ? `<span>${h(horaires)}</span>` : ''}${infos.lieu && !organise ? `<span>${h(infos.lieu)}</span>` : ''}</p>
+    ${organise}
     ${infos.slogan ? `<p class="slogan">${h(tt(infos.slogan))}</p>` : ''}
     ${infos.entree ? `<p class="entree-libre">${icone('entrer', 15)}<span>${h(t('Entrée libre'))}</span></p>` : ''}
     ${sceauxEcoles()}
