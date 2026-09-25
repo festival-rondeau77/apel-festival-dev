@@ -96,7 +96,6 @@ export default [
   'Retiré de ma visite : %s', '★ Ajouté à ma visite : %s', '★ Ajouté, mais à la même heure que « %s »', 'un autre événement', 'Voir',
   'Date du festival inconnue : impossible de créer le rappel.', 'Fermer', 'Fermer ce message',
   'Dans %s min', 'Nouvelle version disponible.', 'Recharger',
-  'Version de recette : le programme et les salles sont en partie fictifs.',
   // Grand Défi
   'Mon grand défi', '+%s points en attente', 'Grand Défi', 'Défi %s', 'Valider', 'Validé', 'En attente', 'Refusé',
   // Grand Défi : tous les défis par scan (grand-defi 02)

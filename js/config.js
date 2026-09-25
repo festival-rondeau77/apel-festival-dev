@@ -2,12 +2,8 @@
 // `version:` à chaque publication : gardez une valeur par ligne pour ces réécritures-là.
 export const CONFIG = {
   // Le classeur lu en secours via gviz quand le Worker ne répond pas (ADR-0003, 0004).
-  // Depuis le 2026-09-23 : « Festival — Données du site (production) » (l'ancienne
-  // Recette, en lecture publique), celui que le script sert — l'Export public
-  // (1-1TURF3X…) est alimenté par le maître, pas par lui, et le secours y affichait
-  // un autre festival quand le script ralentissait (37 s mesurées ce soir-là).
-  // Le jour où la cellule classeur_recette est vidée, revenir à l'Export public
-  // (et retirer `onglets`), comme le Worker du jeu (docs/tableur.md).
+  // C'est la Publication, « Festival — Données du site (production) », celle que sert le
+  // Worker de prod, aux mêmes onglets « Export … » (ADR-0019, docs/publication.md).
   sheetId: '1JQLl1_DQ8H14_b_LPByCnGSYNrYC9SOIWUced_E7u6Q',
   onglets: { exposants: 'Export Exposants', evenements: 'Export Événements', salles: 'Export Salles', preparation: 'Export Préparation', infos: 'Export Infos', traductions: 'Traductions' },
   // Hébergement GitHub Pages, deux plateformes (ADR-domaine 0007) : la prod sert le
@@ -31,7 +27,7 @@ export const CONFIG = {
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.25-d13f9e5',
+  version: '2026.09.25-ea21b8e',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le

@@ -1,7 +1,7 @@
 // Module Sources : la chaîne de lecture des données (ADR-0004).
 //   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) : `etat` : version + bandeau ;
 //      `donnees` : six tables (le contrat qu'avait le script Apps Script).
-//   2. classeur « Festival — Export public » via gviz, onglet par onglet
+//   2. le classeur public (la Publication, ADR-0019) via gviz, onglet par onglet
 //   3. snapshot embarqué au déploiement
 // À chaque succès, les tables sont mises en cache local avec version et heure.
 // Le réseau (fetch), le stockage, l'horloge et la temporisation sont injectés.
@@ -117,10 +117,10 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
   }
 
   async function donneesGviz() {
-    if (!config.sheetId) throw new Error('classeur Export public non configuré');
+    if (!config.sheetId) throw new Error('classeur public non configuré');
     const tables = {};
-    // Les noms d'onglets du classeur lu : ceux de l'Export public par défaut, ceux
-    // d'un classeur de données (« Export Exposants »…) quand la configuration les donne.
+    // Les noms d'onglets du classeur lu : sans préfixe par défaut, ceux de la
+    // Publication (« Export Exposants »…) quand la configuration les donne.
     for (const [nom, onglet] of Object.entries(config.onglets || ONGLETS_GVIZ)) {
       try { tables[nom] = tablesDepuisGviz(await requete(urlGviz(config.sheetId, onglet))); }
       catch (e) { if (!TABLES_FACULTATIVES.includes(nom)) throw e; tables[nom] = []; journal('gviz : onglet facultatif absent', onglet, e.message); }

@@ -477,7 +477,7 @@ export function tablesDepuisGviz(texteReponse) {
   const cols = rep.table.cols || [];
   const lignes = (rep.table.rows || []).map((r) => (r.c || []).map((c) => (c && c.v !== null && c.v !== undefined ? c.v : '')));
   if (lignes.length && lignes[0].some((c) => typeof c === 'string' && c.includes('#REF!'))) {
-    throw new Error('gviz : #REF! (IMPORTRANGE non autorisé dans le classeur Export public)');
+    throw new Error('gviz : #REF! (formule cassée dans le classeur public)');
   }
   if (rep.table.parsedNumHeaders > 0 || cols.some((c) => texte(c.label))) lignes.unshift(cols.map((c) => texte(c.label)));
   return lignes;
