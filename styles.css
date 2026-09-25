@@ -794,3 +794,12 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appe
 .grand-defi .rejouer-lien { display: inline-block; margin: 12px 0 0 14px; font-size: 0.85rem; color: var(--encre-2); text-decoration: underline; }
 .rejouer ul { margin: 12px 0 18px; padding-left: 1.2em; display: grid; gap: 6px; }
 .rejouer .note { margin-top: 16px; color: var(--encre-2); font-size: 0.9rem; }
+
+/* Le règlement du Grand Défi (app/reglement-jeu.html) : une page de lecture, sans script. */
+.reglement { padding-block: 24px 48px; }
+.reglement h1 { font-family: var(--display); font-size: 1.7rem; line-height: 1.15; margin: 8px 0 12px; }
+.reglement h2 { font-family: var(--display); font-size: 1.15rem; margin: 26px 0 8px; }
+.reglement p, .reglement li { line-height: 1.5; }
+.reglement ul { padding-left: 1.2em; display: grid; gap: 6px; }
+.reglement .brouillon { padding: 10px 14px; border-left: 4px solid var(--ambre); background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
+.reglement .retour-appli { margin: 0; font-weight: 650; }
