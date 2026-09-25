@@ -310,11 +310,13 @@ const fileJeu = Passeport.creerEnvoi({
 // Sans Worker, rien ne part : les validations restent gardées dans le téléphone.
 const envoiJeu = { envoyer: () => (JEU_URL ? fileJeu.envoyer() : Promise.resolve()) };
 
-function validerDefi(defi, cle) {
+// `choix` : le numéro du choix touché (défi à choix), qui part avec la preuve.
+function validerDefi(defi, cle, choix) {
   const fiche = ficheOuverte(etat.route, etat.modele);
   const secret = fiche && fiche.cle === cle ? fiche.secret : '';
   if (!secret || !defi || !cle) return;
-  const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: cle, secret, t: Date.now() });
+  const n = choix === undefined || choix === '' ? undefined : Number(choix);
+  const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: cle, secret, choix: n, t: Date.now() });
   modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, v) });
   envoiJeu.envoyer();
 }
@@ -444,6 +446,13 @@ let minuteurRecherche = null;
 document.addEventListener('input', (e) => {
   const champ = e.target.dataset ? e.target.dataset.champ : null;
   if (!champ) return;
+  // Le carnet (grand-defi 02) : gardé dans Ma visite à chaque frappe, sans nouveau
+  // rendu (le curseur reste où il est) ; il ne part jamais, ni au Worker ni dans les mesures.
+  if (champ === 'carnet') {
+    etat.visite = Visite.ecrireCarnet(etat.visite, e.target.dataset.cle, e.target.value);
+    stockageVisite.sauver(etat.visite);
+    return;
+  }
   etat.ui[champ] = e.target.value;
   clearTimeout(minuteurRecherche);
   minuteurRecherche = setTimeout(() => {
@@ -503,7 +512,7 @@ document.addEventListener('click', (e) => {
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
-    case 'valider-defi': validerDefi(cible.dataset.defi, cle); break;
+    case 'valider-defi': validerDefi(cible.dataset.defi, cle, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     default: break;
   }

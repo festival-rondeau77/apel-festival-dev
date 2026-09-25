@@ -281,8 +281,26 @@ main { min-height: 60vh; }
 .defis-ici .points { font-family: var(--display); font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; }
 .defis-ici .bouton { min-height: 40px; padding: 8px 16px; }
 .defis-ici .etat { font-weight: 650; font-size: 0.9rem; color: var(--encre-2); }
-.defis-ici .etat.valide { color: var(--bleu); }
-.defis-ici .etat.refuse { color: var(--alerte); }
+.defis-ici .etat.valide, .mes-defis .etat.valide { color: var(--bleu); }
+.defis-ici .etat.refuse, .mes-defis .etat.refuse { color: var(--alerte); }
+/* grand-defi 02 : choix d'un geste, raison « pas ici », carnet, Mes défis. */
+.defis-ici .plusieurs { margin: 0 0 10px; color: var(--encre-2); font-size: 0.95rem; }
+.defis-ici .etat.pas-ici { color: var(--encre-2); font-style: italic; }
+.defis-ici .question { flex: 1 1 100%; margin: 0; font-weight: 600; }
+.defis-ici .choix { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.defis-ici .choix .bouton { min-width: 52px; min-height: 44px; padding: 6px 12px; font-size: 1.3rem; }
+.carnet { margin: 18px 0 0; }
+.carnet .titre-section { margin-top: 0; }
+.carnet textarea { width: 100%; box-sizing: border-box; min-height: 5.5em; padding: 10px 12px; border: 1px solid var(--trait); border-radius: 10px; font: inherit; background: var(--carte); color: inherit; resize: vertical; }
+.carnet .note { margin: 6px 0 0; color: var(--encre-2); font-size: 0.88rem; }
+.grand-defi .mes-defis-lien { display: inline-block; margin: 12px 0 0 14px; font-weight: 650; }
+.mes-defis { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.mes-defis li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
+.mes-defis .nom { font-weight: 650; }
+.mes-defis .points { font-family: var(--display); font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; }
+.mes-defis .comment { color: var(--encre-2); font-size: 0.92rem; }
+.mes-defis .etat { font-weight: 650; font-size: 0.9rem; color: var(--encre-2); text-align: right; }
+.mes-defis .etat.attente { color: var(--orange); }
 
 /* Le scanner (grand-defi 10) : l'invitation de l'accueil, le bouton sous la jauge, l'écran caméra. */
 .grand-defi.invitation p { margin: 6px 0 12px; color: var(--encre-2); }

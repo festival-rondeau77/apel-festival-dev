@@ -14,7 +14,12 @@ export function etatInitial() {
   // `bandeauVu` du schéma 1 disait « déjà notifié », ce qui n'a plus cours).
   // `jeu` (schéma 3) est le Passeport du Grand Défi : validations gardées jusqu'à
   // les voir traitées, points confirmés (passeport.js).
-  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauFerme: '', jeu: etatJeuInitial() };
+  // `carnet` (grand-defi 02) : ce que le Visiteur retient d'un stand, une note par
+  // clé d'exposant. Texte libre : il ne quitte jamais le téléphone (ADR-0014), et
+  // il reste quand on rejoue (il n'est pas dans `jeu`). Champ ajouté sans changer
+  // SCHEMA : absent d'une visite plus ancienne, migrer() le lit vide ; un code plus
+  // ancien qui relit une visite neuve l'ignore sans rien perdre d'autre.
+  return { schema: SCHEMA, entrees: [], interets: [], niveau: null, questionsCochees: [], bandeauFerme: '', jeu: etatJeuInitial(), carnet: {} };
 }
 
 // ---------------------------------------------------------------- entrées
@@ -194,6 +199,21 @@ export function rappelsAFaire(etat, modele, minutesMaintenant) {
     .filter((o) => o.debut - minutesMaintenant > 0 && o.debut - minutesMaintenant <= RAPPEL_MINUTES);
 }
 
+// ---------------------------------------------------------------- carnet (grand-defi 02)
+
+export const CARNET_MAX = 2000;
+
+export function ecrireCarnet(etat, cle, texte) {
+  const carnet = { ...etat.carnet };
+  const note = String(texte || '').slice(0, CARNET_MAX);
+  if (note.trim()) carnet[cle] = note; else delete carnet[cle];
+  return { ...etat, carnet };
+}
+
+export function noteDuCarnet(etat, cle) {
+  return (etat.carnet && etat.carnet[cle]) || '';
+}
+
 // ---------------------------------------------------------------- persistance
 
 export function serialiser(etat) {
@@ -225,6 +245,8 @@ function migrer(brut) {
   etat.questionsCochees = Array.isArray(brut.questionsCochees) ? brut.questionsCochees.filter((s) => typeof s === 'string') : [];
   etat.bandeauFerme = typeof brut.bandeauFerme === 'string' ? brut.bandeauFerme : '';
   etat.jeu = migrerJeu(brut.jeu);
+  const carnet = brut.carnet && typeof brut.carnet === 'object' && !Array.isArray(brut.carnet) ? brut.carnet : {};
+  etat.carnet = Object.fromEntries(Object.entries(carnet).filter(([, v]) => typeof v === 'string' && v.trim()).map(([k, v]) => [k, v.slice(0, CARNET_MAX)]));
   return etat;
 }
 

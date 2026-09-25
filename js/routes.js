@@ -6,7 +6,7 @@ import { exposantDeCarte, etiquetteCanonique } from './donnees.js';
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
   ['plan', 'plan'], ['visite', 'visite'], ['preparer', 'preparer'], ['questions', 'questions'], ['aide', 'aide'],
-  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['carte', 'carte'], ['c', 'cartePublique'],
+  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['carte', 'carte'], ['c', 'cartePublique'],
 ];
 
 // Les routes qui ouvrent la fiche d'un Exposant (voir ficheOuverte).

@@ -99,6 +99,8 @@ export default [
   'Version de recette : le programme et les salles sont en partie fictifs.',
   // Grand Défi
   'Mon grand défi', '+%s points en attente', 'Grand Défi', 'Défi %s', 'Valider', 'Validé', 'En attente', 'Refusé',
+  // Grand Défi : tous les défis par scan (grand-defi 02)
+  "Mes défis", "À faire", "Déjà utilisé pour le défi %s", "Domaine déjà croisé", "Scannez d’abord un autre stand", "Pas pour ce stand", "QR d’une école", "QR d’un pro", "QR d’une entreprise", "QR d’un ancien élève", "QR du stand %s", "QR d’un stand d’un domaine encore jamais scanné", "pas le même que pour le défi %s", "Un même scan valide plusieurs défis ici.", "Votre choix : %s", "Mon carnet", "Ce que je retiens de ce stand…", "Reste sur ce téléphone : rien n’est envoyé.", "Le Grand Défi n’est pas ouvert.",
   // Grand Défi : scanner depuis l'appli (grand-defi 10)
   'Scanner un QR', 'Scannez les QR des stands pour gagner des points.', 'Visez le QR code du stand.', 'Déjà gagné chez %s', 'Déjà gagné', 'Ouverture de la caméra…', 'Caméra refusée : autorisez-la dans les réglages du navigateur.', 'Pas de caméra disponible sur cet appareil.', 'Ce QR code n’est pas celui d’un stand du festival.',
 ];

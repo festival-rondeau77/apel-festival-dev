@@ -5,10 +5,11 @@
 // `etat.langue` à l'entrée de chaque fonction publique, pour que le rendu reste
 // une fonction de l'état et rien d'autre.
 import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone } from './donnees.js';
-import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe } from './visite.js';
+import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, rejouerOuvert } from './passeport.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert } from './passeport.js';
+import { standCorrespond } from './defis.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
@@ -275,7 +276,7 @@ export function ecranAccueil(etat) {
 // il vient seul, avec une phrase ; jeu coupé, rien.
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>${rejouerOuvert(etat.modele.infos)
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a>${rejouerOuvert(etat.modele.infos)
     ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
   if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
@@ -329,7 +330,7 @@ export function ecranScanner(etat) {
 }
 
 const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));
-const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé' };
+const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé', 'a-faire': 'À faire' };
 // « Validé » ici ; gagné sur un autre stand, on dit lequel : sur la fiche d'une
 // 2e école, « Validé » laissait croire qu'on venait de le valider là.
 function etatDuDefi(etat, ex, statut, chez) {
@@ -338,22 +339,86 @@ function etatDuDefi(etat, ex, statut, chez) {
   return autre ? t('Déjà gagné chez %s', autre.nom) : t('Déjà gagné');
 }
 
+// Pourquoi un défi à faire n'est pas pour ce stand (le motif de defis.js, estimé
+// par le téléphone), dit au Visiteur.
+function raisonAffichee(raison) {
+  const lie = /^même exposant que le défi (.+)$/.exec(raison);
+  if (lie) return t('Déjà utilisé pour le défi %s', lie[1]);
+  if (raison === 'aucun scan avant') return t('Scannez d’abord un autre stand');
+  return raison === 'domaine déjà croisé' ? t('Domaine déjà croisé') : t('Pas pour ce stand');
+}
+
+const domainesDans = (modele) => (cle) => { const e = modele.exposants.find((x) => x.cle === cle); return e ? e.domaines : []; };
+
+// Comment se prouve un défi, écrit d'après ses réglages (ADR-0015 : la règle
+// affichée ne peut pas mentir).
+const QR_DU_TYPE = { ecole: 'QR d’une école', pro: 'QR d’un pro', entreprise: 'QR d’une entreprise', 'ancien-eleve': 'QR d’un ancien élève' };
+function commentProuver(etat, d) {
+  let texte = '';
+  if (d.type_preuve === 'scan-exposant') texte = t(QR_DU_TYPE[d.params.type_exposant] || 'Scanner un QR');
+  else if (d.type_preuve === 'scan-stand') {
+    const e = etat.modele.exposants.find((x) => standCorrespond(d.params.stand, x.cle));
+    texte = t('QR du stand %s', e ? e.nom : d.params.nom_stand);
+  } else if (d.type_preuve === 'hors-domaines') texte = t('QR d’un stand d’un domaine encore jamais scanné');
+  return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
+}
+
 // Sur la fiche ouverte par le QR d'une Carte du jeu (son jeton), ou d'un ancien
 // chevalet (`?s=`) : les défis que cet Exposant peut prouver. Un lien public
-// (`#/c/<étiquette>`, `?qr=1`) n'en propose aucun.
+// (`#/c/<étiquette>`, `?qr=1`) n'en propose aucun. Un défi à choix se valide en
+// touchant un choix : il part par son numéro, jamais comme un texte.
 function defisDeLaFiche(etat, ex, secret) {
   if (!secret) return '';
-  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle);
+  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele) });
   if (!ici.length) return '';
+  const action = (defi, choix = null) => `data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}"${choix === null ? '' : ` data-choix="${choix}"`}`;
   return `<section class="defis-ici" aria-labelledby="defis-ici-titre">
     <h2 class="titre-section" id="defis-ici-titre">${h(t('Grand Défi'))}</h2>
-    <ul>${ici.map(({ defi, statut, validable, chez }) => `<li>
+    ${ici.length > 1 ? `<p class="plusieurs">${h(t('Un même scan valide plusieurs défis ici.'))}</p>` : ''}
+    <ul>${ici.map(({ defi, statut, validable, raison, chez }) => {
+      const choix = defi.choix || [];
+      return `<li>
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
-      ${validable
-        ? `<button class="bouton" type="button" data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}">${h(t('Valider'))}</button>`
-        : `<span class="etat ${attr(statut)}">${h(etatDuDefi(etat, ex, statut, chez))}</span>`}
-    </li>`).join('')}</ul>
+      ${!validable
+        ? `<span class="etat ${attr(raison ? 'pas-ici' : statut)}">${h(raison ? raisonAffichee(raison) : etatDuDefi(etat, ex, statut, chez))}</span>`
+        : choix.length
+          ? `${defi.question ? `<p class="question">${h(tt(defi.question))}</p>` : ''}<div class="choix" role="group" aria-label="${attr(defi.question ? tt(defi.question) : nomDefi(defi))}">${choix.map((c, i) => `<button class="bouton secondaire" type="button" ${action(defi, i)} aria-label="${attr(t('Votre choix : %s', c))}">${h(c)}</button>`).join('')}</div>`
+          : `<button class="bouton" type="button" ${action(defi)}>${h(t('Valider'))}</button>`}
+    </li>`;
+    }).join('')}</ul>
   </section>`;
+}
+
+// Le carnet : ce que le Visiteur retient d'un stand. Sur la fiche ouverte par QR
+// quand le jeu est ouvert, ou dès qu'une note existe. Il ne part jamais (ADR-0014).
+function carnetDeLaFiche(etat, ex, secret) {
+  if (!etat.grandDefi || !etat.grandDefi.actif) return '';
+  const note = noteDuCarnet(etat.visite, ex.cle);
+  if (!secret && !note) return '';
+  return `<section class="carnet" aria-labelledby="carnet-titre">
+    <h2 class="titre-section" id="carnet-titre"><label for="carnet-texte">${h(t('Mon carnet'))}</label></h2>
+    <textarea id="carnet-texte" data-champ="carnet" data-cle="${attr(ex.cle)}" rows="3" maxlength="2000" placeholder="${attr(t('Ce que je retiens de ce stand…'))}">${h(note)}</textarea>
+    <p class="note">${h(t('Reste sur ce téléphone : rien n’est envoyé.'))}</p>
+  </section>`;
+}
+
+// « Mes défis » : chaque défi actif, comment il se prouve, son état.
+function ecranMesDefis(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  const jeu = (etat.visite && etat.visite.jeu) || { validations: [], passeport: null };
+  const liste = mesDefis(etat.grandDefi, jeu);
+  if (!liste.length) return `${entete(t('Mes défis'), '', retour)}
+    <p class="vide">${h(t('Le Grand Défi n’est pas ouvert.'))}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  const j = jauge(etat.grandDefi, jeu);
+  const points = j ? j.points : 0;
+  return `${entete(t('Mes défis'), h(`${points} / ${etat.grandDefi.objectif}`), retour)}
+    <ul class="mes-defis">${liste.map(({ defi, statut }) => `<li>
+      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
+      <span class="comment">${h(commentProuver(etat, defi))}</span>
+      <span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>
+    </li>`).join('')}</ul>
+    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a></div>`;
 }
 
 // L'Événement à mettre en avant : le jour J, celui en cours ou le prochain ; sinon le premier.
@@ -552,6 +617,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
     ${defisDeLaFiche(etat, ex, secret)}
+    ${carnetDeLaFiche(etat, ex, secret)}
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       ${ex.type === 'Pro' && ex.organisation ? `<dt>${h(t('Entreprise'))}</dt><dd>${h(ex.organisation)}</dd>` : ''}
@@ -975,6 +1041,7 @@ export function ecran(etat) {
     case 'aide': return ecranAide(etat);
     case 'scanner': return ecranScanner(etat);
     case 'rejouer': return ecranRejouer(etat);
+    case 'defis': return ecranMesDefis(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -982,7 +1049,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis') }[etat.route.nom];
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   const fiche = ficheOuverte(etat.route, etat.modele);
   if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;

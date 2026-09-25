@@ -3,9 +3,9 @@
 // Worker CONFIRME : une validation reste « en attente » jusqu'à ce que la réponse
 // du Worker la montre traitée, et la file la renvoie jusque-là.
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
-//   { validations: [{ id, defi, exposant, t, preuve, statut }], passeport: { points, defis } | null }
+//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut }], passeport: { points, defis } | null }
 // statut : attente | ok | deja | refus.
-import { proposable, OBJECTIF_PAR_DEFAUT } from './defis.js';
+import { proposable, motifIci, OBJECTIF_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus'];
 const texte = (v) => typeof v === 'string';
@@ -14,13 +14,19 @@ export function etatJeuInitial() {
   return { validations: [], passeport: null };
 }
 
+// La preuve qui part au Worker : le secret du QR, et le numéro d'un choix. Rien
+// d'autre, même relu d'un stockage abîmé : le Worker refuserait la salve (400).
+function preuve(secret, choix) {
+  return { ...(texte(secret) && secret ? { secret } : {}), ...(Number.isInteger(choix) && choix >= 0 ? { choix } : {}) };
+}
+
 // Lecture tolérante de ce qui dort dans le téléphone : on garde ce qui se lit.
 export function migrerJeu(brut) {
   const e = etatJeuInitial();
   if (!brut || typeof brut !== 'object') return e;
   e.validations = (Array.isArray(brut.validations) ? brut.validations : [])
     .filter((v) => v && texte(v.id) && texte(v.defi) && v.preuve && typeof v.preuve === 'object')
-    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: { ...v.preuve }, statut: STATUTS.includes(v.statut) ? v.statut : 'attente' }));
+    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente' }));
   const p = brut.passeport;
   if (p && typeof p === 'object') e.passeport = { points: Number(p.points) || 0, defis: (Array.isArray(p.defis) ? p.defis : []).filter(texte) };
   return e;
@@ -29,7 +35,8 @@ export function migrerJeu(brut) {
 // Le jeu public reçu du Worker (ou du cache local), vérifié avant d'être cru.
 export function lireJeuPublic(rep) {
   if (!rep || typeof rep !== 'object' || !Array.isArray(rep.defis)) return null;
-  const defis = rep.defis.filter((d) => d && texte(d.id) && texte(d.titre) && Number.isFinite(d.points) && texte(d.type_preuve) && d.params && typeof d.params === 'object');
+  const defis = rep.defis.filter((d) => d && texte(d.id) && texte(d.titre) && Number.isFinite(d.points) && texte(d.type_preuve) && d.params && typeof d.params === 'object')
+    .map((d) => ({ ...d, question: texte(d.question) ? d.question : '', choix: Array.isArray(d.choix) && d.choix.every(texte) ? d.choix : [] }));
   return { actif: rep.actif === true, objectif: Number(rep.objectif) > 0 ? Number(rep.objectif) : OBJECTIF_PAR_DEFAUT, defis };
 }
 
@@ -41,8 +48,8 @@ export function urlJeu(hote, configure) {
   return local ? './jeu' : (configure || '');
 }
 
-export function nouvelleValidation({ id, defi, exposant, secret, t }) {
-  return { id, defi, exposant, t, preuve: { secret }, statut: 'attente' };
+export function nouvelleValidation({ id, defi, exposant, secret, choix, t }) {
+  return { id, defi, exposant, t, preuve: preuve(secret, choix), statut: 'attente' };
 }
 
 export function ajouterValidation(etat, v) {
@@ -79,18 +86,30 @@ export function statutDefi(etat, defi) {
   return 'a-faire';
 }
 
-// Sur une fiche ouverte par le QR d'un chevalet : les défis que cet Exposant peut
+// Sur une fiche ouverte par le QR d'une Carte : les défis que cet Exposant peut
 // prouver. Un défi refusé sur ce stand-ci n'y est pas reproposé (le Worker
 // refuserait encore) ; un autre stand peut le valider. `chez` : l'Exposant où un
 // défi validé a été gagné (la fiche d'une 2e école le dit, au lieu de « Validé »).
-export function defisIci(jeu, etat, exposant) {
+// `raison` : pourquoi un défi à faire ne vaut pas ici, estimé avec les règles du
+// Worker (defis.js) sur les scans de ce téléphone, validés ou en attente — l'école
+// du défi 1 pour le défi 2, un domaine déjà croisé pour le défi 9.
+export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
   if (!jeu || !jeu.actif) return [];
+  const scans = etat.validations.filter((v) => (v.statut === 'ok' || v.statut === 'attente') && v.exposant).map((v) => ({ defi: v.defi, exposant: v.exposant }));
   return jeu.defis.filter((d) => proposable(d, exposant)).map((defi) => {
     const statut = statutDefi(etat, defi.id);
     const refuseIci = etat.validations.some((v) => v.defi === defi.id && v.exposant === exposant && v.statut === 'refus');
     const gagnee = etat.validations.find((v) => v.defi === defi.id && v.statut === 'ok');
-    return { defi, statut, validable: statut === 'a-faire' || (statut === 'refuse' && !refuseIci), chez: gagnee ? gagnee.exposant || null : null };
+    const libre = statut === 'a-faire' || (statut === 'refuse' && !refuseIci);
+    const raison = libre ? motifIci(defi, { jeu, exposant, scans, domainesDe }) : '';
+    return { defi, statut, validable: libre && !raison, raison, chez: gagnee ? gagnee.exposant || null : null };
   });
+}
+
+// L'écran « Mes défis » : chaque défi actif, dans l'ordre du tableur, et son état.
+export function mesDefis(jeu, etat) {
+  if (!jeu || !jeu.actif) return [];
+  return jeu.defis.map((defi) => ({ defi, statut: statutDefi(etat, defi.id) }));
 }
 
 // La jauge de l'accueil, ou null : pas de jeu, ou pas encore joué (un Visiteur
