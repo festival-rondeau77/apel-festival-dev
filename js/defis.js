@@ -7,7 +7,8 @@ import { tablesEnObjets, normaliser, slugType, typeExposantCanonique, TYPES_EXPO
 
 export const OBJECTIF_PAR_DEFAUT = 100;
 export const CHANCES_BADGE_PAR_DEFAUT = 1;
-const ID = /^[a-z0-9-]{1,20}$/i;
+export const ESSAIS_PAR_DEFAUT = 2;
+export const ID_DEFI = /^[a-z0-9-]{1,20}$/i;
 const OUI = ['oui', 'vrai', 'true', 'x', '1'];
 const NON = ['non', 'faux', 'false', '0'];
 
@@ -67,7 +68,39 @@ export const TYPES_PREUVE = {
       return siens.some((d) => croises.has(d)) ? 'domaine déjà croisé' : '';
     },
   },
+  // Une question à choix, souvent derrière un QR spécial (défi 7, Parcoursup). La
+  // question et les choix sont publics (colonnes `question`, `choix`) ; la bonne
+  // réponse et le jeton du QR vivent dans D1 (`bin/jeu.sh reponse`), jamais dans le
+  // tableur (ADR-0016). `essais` (2 par défaut) : les mauvaises réponses permises ;
+  // `qr_requis` (oui par défaut) : sans le jeton du QR, la réponse ne vaut rien.
+  // Aucune fiche d'exposant ne la propose : elle a son propre écran (`#/question`).
+  reponse: {
+    lireParams(l) {
+      if (!texte(l.question)) return { motif: 'question vide' };
+      if (!texte(l.choix)) return { motif: 'choix vides : la bonne réponse doit en être un' };
+      const brut = texte(l.essais);
+      const essais = brut ? Number(brut) : ESSAIS_PAR_DEFAUT;
+      if (!Number.isInteger(essais) || essais < 1 || essais > 5) return { motif: `essais illisibles : « ${brut} » (de 1 à 5)` };
+      return { params: { essais, qr: !non(l.qr_requis) } };
+    },
+    concerne: () => false,
+    motif: () => '',
+    // Pourquoi cette réponse ne vaut pas ('' si elle vaut). `reponse` : la ligne D1
+    // du défi ; `ratees` : les mauvaises réponses déjà reçues de ce Passeport. Ni le
+    // mauvais QR ni une réponse absente ne coûtent d'essai.
+    verifier(defi, preuve, { reponse, ratees }) {
+      if (!reponse) return 'bonne réponse non saisie';
+      if (defi.params.qr && preuve.secret !== reponse.jeton) return 'pas le QR de la question';
+      if (ratees >= defi.params.essais) return 'essais épuisés';
+      if (!Number.isInteger(preuve.choix) || !defi.choix[preuve.choix]) return 'réponse attendue';
+      return normaliser(defi.choix[preuve.choix]) === normaliser(reponse.bonne) ? '' : MAUVAISE_REPONSE;
+    },
+  },
 };
+
+// Le motif qui compte un essai de question : le Worker compte ses refus ainsi motivés,
+// dans D1. Ne pas le reformuler pendant le jeu : les essais déjà joués seraient oubliés.
+export const MAUVAISE_REPONSE = 'mauvaise réponse';
 
 // Un stand désigné par sa clé complète, ou par le seul nom (quel que soit le type).
 export function standCorrespond(stand, exposant) {
@@ -85,14 +118,23 @@ function motifDifferentDe(defi, { jeu, exposant, scans }) {
 
 // Les réglages publics communs à tous les Types : `different_de`, une `question` et
 // ses `choix` (des émojis ou des mots courts, séparés par des points-virgules, ou
-// par des espaces s'il n'y en a pas). Le choix part au Worker par son numéro,
+// par des espaces s'il n'y en a pas ; les mots se traduisent un par un), et une
+// `explication` montrée après le verdict d'une question (grand-defi 04). Le choix part au Worker par son numéro,
 // jamais comme un texte (ADR-0014).
 const CHOIX_MAX = 6;
-const LONGUEUR_CHOIX_MAX = 16;
+export const LONGUEUR_CHOIX_MAX = 16;
+// Découper la cellule `choix` : points-virgules s'il y en a, espaces sinon. Partagé
+// avec le contrôle des traductions (bin/lib/publication.mjs) ; le traducteur Apps
+// Script (script/Code.js, decouperChoix) fait de même.
+export function decouperChoix(valeur) {
+  const brut = texte(valeur);
+  return brut ? brut.split(brut.includes(';') ? ';' : /\s+/).map((c) => c.trim()).filter(Boolean) : [];
+}
+
 function lireChoix(valeur) {
   const brut = texte(valeur);
   if (!brut) return { choix: [] };
-  const choix = brut.split(brut.includes(';') ? ';' : /\s+/).map((c) => c.trim()).filter(Boolean);
+  const choix = decouperChoix(brut);
   if (choix.length < 2 || choix.length > CHOIX_MAX) return { motif: `choix : de 2 à ${CHOIX_MAX}, et non ${choix.length}` };
   if (choix.some((c) => c.length > LONGUEUR_CHOIX_MAX)) return { motif: `choix trop longs (${LONGUEUR_CHOIX_MAX} caractères au plus)` };
   return { choix };
@@ -141,7 +183,7 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
     const id = texte(l.id);
     if (!id) continue;
     const ecarter = (motif) => jeu.invalides.push({ id, motif });
-    if (!ID.test(id)) { ecarter('identifiant illisible (lettres, chiffres, tirets)'); continue; }
+    if (!ID_DEFI.test(id)) { ecarter('identifiant illisible (lettres, chiffres, tirets)'); continue; }
     if (vus.has(id)) { ecarter('identifiant en double'); continue; }
     vus.add(id);
     const points = texte(l.points) === '' ? NaN : Number(l.points);
@@ -157,7 +199,7 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
     }
     const { choix, motif: motifChoix } = lireChoix(l.choix);
     if (motifChoix) { ecarter(motifChoix); continue; }
-    jeu.defis.push({ id, titre: texte(l.titre), points, type_preuve: normaliser(l.type_preuve), actif: !non(l.actif), params, question: texte(l.question), choix });
+    jeu.defis.push({ id, titre: texte(l.titre), points, type_preuve: normaliser(l.type_preuve), actif: !non(l.actif), params, question: texte(l.question), choix, explication: texte(l.explication) });
   }
   // Ce qui se vérifie seulement une fois toutes les lignes lues : le défi désigné
   // par `different_de` existe ; le stand désigné est au programme (quand il est fourni).
@@ -170,6 +212,24 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
     return !motif;
   });
   return jeu;
+}
+
+// Les bonnes réponses (D1 : défi → { bonne, jeton }) confrontées aux questions du
+// tableur : une question sans bonne réponse saisie, ou dont la bonne réponse n'est
+// plus parmi ses choix (choix réécrits), est écartée et signalée, jamais proposée.
+// La comparaison ignore casse, accents et espaces. Rend { jeu, reponses }.
+export function avecReponses(jeu, reponses = new Map()) {
+  const invalides = [];
+  const defis = jeu.defis.filter((d) => {
+    if (d.type_preuve !== 'reponse') return true;
+    const r = reponses.get(d.id);
+    if (!r) invalides.push({ id: d.id, motif: 'bonne réponse non saisie (Gestion, Défis, colonne bonne_reponse, puis Push)' });
+    // Sans citer la réponse : `invalides` est public (GET ?action=jeu).
+    else if (!d.choix.some((c) => normaliser(c) === normaliser(r.bonne))) invalides.push({ id: d.id, motif: 'bonne réponse absente des choix (Gestion, colonne bonne_reponse, puis Push)' });
+    else return true;
+    return false;
+  });
+  return { jeu: { ...jeu, defis, invalides: [...jeu.invalides, ...invalides] }, reponses };
 }
 
 // Ce que le téléphone reçoit : les défis actifs et leurs réglages publics. Sans
@@ -199,11 +259,18 @@ export function motifIci(defi, contexte) {
 // `faits`, les défis qu'il a déjà validés (déduits des scans par défaut).
 // `choix` : le numéro du choix envoyé, gardé seulement s'il est dans la liste du
 // défi (une liste raccourcie le jour J ne coûte pas le point).
-export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null }) {
+export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map() }) {
   const refus = (motif) => ({ statut: 'refus', motif, choix: null });
   if (!jeu.actif) return refus('jeu coupé');
   const defi = jeu.defis.find((d) => d.id === v.defi && d.actif);
   if (!defi) return refus('défi inconnu ou inactif');
+  // Un Type qui se prouve sans Exposant (la question) vérifie sa preuve lui-même.
+  const { verifier } = TYPES_PREUVE[defi.type_preuve];
+  if (verifier) {
+    if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
+    const motif = verifier(defi, v.preuve || {}, { reponse: reponses.get(defi.id) || null, ratees: ratees.get(defi.id) || 0 });
+    return motif ? refus(motif) : { statut: 'ok', motif: '', choix: null, libelle: '' };
+  }
   if (!v.preuve || !v.preuve.secret) return refus('preuve attendue');
   if (!exposant) return refus('secret inconnu');
   if (!proposable(defi, exposant)) return refus(defi.type_preuve === 'scan-stand' ? 'pas le stand du défi' : 'exposant d’un autre type');

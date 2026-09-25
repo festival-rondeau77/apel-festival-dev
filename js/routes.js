@@ -1,12 +1,12 @@
 // Navigation par fragment d'URL : « #/programme », « #/evenement/<clé> »,
 // « #/exposant/<clé>?qr=1 », « #/carte/<étiquette>/<jeton> », « #/c/<étiquette> »,
-// « #/plan?salle=Salle 12 ». Pure.
+// « #/question/<défi>/<jeton> », « #/plan?salle=Salle 12 ». Pure.
 import { exposantDeCarte, etiquetteCanonique } from './donnees.js';
 
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
   ['plan', 'plan'], ['visite', 'visite'], ['preparer', 'preparer'], ['questions', 'questions'], ['aide', 'aide'],
-  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'],
+  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'], ['question', 'question'],
 ];
 
 // Les routes qui ouvrent la fiche d'un Exposant (voir ficheOuverte).
@@ -27,7 +27,8 @@ export function analyserRoute(hash) {
   const nom = (ROUTES.find(([seg]) => seg === (segments[0] || '')) || [null, 'inconnue'])[1];
   if ((nom === 'evenement' || nom === 'exposant') && segments[1]) params.cle = segments[1];
   if ((nom === 'carte' || nom === 'cartePublique') && segments[1]) params.etiquette = segments[1];
-  if (nom === 'carte' && segments[2]) params.jeton = segments[2];
+  if ((nom === 'carte' || nom === 'question') && segments[2]) params.jeton = segments[2];
+  if (nom === 'question' && segments[1]) params.defi = segments[1];
   return { nom, params, chemin: segments.join('/') };
 }
 
@@ -46,6 +47,13 @@ export function urlExposant(base, cle, { qr = false, secret = '' } = {}) {
 // l'étiquette du lien ne fait gagner aucun point.
 export function urlCarte(base, etiquette, jeton) {
   return `${String(base || '').replace(/\/+$/, '')}/#/carte/${encodeURIComponent(etiquette)}/${encodeURIComponent(jeton)}`;
+}
+
+// Le QR spécial d'une question (grand-defi 04, défi 7 à la sortie) : le jeton, gardé
+// dans D1 avec la bonne réponse, prouve qu'on est passé devant. Sans jeton (question
+// à `qr_requis` = non), le même écran, ouvert depuis Mes défis.
+export function urlQuestion(base, defi, jeton = '') {
+  return `${String(base || '').replace(/\/+$/, '')}/#/question/${encodeURIComponent(defi)}${jeton ? `/${encodeURIComponent(jeton)}` : ''}`;
 }
 
 // Le lien public d'une Carte : la fiche de l'Exposant auquel elle est attribuée,

@@ -340,6 +340,19 @@ function validerDefi(defi, cle, choix) {
   envoiJeu.envoyer();
 }
 
+// Une réponse à une question (grand-defi 04) : le numéro du choix touché part avec le
+// jeton du QR spécial, lu dans la route (#/question/<défi>/<jeton>) et jamais
+// ailleurs. Une seule réponse à la fois : la suivante attend le verdict du Worker.
+function repondre(defi, choix) {
+  const { nom, params } = etat.route;
+  const q = nom === 'question' && params.defi === defi ? Passeport.questionIci(etat.grandDefi, etat.visite.jeu, defi, { jeton: params.jeton }) : null;
+  const n = Number(choix);
+  if (!q || !q.peutRepondre || !Number.isInteger(n)) return;
+  const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: '', secret: params.jeton || '', choix: n, t: Date.now() });
+  modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, v) });
+  envoiJeu.envoyer();
+}
+
 // Rejouer depuis le début (essai, grand-defi 11) : ce téléphone oublie son Passeport
 // et ses validations, puis l'appli redémarre et en tire un nouveau (ID_PASSEPORT est
 // fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
@@ -533,6 +546,7 @@ document.addEventListener('click', (e) => {
     case 'langue': changerLangue(valeur); break;
     case 'theme': changerTheme(); break;
     case 'valider-defi': validerDefi(cible.dataset.defi, cle, cible.dataset.choix); break;
+    case 'repondre': repondre(cible.dataset.defi, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     default: break;
   }

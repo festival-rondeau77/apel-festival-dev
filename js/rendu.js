@@ -8,7 +8,7 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, mesDefis, rejouerOuvert } from './passeport.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci } from './passeport.js';
 import { standCorrespond, paliersDe, chancesBadgeDe } from './defis.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
@@ -418,6 +418,7 @@ function commentProuver(etat, d) {
     const e = etat.modele.exposants.find((x) => standCorrespond(d.params.stand, x.cle));
     texte = t('QR du stand %s', e ? e.nom : d.params.nom_stand);
   } else if (d.type_preuve === 'hors-domaines') texte = t('QR d’un stand d’un domaine encore jamais scanné');
+  else if (d.type_preuve === 'reponse') texte = `${t(d.params.qr ? 'QR de la question, puis la bonne réponse' : 'Une question, et la bonne réponse')} · ${tn('%s essai', '%s essais', d.params.essais)}`;
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
 
@@ -440,7 +441,7 @@ function defisDeLaFiche(etat, ex, secret) {
       ${!validable
         ? `<span class="etat ${attr(raison ? 'pas-ici' : statut)}">${h(raison ? raisonAffichee(raison) : etatDuDefi(etat, ex, statut, chez))}</span>`
         : choix.length
-          ? `${defi.question ? `<p class="question">${h(tt(defi.question))}</p>` : ''}<div class="choix" role="group" aria-label="${attr(defi.question ? tt(defi.question) : nomDefi(defi))}">${choix.map((c, i) => `<button class="bouton secondaire" type="button" ${action(defi, i)} aria-label="${attr(t('Votre choix : %s', c))}">${h(c)}</button>`).join('')}</div>`
+          ? `${defi.question ? `<p class="question">${h(tt(defi.question))}</p>` : ''}<div class="choix" role="group" aria-label="${attr(defi.question ? tt(defi.question) : nomDefi(defi))}">${choix.map((c, i) => `<button class="bouton secondaire" type="button" ${action(defi, i)} aria-label="${attr(t('Votre choix : %s', tt(c)))}">${h(tt(c))}</button>`).join('')}</div>`
           : `<button class="bouton" type="button" ${action(defi)}>${h(t('Valider'))}</button>`}
     </li>`;
     }).join('')}</ul>
@@ -473,10 +474,48 @@ function ecranMesDefis(etat) {
   return `${entete(t('Mes défis'), h(sous), retour)}
     <ul class="mes-defis">${liste.map(({ defi, statut }) => `<li>
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
-      <span class="comment">${h(commentProuver(etat, defi))}</span>
+      <span class="comment">${h(commentProuver(etat, defi))}${defi.type_preuve === 'reponse' && !defi.params.qr && statut === 'a-faire'
+        ? ` <a href="#/question/${attr(encodeURIComponent(defi.id))}">${h(t('Répondre'))}</a>` : ''}</span>
       <span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>
     </li>`).join('')}</ul>
     <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a></div>`;
+}
+
+// Une question (grand-defi 04, le défi 7 à la sortie), ouverte par son QR spécial
+// (`#/question/<défi>/<jeton>`) : la question, ses choix, « essai 1 sur 2 ». Un choix
+// touché part par son numéro avec le jeton ; le verdict vient du Worker, qui seul
+// connaît la bonne réponse. Sans le jeton, pas de choix, sauf si le défi ne demande
+// pas de QR (`qr_requis` = non : on y vient depuis Mes défis).
+function ecranQuestion(etat) {
+  const retour = { href: '#/defis', libelle: t('Mes défis') };
+  const jeu = etat.grandDefi;
+  const pasOuvert = (message) => `${entete(t('Grand Défi'), '', retour)}
+    <p class="vide">${h(message)}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  if (!jeu || !jeu.actif) return pasOuvert(t('Le Grand Défi n’est pas ouvert.'));
+  const { defi: id, jeton } = etat.route.params;
+  const q = questionIci(jeu, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, id, { jeton });
+  if (!q) return pasOuvert(t('Ce défi n’est pas une question.'));
+  const { defi, statut, essai, essais, peutRepondre } = q;
+  let corps = '';
+  if (statut === 'valide') corps = `<p class="verdict ok">${h(t('Bonne réponse !'))} +${h(defi.points)}</p>`;
+  else if (statut === 'ferme') corps = `<p class="verdict ferme">${h(tn('Défi fermé : %s essai utilisé.', 'Défi fermé : %s essais utilisés.', essais))}</p>`;
+  else if (statut === 'attente') corps = `<p class="verdict attente">${h(t('Réponse envoyée : le verdict arrive.'))}</p>`;
+  else if (!peutRepondre) corps = `<p class="verdict">${h(t('Scannez le QR de ce défi pour répondre.'))}</p>`;
+  else {
+    corps = `${essai > 1 ? `<p class="verdict rate">${h(t('Pas la bonne réponse.'))}</p>` : ''}
+    <p class="essai">${h(t('Essai %s sur %s', essai, essais))}</p>
+    <div class="choix" role="group" aria-label="${attr(tt(defi.question))}">${defi.choix.map((c, i) => `<button class="bouton secondaire" type="button" data-action="repondre" data-defi="${attr(defi.id)}" data-choix="${i}">${h(tt(c))}</button>`).join('')}</div>`;
+  }
+  // L'explication, une fois le verdict tombé (validé ou fermé) : on apprend quelque
+  // chose même en ayant perdu, et jamais avant d'avoir joué ses essais.
+  const explication = defi.explication && (statut === 'valide' || statut === 'ferme') ? `<p class="explication">${h(tt(defi.explication))}</p>` : '';
+  return `${entete(nomDefi(defi), `+${h(defi.points)}`, retour)}
+    <section class="question-defi">
+      <p class="question">${h(tt(defi.question))}</p>
+      ${corps}${explication}
+    </section>
+    <div class="boutons"><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a></div>`;
 }
 
 // L'Événement à mettre en avant : le jour J, celui en cours ou le prochain ; sinon le premier.
@@ -1101,6 +1140,7 @@ export function ecran(etat) {
     case 'rejouer': return ecranRejouer(etat);
     case 'defis': return ecranMesDefis(etat);
     case 'regle': return ecranRegle(etat);
+    case 'question': return ecranQuestion(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1109,6 +1149,10 @@ export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
   const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu') }[etat.route.nom];
+  if (etat.route.nom === 'question') {
+    const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
+    return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;
+  }
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   const fiche = ficheOuverte(etat.route, etat.modele);
   if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;

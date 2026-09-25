@@ -3,7 +3,8 @@
 // Worker CONFIRME : une validation reste « en attente » jusqu'à ce que la réponse
 // du Worker la montre traitée, et la file la renvoie jusque-là.
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
-//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut }], passeport: { points, defis } | null }
+//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai? }], passeport: { points, defis } | null }
+// `essai` : une mauvaise réponse à une question, dite par le Worker (grand-defi 04).
 // statut : attente | ok | deja | refus.
 import { proposable, motifIci, chancesDe, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
@@ -26,7 +27,7 @@ export function migrerJeu(brut) {
   if (!brut || typeof brut !== 'object') return e;
   e.validations = (Array.isArray(brut.validations) ? brut.validations : [])
     .filter((v) => v && texte(v.id) && texte(v.defi) && v.preuve && typeof v.preuve === 'object')
-    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente' }));
+    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente', ...(v.essai === true ? { essai: true } : {}) }));
   const p = brut.passeport;
   if (p && typeof p === 'object') e.passeport = { points: Number(p.points) || 0, defis: (Array.isArray(p.defis) ? p.defis : []).filter(texte) };
   return e;
@@ -36,7 +37,7 @@ export function migrerJeu(brut) {
 export function lireJeuPublic(rep) {
   if (!rep || typeof rep !== 'object' || !Array.isArray(rep.defis)) return null;
   const defis = rep.defis.filter((d) => d && texte(d.id) && texte(d.titre) && Number.isFinite(d.points) && texte(d.type_preuve) && d.params && typeof d.params === 'object')
-    .map((d) => ({ ...d, question: texte(d.question) ? d.question : '', choix: Array.isArray(d.choix) && d.choix.every(texte) ? d.choix : [] }));
+    .map((d) => ({ ...d, question: texte(d.question) ? d.question : '', choix: Array.isArray(d.choix) && d.choix.every(texte) ? d.choix : [], explication: texte(d.explication) ? d.explication : '' }));
   const objectif = Number(rep.objectif) > 0 ? Number(rep.objectif) : OBJECTIF_PAR_DEFAUT;
   // Un Worker d'avant les Paliers (grand-defi 03), ou des Paliers abîmés : l'objectif seul.
   const paliersLisibles = Array.isArray(rep.paliers) && rep.paliers.length && rep.paliers.every((p, i) => Number.isInteger(p) && p > 0 && (i === 0 || p > rep.paliers[i - 1]));
@@ -68,9 +69,9 @@ export function enAttente(etat) {
 // leur statut, les autres restent en attente ; les points sont les siens.
 export function appliquerReponse(etat, passeport) {
   if (!passeport || !Array.isArray(passeport.traitees)) return etat;
-  const traitees = new Map(passeport.traitees.filter((x) => Array.isArray(x) && STATUTS.includes(x[1])));
+  const traitees = new Map(passeport.traitees.filter((x) => Array.isArray(x) && STATUTS.includes(x[1])).map(([id, statut, marque]) => [id, { statut, ...(marque === 'essai' ? { essai: true } : {}) }]));
   return {
-    validations: etat.validations.map((v) => (traitees.has(v.id) ? { ...v, statut: traitees.get(v.id) } : v)),
+    validations: etat.validations.map((v) => (traitees.has(v.id) ? { ...v, ...traitees.get(v.id) } : v)),
     passeport: { points: Number(passeport.points) || 0, defis: (passeport.defis || []).filter(texte) },
   };
 }
@@ -81,13 +82,34 @@ export function refuser(etat, ids) {
   return { ...etat, validations: etat.validations.map((v) => (s.has(v.id) && v.statut === 'attente' ? { ...v, statut: 'refus' } : v)) };
 }
 
-// valide | attente | refuse | a-faire
-export function statutDefi(etat, defi) {
+// valide | attente | refuse | a-faire. `essais` : une question (grand-defi 04) n'est
+// « refusée » qu'une fois tous ses essais joués (les refus que le Worker dit `essai`) ;
+// un scan refusé l'est tout de suite. Sans `essais`, un scan.
+export function statutDefi(etat, defi, essais = null) {
   const miennes = etat.validations.filter((v) => v.defi === defi);
   if ((etat.passeport && etat.passeport.defis.includes(defi)) || miennes.some((v) => v.statut === 'ok' || v.statut === 'deja')) return 'valide';
   if (miennes.some((v) => v.statut === 'attente')) return 'attente';
-  if (miennes.some((v) => v.statut === 'refus')) return 'refuse';
+  const refus = miennes.filter((v) => v.statut === 'refus' && (essais === null || v.essai));
+  if (refus.length && refus.length >= (essais || 1)) return 'refuse';
   return 'a-faire';
+}
+
+const essaisDe = (defi) => (defi.type_preuve === 'reponse' && Number.isInteger(defi.params.essais) ? defi.params.essais : null);
+
+// L'écran d'une question (grand-defi 04), ou null si ce défi n'en est pas une.
+// statut : ouvert | attente (une réponse envoyée attend son verdict : pas d'autre
+// essai d'ici là) | valide | ferme (tous les essais joués). `essai` : le numéro de
+// l'essai en cours, « essai 1 sur 2 », compté sur les refus que le Worker a dits
+// `essai` (un mauvais QR ne coûte rien). `peutRepondre` : ouvert, et le jeton du QR
+// spécial en main s'il est requis (`jeton` : celui de la route).
+export function questionIci(jeu, etat, id, { jeton = '' } = {}) {
+  const defi = jeu && jeu.actif ? jeu.defis.find((d) => d.id === id && d.type_preuve === 'reponse') : null;
+  if (!defi) return null;
+  const essais = essaisDe(defi);
+  const ratees = etat.validations.filter((v) => v.defi === id && v.statut === 'refus' && v.essai).length;
+  const s = statutDefi(etat, id, essais);
+  const statut = s === 'valide' ? 'valide' : s === 'attente' ? 'attente' : s === 'refuse' ? 'ferme' : 'ouvert';
+  return { defi, statut, essais, essai: Math.min(ratees + 1, essais), peutRepondre: statut === 'ouvert' && Boolean(jeton || !defi.params.qr) };
 }
 
 // Sur une fiche ouverte par le QR d'une Carte : les défis que cet Exposant peut
@@ -113,7 +135,7 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
 // L'écran « Mes défis » : chaque défi actif, dans l'ordre du tableur, et son état.
 export function mesDefis(jeu, etat) {
   if (!jeu || !jeu.actif) return [];
-  return jeu.defis.map((defi) => ({ defi, statut: statutDefi(etat, defi.id) }));
+  return jeu.defis.map((defi) => ({ defi, statut: statutDefi(etat, defi.id, essaisDe(defi)) }));
 }
 
 // La jauge de l'accueil, ou null : pas de jeu, ou pas encore joué (un Visiteur
@@ -123,7 +145,7 @@ export function mesDefis(jeu, etat) {
 export function jauge(jeu, etat) {
   if (!jeu || !jeu.actif || !etat.validations.length) return null;
   const points = etat.passeport ? etat.passeport.points : 0;
-  const attente = jeu.defis.filter((d) => statutDefi(etat, d.id) === 'attente').reduce((s, d) => s + d.points, 0);
+  const attente = jeu.defis.filter((d) => statutDefi(etat, d.id, essaisDe(d)) === 'attente').reduce((s, d) => s + d.points, 0);
   return { points, attente, objectif: jeu.objectif, ...chancesDe(points, etat.passeport ? etat.passeport.defis : [], jeu) };
 }
 
