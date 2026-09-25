@@ -7,7 +7,7 @@
 // `essai` : une mauvaise réponse à une question, dite par le Worker (grand-defi 04).
 // `moment` : avant | apres, la fenêtre où le Worker a compté un vote (grand-defi 05).
 // statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
-import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, MOMENTS_VOTE, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
+import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, MOMENTS_VOTE, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
 // Ce que le Worker ajoute à une validation traitée (son 3e élément).
@@ -100,8 +100,16 @@ export function statutDefi(etat, defi, essais = null) {
 const essaisDe = (defi) => (defi.type_preuve === 'reponse' && Number.isInteger(defi.params.essais) ? defi.params.essais : null);
 
 // L'état d'un défi dans Mes défis et la jauge, selon son Type. `maintenant` (ms) :
-// sans lui, un vote n'est jamais dit perdu.
+// sans lui, un vote n'est jamais dit perdu, ni un mystère fermé.
 function statutDuDefi(defi, etat, maintenant = null) {
+  if (parAnnonce(defi)) {
+    // Le mystère (grand-defi 06) : un scan sur le mauvais stand ne le ferme pas ;
+    // seule l'heure limite le fait. `a-venir` : pas encore annoncé.
+    const s = statutDefi(etat, defi.id);
+    if (s === 'valide' || s === 'attente') return s;
+    if (defi.params.a_venir) return 'a-venir';
+    return maintenant !== null && phaseAnnonce(defi, maintenant) === 'close' ? 'refuse' : 'a-faire';
+  }
   if (defi.type_preuve !== 'votes-evenement') return statutDefi(etat, defi.id, essaisDe(defi));
   const { statut } = etatDesVotes(defi, etat, maintenant);
   return { valide: 'valide', attente: 'attente', ferme: 'refuse' }[statut] || 'a-faire';
@@ -173,8 +181,10 @@ export function questionIci(jeu, etat, id, { jeton = '' } = {}) {
 // défi validé a été gagné (la fiche d'une 2e école le dit, au lieu de « Validé »).
 // `raison` : pourquoi un défi à faire ne vaut pas ici, estimé avec les règles du
 // Worker (defis.js) sur les scans de ce téléphone, validés ou en attente — l'école
-// du défi 1 pour le défi 2, un domaine déjà croisé pour le défi 9.
-export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
+// du défi 1 pour le défi 2, un domaine déjà croisé pour le défi 9, un autre stand
+// que le sien, ou l'heure limite, pour le mystère (`appareil` : ce Passeport ;
+// `maintenant`, ms).
+export function defisIci(jeu, etat, exposant, { domainesDe = () => [], appareil = '', maintenant = null } = {}) {
   if (!jeu || !jeu.actif) return [];
   const scans = etat.validations.filter((v) => (v.statut === 'ok' || v.statut === 'attente') && v.exposant).map((v) => ({ defi: v.defi, exposant: v.exposant }));
   return jeu.defis.filter((d) => proposable(d, exposant)).map((defi) => {
@@ -182,7 +192,7 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
     const refuseIci = etat.validations.some((v) => v.defi === defi.id && v.exposant === exposant && v.statut === 'refus');
     const gagnee = etat.validations.find((v) => v.defi === defi.id && v.statut === 'ok');
     const libre = statut === 'a-faire' || (statut === 'refuse' && !refuseIci);
-    const raison = libre ? motifIci(defi, { jeu, exposant, scans, domainesDe }) : '';
+    const raison = libre ? motifIci(defi, { jeu, exposant, scans, domainesDe, appareil, heure: maintenant }) : '';
     return { defi, statut, validable: libre && !raison, raison, chez: gagnee ? gagnee.exposant || null : null };
   });
 }
@@ -192,6 +202,27 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
 export function mesDefis(jeu, etat, { maintenant = null } = {}) {
   if (!jeu || !jeu.actif) return [];
   return jeu.defis.map((defi) => ({ defi, statut: statutDuDefi(defi, etat, maintenant) }));
+}
+
+// Le bandeau d'annonce (grand-defi 06) : chaque défi annoncé en ce moment (le
+// mystère, révélé par le Worker), pas encore fait par ce téléphone :
+// [{ defi, stand: { stand, nom } (le sien, standAttribue), jusqua (minutes, à Paris) }].
+// Annoncé, c'est ce que dit l'horloge du téléphone OU la dernière liste du Worker
+// (`annonces`, de ?action=etat) : un téléphone en retard de quelques minutes voit le
+// bandeau quand le Worker annonce ; son heure limite, elle, reste celle de son horloge.
+export function annoncesEnCours(jeu, etat, { appareil = '', maintenant = null, annonces = [] } = {}) {
+  if (!jeu || !jeu.actif || maintenant === null) return [];
+  const annonce = (d) => { const p = phaseAnnonce(d, maintenant); return p === 'ouverte' || (p === 'a-venir' && annonces.includes(d.id)); };
+  return jeu.defis
+    .filter((d) => parAnnonce(d) && annonce(d) && !['valide', 'attente'].includes(statutDefi(etat, d.id)))
+    .map((defi) => ({ defi, stand: standAttribue(defi, appareil), jusqua: defi.params.actif_a }))
+    .filter((a) => a.stand);
+}
+
+// Le Worker annonce un défi (`annonces` de ?action=etat) que le jeu gardé ne connaît
+// pas, ou seulement « à venir » : ses stands sont au Worker, il faut recharger le jeu.
+export function jeuARecharger(jeu, annonces) {
+  return (annonces || []).some((id) => { const d = jeu && jeu.defis.find((x) => x.id === id); return !d || Boolean(d.params.a_venir); });
 }
 
 // La jauge de l'accueil, ou null : pas de jeu, ou pas encore joué (un Visiteur

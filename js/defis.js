@@ -3,7 +3,7 @@
 // (worker/src/index.js l'importe tel quel) pour le JUGER. Un Défi est une ligne de
 // l'onglet `Défis` : un Type de preuve et ses paramètres. Un réglage invalide
 // désactive son défi et dit pourquoi ; il ne casse jamais le reste.
-import { tablesEnObjets, normaliser, slugType, typeExposantCanonique, TYPES_EXPOSANT } from './donnees.js';
+import { tablesEnObjets, normaliser, slugType, typeExposantCanonique, TYPES_EXPOSANT, heureEnMinutes } from './donnees.js';
 
 export const OBJECTIF_PAR_DEFAUT = 100;
 export const CHANCES_BADGE_PAR_DEFAUT = 1;
@@ -17,6 +17,21 @@ const NON = ['non', 'faux', 'false', '0'];
 const texte = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const oui = (v) => v === true || OUI.includes(normaliser(v));
 const non = (v) => v === false || NON.includes(normaliser(v));
+
+// Un stand désigné dans le tableur : le nom de son exposant tel qu'il est écrit, ou
+// sa clé (`entreprise:nom`) → { stand, nom }, ou null s'il est illisible.
+function lireStand(brut) {
+  if (!normaliser(brut)) return null;
+  const [type, ...reste] = brut.split(':');
+  return reste.length ? { stand: `${slugType(type)}:${normaliser(reste.join(':'))}`, nom: reste.join(':').trim() } : { stand: normaliser(brut), nom: brut };
+}
+
+// Une heure du tableur, en minutes depuis minuit : « 12:45 », « 12 h 45 », ou la
+// cellule heure telle que gviz la rend ([12, 45, 0, 0]). null si illisible.
+function lireHeure(v) {
+  if (Array.isArray(v)) return Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] < 24 && v[1] < 60 ? v[0] * 60 + v[1] : null;
+  return heureEnMinutes(v);
+}
 
 // Un Type de preuve : lire ses paramètres dans la ligne (ou dire ce qui cloche),
 // dire si le QR d'un exposant le concerne (`concerne`), et pourquoi il ne vaut
@@ -44,13 +59,49 @@ export const TYPES_PREUVE = {
     lireParams(l) {
       const brut = texte(l.stand);
       if (!brut) return { motif: 'stand vide' };
-      const [type, ...reste] = brut.split(':');
-      const stand = reste.length ? `${slugType(type)}:${normaliser(reste.join(':'))}` : normaliser(brut);
-      if (!normaliser(brut)) return { motif: `stand illisible : ${brut}` };
-      return { params: { stand, nom_stand: reste.length ? reste.join(':').trim() : brut } };
+      const s = lireStand(brut);
+      if (!s) return { motif: `stand illisible : ${brut}` };
+      return { params: { stand: s.stand, nom_stand: s.nom } };
     },
     concerne: (defi, exposant) => standCorrespond(defi.params.stand, exposant),
     motif: () => '',
+  },
+  // Le QR du stand attribué à ce téléphone (défi 10, le défi mystère) : une dizaine de
+  // stands (colonne `stands`, séparés par des points-virgules), un par téléphone, fixe
+  // (standAttribue : le téléphone et le Worker le calculent pareil depuis l'identifiant
+  // de l'appareil, rien de plus n'est envoyé), pour qu'il n'y ait pas de ruée vers un
+  // seul stand. Il vaut entre l'annonce (`actif_de`, une heure de Paris ; vide = pas
+  // encore annoncé) et l'heure limite (`actif_a`), bornes comprises. Avant l'annonce, le
+  // téléphone ne reçoit ni les stands ni les heures (jeuPublic) ; l'annonce est un
+  // Type qui a `annonce` (grand-defi 08 : les instants gagnants suivront).
+  'scan-attribue': {
+    annonce: true,
+    lireParams(l) {
+      const noms = texte(l.stands).split(/[;\n]/).map((n) => n.trim()).filter(Boolean);
+      if (!noms.length) return { motif: 'stands vides : les stands du mystère, séparés par des points-virgules' };
+      const stands = [];
+      for (const n of noms) {
+        const s = lireStand(n);
+        if (!s) return { motif: `stand illisible : ${n}` };
+        if (stands.some((x) => x.stand === s.stand)) return { motif: `stand en double : ${n}` };
+        stands.push(s);
+      }
+      const actifA = lireHeure(l.actif_a);
+      if (actifA === null) return { motif: `actif_a illisible : « ${texte(l.actif_a)} » (l’heure limite, 12:45)` };
+      const sansAnnonce = !Array.isArray(l.actif_de) && texte(l.actif_de) === '';
+      const actifDe = sansAnnonce ? null : lireHeure(l.actif_de);
+      if (!sansAnnonce && actifDe === null) return { motif: `actif_de illisible : « ${texte(l.actif_de)} » (l’heure de l’annonce, 10:30 ; vide = pas encore annoncé)` };
+      if (actifDe !== null && actifDe >= actifA) return { motif: `actif_de (${texte(l.actif_de)}) doit être avant actif_a (${texte(l.actif_a)})` };
+      return { params: { stands, actif_de: actifDe, actif_a: actifA } };
+    },
+    concerne: (defi, exposant) => (defi.params.stands || []).some((s) => standCorrespond(s.stand, exposant)),
+    motif(defi, { exposant, appareil, heure }) {
+      const phase = phaseAnnonce(defi, heure);
+      if (phase === 'a-venir') return 'pas encore annoncé';
+      if (phase === 'close') return 'heure limite passée';
+      const s = standAttribue(defi, appareil);
+      return s && standCorrespond(s.stand, exposant) ? '' : 'pas votre stand';
+    },
   },
   // Le QR d'un exposant dont aucun Domaine n'apparaît parmi ceux des scans déjà
   // validés (défi 9). Les centres d'intérêt du Visiteur ne partent jamais : seuls
@@ -142,6 +193,45 @@ export const TYPES_PREUVE = {
 // Les deux moments d'un vote : le Worker les écrit dans `validations.motif` d'un vote
 // compté et les renvoie au téléphone. Ne pas les renommer pendant le jeu.
 export const MOMENTS_VOTE = ['avant', 'apres'];
+
+// Le stand attribué à un appareil pour un défi `scan-attribue` : { stand, nom }, ou
+// null (pas de stands connus, pas d'appareil). Une empreinte de « défi:appareil »
+// (FNV-1a, puis un mélange final pour répartir les derniers bits) modulo le nombre de
+// stands. Ne pas la changer pendant le jeu, ni réordonner la liste : chacun
+// changerait de stand. Répartition vérifiée sur 300 identifiants (tests/defis.test.mjs).
+export function standAttribue(defi, appareil) {
+  const stands = defi && defi.params && defi.params.stands;
+  if (!Array.isArray(stands) || !stands.length || typeof appareil !== 'string' || !appareil) return null;
+  return stands[empreinte32(`${defi.id}:${appareil}`) % stands.length];
+}
+
+function empreinte32(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+}
+
+// Où en est l'annonce d'un défi (Type à `annonce`) à l'instant `ms` : 'a-venir' (pas
+// d'heure d'annonce, ou pas encore), 'ouverte' (jusqu'à `actif_a` compris, à la
+// seconde), 'close'. À l'heure de Paris, sans la date (ADR-0020).
+export function phaseAnnonce(defi, ms) {
+  const { actif_de: de, actif_a: a } = (defi && defi.params) || {};
+  if (!Number.isInteger(de) || !Number.isInteger(a) || !Number.isFinite(ms)) return 'a-venir';
+  const m = Math.floor(minutesAParis(ms) * 60) / 60;
+  if (m < de) return 'a-venir';
+  return m <= a ? 'ouverte' : 'close';
+}
+
+// Ce défi vient-il par une annonce (le mystère ; les instants gagnants suivront) ?
+export const parAnnonce = (defi) => Boolean(defi && TYPES_PREUVE[defi.type_preuve] && TYPES_PREUVE[defi.type_preuve].annonce);
+
+// Les défis annoncés en ce moment (leurs id) : ce que le Worker joint à `?action=etat`,
+// que les téléphones ouverts interrogent chaque minute.
+export function annoncesDe(jeu, ms) {
+  if (!jeu || !jeu.actif) return [];
+  return jeu.defis.filter((d) => d.actif !== false && parAnnonce(d) && phaseAnnonce(d, ms) === 'ouverte').map((d) => d.id);
+}
 
 // Les minutes depuis minuit à Paris (fraction comprise) d'un instant en ms : les
 // heures du Programme sont celles de Paris, quel que soit le fuseau du téléphone ou
@@ -282,6 +372,10 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
     if (d.params.different_de && !ids.has(d.params.different_de)) motif = `different_de : défi ${d.params.different_de} introuvable`;
     else if (d.type_preuve === 'scan-stand' && exposants && !exposants.some((e) => standCorrespond(d.params.stand, e.cle))) motif = `stand introuvable au programme : ${d.params.nom_stand}`;
     else if (d.type_preuve === 'votes-evenement' && evenements) motif = placerVotes(d, evenements);
+    else if (d.type_preuve === 'scan-attribue' && exposants) {
+      const absents = d.params.stands.filter((s) => !exposants.some((e) => standCorrespond(s.stand, e.cle)));
+      if (absents.length) motif = `stand introuvable au programme : ${absents.map((s) => s.nom).join(', ')}`;
+    }
     if (motif) jeu.invalides.push({ id: d.id, motif });
     return !motif;
   });
@@ -322,9 +416,11 @@ export function avecReponses(jeu, reponses = new Map()) {
 }
 
 // Ce que le téléphone reçoit : les défis actifs et leurs réglages publics. Sans
-// défi actif, pas de jeu à l'écran.
-export function jeuPublic(jeu) {
-  const defis = jeu.defis.filter((d) => d.actif).map(({ actif, ...d }) => d);
+// défi actif, pas de jeu à l'écran. Un défi à annonce (le mystère) pas encore annoncé
+// à `maintenant` (ms) ne dit que son titre et ses points : ni stands, ni heures.
+export function jeuPublic(jeu, { maintenant = null } = {}) {
+  const cache = (d) => parAnnonce(d) && (maintenant === null || phaseAnnonce(d, maintenant) === 'a-venir');
+  const defis = jeu.defis.filter((d) => d.actif).map(({ actif, ...d }) => (cache(d) ? { ...d, params: { a_venir: true }, question: '', choix: [], explication: '' } : d));
   return { actif: jeu.actif && defis.length > 0, objectif: jeu.objectif, paliers: jeu.paliers, chances_badge: jeu.chances_badge, defis };
 }
 
@@ -352,7 +448,8 @@ export function motifIci(defi, contexte) {
 // `votes`, les moments déjà reçus de ce Passeport, par défi (Map défi → Set). Le
 // premier vote reçu a le statut `vote` (compté, pas encore de point), celui qui fait
 // la paire `ok` ; les deux portent leur `moment`.
-export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map() }) {
+// Le défi mystère (`scan-attribue`) : `appareil`, le Passeport qui envoie ; jugé à `heure`.
+export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map(), appareil = '' }) {
   const refus = (motif) => ({ statut: 'refus', motif, choix: null });
   if (!jeu.actif) return refus('jeu coupé');
   const defi = jeu.defis.find((d) => d.id === v.defi && d.actif);
@@ -373,9 +470,9 @@ export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(sca
   }
   if (!v.preuve || !v.preuve.secret) return refus('preuve attendue');
   if (!exposant) return refus('secret inconnu');
-  if (!proposable(defi, exposant)) return refus(defi.type_preuve === 'scan-stand' ? 'pas le stand du défi' : 'exposant d’un autre type');
+  if (!proposable(defi, exposant)) return refus({ 'scan-stand': 'pas le stand du défi', 'scan-attribue': 'pas un stand du défi' }[defi.type_preuve] || 'exposant d’un autre type');
   if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
-  const motif = motifIci(defi, { jeu, exposant, scans, domainesDe });
+  const motif = motifIci(defi, { jeu, exposant, scans, domainesDe, appareil, heure });
   if (motif) return refus(motif);
   const n = v.preuve.choix;
   const choix = Number.isInteger(n) && n >= 0 && n < defi.choix.length ? n : null;

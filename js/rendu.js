@@ -8,8 +8,8 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci } from './passeport.js';
-import { standCorrespond, paliersDe, chancesBadgeDe } from './defis.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, annoncesEnCours } from './passeport.js';
+import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe } from './defis.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
 
@@ -394,7 +394,7 @@ export function ecranScanner(etat) {
 }
 
 const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));
-const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé', 'a-faire': 'À faire' };
+const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé', 'a-faire': 'À faire', 'a-venir': 'Bientôt' };
 // « Validé » ici ; gagné sur un autre stand, on dit lequel : sur la fiche d'une
 // 2e école, « Validé » laissait croire qu'on venait de le valider là.
 function etatDuDefi(etat, ex, statut, chez) {
@@ -409,7 +409,26 @@ function raisonAffichee(raison) {
   const lie = /^même exposant que le défi (.+)$/.exec(raison);
   if (lie) return t('Déjà utilisé pour le défi %s', lie[1]);
   if (raison === 'aucun scan avant') return t('Scannez d’abord un autre stand');
+  if (raison === 'pas votre stand') return t('Pas votre stand mystère');
+  if (raison === 'heure limite passée') return t('Heure limite passée');
   return raison === 'domaine déjà croisé' ? t('Domaine déjà croisé') : t('Pas pour ce stand');
+}
+
+// Un stand désigné dans le tableur ({ stand, nom }) → l'Exposant du programme, ou null.
+const exposantDuStand = (etat, s) => etat.modele.exposants.find((e) => standCorrespond(s.stand, e.cle)) || null;
+const nomDuStand = (etat, s) => { const e = exposantDuStand(etat, s); return e ? e.nom : s.nom; };
+
+// Le bandeau d'annonce (grand-defi 06), au-dessus de l'écran, dans le flux (il ne
+// recouvre rien) : « Défi mystère ! Votre stand : … · jusqu'à 12 h 45 », un lien vers
+// la fiche du stand. '' quand rien n'est annoncé, ou que ce téléphone l'a déjà fait.
+export function bandeauAnnonces(etat) {
+  poserLangue(etat);
+  const jeu = (etat.visite && etat.visite.jeu) || { validations: [], passeport: null };
+  return annoncesEnCours(etat.grandDefi, jeu, { appareil: etat.appareil, maintenant: maintenantMs(etat), annonces: etat.annonces || [] }).map(({ defi, stand, jusqua }) => {
+    const e = exposantDuStand(etat, stand);
+    const corps = `<strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Votre stand : %s', nomDuStand(etat, stand)))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span>`;
+    return e ? `<a class="annonce-defi" href="${lienExposant(e.cle)}">${corps}</a>` : `<p class="annonce-defi">${corps}</p>`;
+  }).join('');
 }
 
 const domainesDans = (modele) => (cle) => { const e = modele.exposants.find((x) => x.cle === cle); return e ? e.domaines : []; };
@@ -426,6 +445,10 @@ function commentProuver(etat, d) {
   } else if (d.type_preuve === 'hors-domaines') texte = t('QR d’un stand d’un domaine encore jamais scanné');
   else if (d.type_preuve === 'reponse') texte = `${t(d.params.qr ? 'QR de la question, puis la bonne réponse' : 'Une question, et la bonne réponse')} · ${tn('%s essai', '%s essais', d.params.essais)}`;
   else if (d.type_preuve === 'votes-evenement') texte = t('Voter avant et après : %s', tt(d.params.evenement));
+  else if (d.type_preuve === 'scan-attribue') {
+    const s = standAttribue(d, etat.appareil);
+    texte = s ? t('QR de votre stand : %s, jusqu’à %s', nomDuStand(etat, s), heure(d.params.actif_a)) : t('Révélé en cours de matinée');
+  }
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
 
@@ -435,7 +458,7 @@ function commentProuver(etat, d) {
 // touchant un choix : il part par son numéro, jamais comme un texte.
 function defisDeLaFiche(etat, ex, secret) {
   if (!secret) return '';
-  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele) });
+  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele), appareil: etat.appareil, maintenant: maintenantMs(etat) });
   if (!ici.length) return '';
   const action = (defi, choix = null) => `data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}"${choix === null ? '' : ` data-choix="${choix}"`}`;
   return `<section class="defis-ici" aria-labelledby="defis-ici-titre">

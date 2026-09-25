@@ -100,4 +100,6 @@ export default {
   "Voter avant et après : %s": "Vota antes y después: %s", "Voter": "Votar", "Ce défi n’est pas un vote.": "Este reto no es una votación.", "Vos deux votes sont comptés !": "¡Tus dos votos cuentan!", "Vote envoyé : le verdict arrive.": "Voto enviado: el resultado está en camino.", "Défi fermé : le vote « avant » n’a pas été donné à temps.": "Reto cerrado: el voto «antes» no se emitió a tiempo.", "Voté : %s": "Votado: %s", "Vote envoyé": "Voto enviado", "Fermé": "Cerrado", "Pas encore ouvert": "Aún no abierto", "Avant": "Antes", "Après": "Después", "jusqu’à %s": "hasta las %s", "à partir de %s": "a partir de las %s", "Chaque vote est compté sans lien avec votre téléphone.": "Cada voto se cuenta sin vínculo con tu teléfono.",
   "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.": "Voto rechazado: según la hora del juego, quedaba fuera del plazo. Comprueba la hora de tu teléfono.",
   "Organisé par %s": "Organizado por %s",
+  // grand-defi 06
+  "Bientôt": "Muy pronto", "Pas votre stand mystère": "No es tu stand misterioso", "Heure limite passée": "Plazo vencido", "QR de votre stand : %s, jusqu’à %s": "QR de tu stand: %s, hasta las %s", "Révélé en cours de matinée": "Se revela durante la mañana", "%s !": "¡%s!", "Votre stand : %s": "Tu stand: %s",
 };

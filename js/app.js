@@ -8,7 +8,7 @@ import * as Passeport from './passeport.js';
 import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
-import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, h as echapper } from './rendu.js';
+import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, bandeauAnnonces, h as echapper } from './rendu.js';
 import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
 import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, definirLanguesProposees, languesProposees } from './i18n.js';
 import { dictionnaireDepuis } from './donnees.js';
@@ -132,6 +132,9 @@ const ID_PASSEPORT = (() => {
     return id;
   } catch { return identifiantAleatoire(); }
 })();
+// Le rendu en a besoin pour le stand du défi mystère (grand-defi 06) : calculé ici
+// comme au Worker, rien de plus n'est envoyé.
+etat.appareil = ID_PASSEPORT;
 
 // Le vocabulaire du festival : ce qu'une recherche a le droit d'envoyer (sécurité 05).
 function vocabulaire(m) {
@@ -143,7 +146,7 @@ function vocabulaire(m) {
 }
 
 const $ = (s) => document.querySelector(s);
-const el = { main: $('#ecran'), nav: $('#nav'), bandeau: $('#bandeau'), pied: $('#pied'), messages: $('#messages'), annonce: $('#annonce') };
+const el = { main: $('#ecran'), nav: $('#nav'), bandeau: $('#bandeau'), annonces: $('#annonces'), pied: $('#pied'), messages: $('#messages'), annonce: $('#annonce') };
 
 // ---------------------------------------------------------------- horloge et messages
 
@@ -179,6 +182,7 @@ function rendre({ conserver = false } = {}) {
   el.pied.innerHTML = piedDePage(etat);
   document.title = titreDocument(etat);
   peindreBandeau();
+  peindreAnnonces();
   if (champActif) {
     const champ = el.main.querySelector(`[data-champ="${champActif}"]`);
     if (champ) { champ.focus({ preventScroll: true }); try { champ.setSelectionRange(selection[0], selection[1]); } catch { /* type search sur certains navigateurs */ } }
@@ -858,6 +862,18 @@ function peindreBandeau() {
   el.bandeau.innerHTML = `<span>${echapper(texteBandeau())}</span><button type="button" data-action="fermer-bandeau" aria-label="${echapper(t('Fermer ce message'))}">✕</button>`;
 }
 
+// Le bandeau d'annonce du Grand Défi (grand-defi 06) : au-dessus de l'écran, dans le
+// flux, repeint à chaque rendu (le rafraîchissement de chaque minute en fait un).
+// Une annonce nouvelle est aussi dite aux lecteurs d'écran, une fois.
+const annoncesDites = new Set();
+function peindreAnnonces() {
+  const html = bandeauAnnonces(etat);
+  if (el.annonces.innerHTML !== html) el.annonces.innerHTML = html;
+  el.annonces.hidden = !html;
+  const texte = el.annonces.textContent.trim();
+  if (texte && !annoncesDites.has(texte)) { annoncesDites.add(texte); el.annonce.textContent = texte; }
+}
+
 el.bandeau.addEventListener('click', (e) => {
   if (!e.target.closest('[data-action="fermer-bandeau"]')) return;
   modifierVisite({ ...etat.visite, bandeauFerme: etat.bandeau || '' });
@@ -905,6 +921,10 @@ async function rafraichirDonnees() {
   // même son heure — dire « mis à jour » ici serait mentir, puisqu'on garde l'ancien.
   if (!r.refus) {
     if (r.bandeau !== null && r.bandeau !== undefined) afficherBandeau(r.bandeau, r.bandeaux === undefined ? null : r.bandeaux);
+    // Le Worker annonce un défi (le mystère) que le jeu gardé tait encore : on le recharge
+    // tout de suite, sans attendre les cinq minutes du jeu (grand-defi 06).
+    if (Array.isArray(r.annonces)) etat.annonces = r.annonces;
+    if (JEU_URL && Passeport.jeuARecharger(etat.grandDefi, r.annonces)) chargerJeu().catch((e) => journal('jeu indisponible', e));
     if (r.change) installerTables(r.tables, r.version, r.source);
     else { etat.derniereMaj = Date.now(); etat.source = r.source; }
   }
@@ -1030,7 +1050,7 @@ async function demarrer() {
   setInterval(verifierRappels, 30000);
   // L'écran de vote suit l'horloge : une fenêtre s'ouvre ou se ferme sans geste.
   setInterval(() => { if (etat.route.nom === 'vote' && document.visibilityState === 'visible') rendre({ conserver: true }); }, 20000);
-  window.__festival = { etat, rendre, stats, sources, changerLangue, changerTheme, chargerJeu }; // pour le test de fumée et le débogage
+  window.__festival = { etat, rendre, stats, sources, changerLangue, changerTheme, chargerJeu, rafraichirDonnees }; // pour le test de fumée et le débogage
 }
 
 demarrer();

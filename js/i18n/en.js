@@ -100,4 +100,6 @@ export default {
   "Voter avant et après : %s": "Vote before and after: %s", "Voter": "Vote", "Ce défi n’est pas un vote.": "This challenge is not a vote.", "Vos deux votes sont comptés !": "Both your votes are counted!", "Vote envoyé : le verdict arrive.": "Vote sent: the result is on its way.", "Défi fermé : le vote « avant » n’a pas été donné à temps.": "Challenge closed: the “before” vote was not cast in time.", "Voté : %s": "Voted: %s", "Vote envoyé": "Vote sent", "Fermé": "Closed", "Pas encore ouvert": "Not open yet", "Avant": "Before", "Après": "After", "jusqu’à %s": "until %s", "à partir de %s": "from %s", "Chaque vote est compté sans lien avec votre téléphone.": "Each vote is counted with no link to your phone.",
   "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.": "Vote refused: by the game’s clock it fell outside the window. Check your phone’s time.",
   "Organisé par %s": "Organised by %s",
+  // grand-defi 06
+  "Bientôt": "Coming soon", "Pas votre stand mystère": "Not your mystery stand", "Heure limite passée": "Deadline passed", "QR de votre stand : %s, jusqu’à %s": "Your stand’s QR code: %s, until %s", "Révélé en cours de matinée": "Revealed during the morning", "%s !": "%s!", "Votre stand : %s": "Your stand: %s",
 };

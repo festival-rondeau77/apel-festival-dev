@@ -100,4 +100,6 @@ export default {
   "Voter avant et après : %s": "在活动前后各投一票：%s", "Voter": "投票", "Ce défi n’est pas un vote.": "这个挑战不是投票。", "Vos deux votes sont comptés !": "你的两票都已计入！", "Vote envoyé : le verdict arrive.": "投票已发送：结果马上就到。", "Défi fermé : le vote « avant » n’a pas été donné à temps.": "挑战已关闭：没有及时投出“之前”的一票。", "Voté : %s": "已投：%s", "Vote envoyé": "投票已发送", "Fermé": "已关闭", "Pas encore ouvert": "尚未开放", "Avant": "之前", "Après": "之后", "jusqu’à %s": "截至 %s", "à partir de %s": "%s 起", "Chaque vote est compté sans lien avec votre téléphone.": "每一票的统计都与你的手机无关。",
   "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.": "投票被拒：按游戏时间，它不在投票时段内。请检查手机时间。",
   "Organisé par %s": "主办：%s",
+  // grand-defi 06
+  "Bientôt": "即将揭晓", "Pas votre stand mystère": "不是你的神秘展位", "Heure limite passée": "已过截止时间", "QR de votre stand : %s, jusqu’à %s": "你的展位二维码：%s，截至 %s", "Révélé en cours de matinée": "上午期间揭晓", "%s !": "%s！", "Votre stand : %s": "你的展位：%s",
 };

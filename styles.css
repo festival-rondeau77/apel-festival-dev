@@ -118,6 +118,15 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
   background: transparent; border: 0; color: inherit; cursor: pointer; font-weight: 700; font-size: 1rem;
 }
 .bandeau[hidden] { display: none; }
+/* L'annonce du Grand Défi (grand-defi 06, le défi mystère) : dans le flux, pas
+   collante — elle pousse l'écran vers le bas et ne recouvre jamais le contenu. */
+.annonces[hidden] { display: none; }
+.annonce-defi {
+  display: block; margin: 0; background: var(--bleu); color: #fff; text-align: center; text-decoration: none;
+  padding: 9px var(--marge); font-size: 0.92rem; line-height: 1.35;
+}
+.annonce-defi strong { font-weight: 800; }
+.annonce-defi .limite { white-space: nowrap; }
 
 .entete { padding: 26px 0 14px; }
 /* Le sélecteur de langue : quatre pastilles discrètes, alignées à droite, chacune
@@ -613,7 +622,7 @@ span.salle.avenir { color: var(--encre-2); font-weight: 500; font-style: italic;
 /* Plein écran : le plan prend toute la fenêtre, la barre basse et le pied
    disparaissent, la croix ferme. Dans la page, il piégeait le défilement. */
 body.plan-ouvert { overflow: hidden; }
-body.plan-ouvert .nav, body.plan-ouvert #pied, body.plan-ouvert .bandeau { display: none; }
+body.plan-ouvert .nav, body.plan-ouvert #pied, body.plan-ouvert .bandeau, body.plan-ouvert .annonces { display: none; }
 .plan-plein {
   position: fixed; inset: 0; z-index: 30; background: var(--fond); display: flex; flex-direction: column; overflow: hidden;
   padding-top: env(safe-area-inset-top);

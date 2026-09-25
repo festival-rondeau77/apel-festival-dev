@@ -1,5 +1,5 @@
 // Module Sources : la chaîne de lecture des données (ADR-0004).
-//   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) : `etat` : version + bandeau ;
+//   1. le Worker (`programmeUrl`, ticket 20, ADR-0016) : `etat` : version + bandeau (+ annonces, grand-defi 06) ;
 //      `donnees` : six tables (le contrat qu'avait le script Apps Script).
 //   2. le classeur public (la Publication, ADR-0019) via gviz, onglet par onglet
 //   3. snapshot embarqué au déploiement
@@ -21,6 +21,13 @@ function attendreParDefaut(ms) { return new Promise((r) => setTimeout(r, ms)); }
 export function bandeauDe(tables) {
   for (const ligne of (tables && tables.infos || []).slice(1)) if (String(ligne[0] ?? '').trim().toLowerCase() === 'bandeau') return String(ligne[1] ?? '').trim();
   return '';
+}
+
+// Les annonces que le Worker joint à l'état (grand-defi 06) : les id des défis
+// annoncés en ce moment. { annonces } s'il en parle, {} sinon (un Worker d'avant).
+function lireAnnonces(rep) {
+  if (!Array.isArray(rep.annonces)) return {};
+  return { annonces: rep.annonces.filter((id) => typeof id === 'string' && /^[a-z0-9-]{1,20}$/i.test(id)) };
 }
 
 // Les traductions du bandeau que le script joint à l'état ({ en, es, zh }), ou null.
@@ -107,7 +114,7 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
   async function etatScript() {
     const rep = JSON.parse(await requete(urlScript('etat'), { redirect: 'follow' }));
     if (!rep || typeof rep.version !== 'string') throw new Error('etat : réponse invalide');
-    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '', bandeaux: bandeauxDe(rep) };
+    return { version: rep.version, bandeau: typeof rep.bandeau === 'string' ? rep.bandeau : '', bandeaux: bandeauxDe(rep), ...lireAnnonces(rep) };
   }
 
   async function donneesScript() {
@@ -177,11 +184,12 @@ export function creerSources({ config = {}, fetch, stockage, horloge = () => Dat
     };
     try {
       const etat = await etatScript();
-      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, bandeaux: etat.bandeaux, source: 'script', version: etat.version };
+      const annonces = lireAnnonces(etat);
+      if (etat.version === versionActuelle) return { change: false, bandeau: etat.bandeau, bandeaux: etat.bandeaux, source: 'script', version: etat.version, ...annonces };
       const d = await donneesScript();
       if (acceptable(d)) {
         memoriser(d);
-        return { change: true, bandeau: d.bandeau ?? etat.bandeau, bandeaux: d.bandeaux || etat.bandeaux, source: 'script', tables: d.tables, version: d.version };
+        return { change: true, bandeau: d.bandeau ?? etat.bandeau, bandeaux: d.bandeaux || etat.bandeaux, source: 'script', tables: d.tables, version: d.version, ...annonces };
       }
     } catch (e) { erreurs.push(e); journal('script indisponible', e); }
     try {
