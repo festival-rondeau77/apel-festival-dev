@@ -180,15 +180,22 @@ main { min-height: 60vh; }
   background: var(--carte); color: var(--encre); position: relative;
   border-bottom: 3px solid var(--marine);
 }
-/* Les logos vivent sur une plaque blanche dans les deux thèmes : celui de l'UFA
-   a un fond blanc opaque, et un logo ne se retouche pas. */
-.affiche .logos {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: #fff; border-radius: 8px; padding: 6px 10px; margin: 0 0 12px;
-  border: 1px solid var(--trait);
+/* Les logos (logos-accueil 01, planche E : https://claude.ai/artifact/FWvLaJPy3tLGKYoeWuvxYv).
+   La fleur de l'APEL en filigrane, coupée par l'affiche ; les deux écoles en sceaux de même
+   taille, posés à cheval sur le filet marine. Les disques restent blancs dans les deux thèmes :
+   un logo ne se retouche pas. */
+.affiche > :not(.filigrane):not(.sceaux) { position: relative; }
+.affiche .filigrane { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.affiche .fleur { position: absolute; right: -92px; top: -8px; width: 250px; height: auto; opacity: 0.16; }
+.affiche .sceaux { position: absolute; right: var(--marge); bottom: -35px; z-index: 2; display: flex; gap: 10px; }
+.affiche .sceau {
+  display: block; width: 66px; height: 66px; border-radius: 50%; background: #fff; object-fit: contain;
+  box-shadow: 0 6px 14px -4px rgba(10, 38, 71, 0.35), 0 2px 4px rgba(10, 38, 71, 0.12);
 }
-.affiche .logos img { height: 26px; width: auto; display: block; }
-.affiche .logos img:last-child { height: 23px; }
+/* Le sceau de Rondeau est dessiné jusqu'au bord de son image : il lui faut une marge blanche. */
+.affiche .sceau.rondeau { padding: 5px; box-sizing: border-box; }
+/* Les sceaux débordent de 35 px sous le filet : le menu s'écarte d'autant, sans rien changer d'autre. */
+.affiche + .grille-boutons { margin-top: 46px; }
 .affiche h1 { font-size: clamp(1.8rem, 9vw, 2.5rem); text-transform: uppercase; }
 .affiche h1 .t1 { color: var(--framboise); }
 .affiche h1 .t2 { color: var(--turquoise); display: block; }
@@ -199,9 +206,11 @@ main { min-height: 60vh; }
   line-height: 1.15; color: var(--turquoise); max-width: 26ch; font-style: italic;
 }
 .affiche .entree-libre {
-  display: inline-block; margin: 9px 0 0; padding: 3px 10px; border-radius: 999px;
-  background: var(--ambre); color: #2B1A00; font-weight: 700; font-size: 0.8rem;
+  display: inline-flex; align-items: center; gap: 7px; margin: 12px 0 0; padding: 6px 13px 6px 10px; border-radius: 999px;
+  background: var(--ambre); color: #2B1A00; box-shadow: inset 0 -2px 0 rgba(43, 26, 0, 0.14);
+  font-family: var(--display); font-weight: 800; font-size: 0.875rem; letter-spacing: 0.01em;
 }
+.affiche .entree-libre svg { width: 15px; height: 15px; flex: none; }
 
 .grille-boutons { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 14px 0 0; }
 /* Le second groupe est plus bas et plus plat : ce sont des outils, pas la vedette. */

@@ -207,14 +207,17 @@ export function titreAffiche(nom) {
   return `<span class="t1">${h(m[1])}</span> <span class="t2">${h(m[2])}</span>`;
 }
 
-// Les trois logos de l'affiche. L'Ensemble Scolaire réunit quatre entités
-// (collège, lycée général et technologique, lycée professionnel, UFA) et une
-// seule a un logo : l'UFA. Les trois autres sont donc nommées en toutes lettres.
-function bandeauLogos() {
-  return `<div class="logos">
-    <img src="./logos/apel.svg" alt="APEL, le souffle de la liberté" width="88" height="60">
-    <img src="./logos/ufa-maurice-rondeau.png" alt="UFA Maurice Rondeau Saint-Colomban" width="80" height="59">
-    <img src="./logos/saint-colomban.png" alt="Saint Colomban" width="46" height="46">
+// Les logos de l'affiche (logos-accueil 01, planche E du canevas
+// https://claude.ai/artifact/FWvLaJPy3tLGKYoeWuvxYv) : la fleur de l'APEL en
+// filigrane, et les deux écoles en sceaux posés sur le filet. Deux règles de
+// l'APEL : les deux écoles ont la même taille, et rien ne dit qui organise.
+function fleurApel() {
+  return '<img class="fleur" src="./logos/apel-fleur.webp" alt="" aria-hidden="true" width="250" height="290">';
+}
+function sceauxEcoles() {
+  return `<div class="sceaux">
+    <img class="sceau rondeau" src="./logos/rondeau.webp" alt="Ensemble Scolaire Maurice Rondeau" width="66" height="66">
+    <img class="sceau" src="./logos/saint-colomban.webp" alt="Saint Colomban" width="66" height="66">
   </div>`;
 }
 
@@ -233,11 +236,12 @@ export function ecranAccueil(etat) {
   // navigation : l'accueil est le seul endroit où on peut les trouver.
   return `${selecteurLangue()}
   <section class="affiche">
-    ${bandeauLogos()}
+    <div class="filigrane">${fleurApel()}</div>
     <h1>${titreAffiche(tt(infos.nom || "Festival de l'Orientation"))}</h1>
     <p class="quand">${h(dateLongue(infos.date) || t('Date à confirmer'))}${horaires ? `<span>${h(horaires)}</span>` : ''}${infos.lieu ? `<span>${h(infos.lieu)}</span>` : ''}</p>
     ${infos.slogan ? `<p class="slogan">${h(tt(infos.slogan))}</p>` : ''}
-    ${infos.entree ? `<p class="entree-libre">${h(tt(infos.entree))}</p>` : ''}
+    ${infos.entree ? `<p class="entree-libre">${icone('entrer', 15)}<span>${h(t('Entrée libre'))}</span></p>` : ''}
+    ${sceauxEcoles()}
   </section>
   <nav class="grille-boutons" aria-label="${attr(t("Aller à l'essentiel"))}">
     ${bouton('#/plan', 'plan', t('Plan du festival'), { classe: 'principal', ton: 'explorer' })}

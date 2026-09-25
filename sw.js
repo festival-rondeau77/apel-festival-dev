@@ -1,7 +1,7 @@
 // Service worker : l'appli entière en cache à l'installation (cache d'abord,
 // réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
 // secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.09.25-292e17d';
+const VERSION = '2026.09.25-04d9831';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
@@ -9,7 +9,7 @@ const FICHIERS = [
   './js/app.js', './js/erreurs.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js', './js/scan.js', './js/vendor/jsqr.js',
   './js/i18n.js', './js/i18n/fr.js', './js/i18n/en.js', './js/i18n/es.js', './js/i18n/zh.js',
   './icones/icone.svg', './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png', './icones/icone-180.png',
-  './logos/apel.svg', './logos/ufa-maurice-rondeau.png', './logos/saint-colomban.png',
+  './logos/apel-fleur.webp', './logos/rondeau.webp', './logos/saint-colomban.webp',
   './polices/polices.css', './polices/bricolage-700.woff2', './polices/bricolage-800.woff2',
 ];
 const DONNEES = ['./data/snapshot.json'];

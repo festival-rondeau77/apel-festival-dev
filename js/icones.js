@@ -30,6 +30,8 @@ const D = {
   cloche: `<path ${T} d="M18 8.4a6 6 0 1 0-12 0c0 5.4-2.4 7.2-2.4 7.2h16.8S18 13.8 18 8.4z"/><path ${T} d="M13.7 19.2a2 2 0 0 1-3.4 0"/>`,
   toilettes: `<circle ${T} cx="8" cy="5.4" r="1.8"/><path ${T} d="M8 9v11.4m-2.4-7.8L8 9l2.4 3.6"/><circle ${T} cx="16.4" cy="5.4" r="1.8"/><path ${T} d="M16.4 9 14 15h4.8l-2.4-6zm0 6v5.4"/>`,
   cafe: `<path ${T} d="M4.4 8.4h12v6.2a4.4 4.4 0 0 1-4.4 4.4H8.8a4.4 4.4 0 0 1-4.4-4.4z"/><path ${T} d="M16.4 10.2h1.8a2.4 2.4 0 0 1 0 4.8h-1.8M4.4 21.4h12"/>`,
+  // Entrer : une flèche qui passe une porte (la pastille « Entrée libre » de l'accueil).
+  entrer: `<path ${T} d="M13.4 4h5a1.4 1.4 0 0 1 1.4 1.4v13.2a1.4 1.4 0 0 1-1.4 1.4h-5M4.2 12h10.6m-3.8-4 4 4-4 4"/>`,
   porte: `<path ${T} d="M5.6 21V4.6a1.6 1.6 0 0 1 1.6-1.6h9.6a1.6 1.6 0 0 1 1.6 1.6V21"/><path ${T} d="M3.6 21h16.8M14.6 12.2h.01"/>`,
   train: `<rect ${T} x="5.4" y="3.6" width="13.2" height="12.6" rx="2.6"/><path ${T} d="M5.4 10.8h13.2M8.6 20.4l1.8-4.2m5 4.2-1.8-4.2"/><path ${T} d="M9 13.6h.01M15 13.6h.01"/>`,
   bus: `<rect ${T} x="3.6" y="4.4" width="16.8" height="11.6" rx="2.4"/><path ${T} d="M3.6 11h16.8M7.4 20v-4m9.2 4v-4"/><path ${T} d="M7.4 13.8h.01m9.2 0h.01"/>`,

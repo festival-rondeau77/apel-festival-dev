@@ -11,7 +11,7 @@ export default {
   '3e': '初三（3e）', '2nde': '高一（2nde）', '1re': '高二（1re）', 'Terminale': '高三（Terminale）', 'étudiant': '大学生', 'parent': '家长',
   'Université': '大学', 'Prépa': '预科班', 'Lycée': '高中', 'CFA': 'CFA 学徒中心', 'UFA': 'UFA 学徒单位', 'Association': '协会',
   'Rez-de-chaussée': '一楼', '1er étage': '二楼', 'Étage': '楼层',
-  'Salle': '教室', 'Auditorium': '礼堂', 'Toilettes': '洗手间', 'Foodtruck': '餐车', 'WC': '洗手间', 'Café': '咖啡', 'Confs': '讲座', 'Entrée': '入口',
+  'Salle': '教室', 'Auditorium': '礼堂', 'Toilettes': '洗手间', 'Foodtruck': '餐车', 'WC': '洗手间', 'Café': '咖啡', 'Confs': '讲座', 'Entrée': '入口', 'Entrée libre': '免费入场',
 
   'Santé & Soin': '医疗与护理', 'Commerce, Marketing & Management': '商业、市场营销与管理', 'Banque, Finance & Droit': '银行、金融与法律', 'Ingénierie, Industrie & Sciences': '工程、工业与科学',
   'Numérique & Cybersécurité': '数字技术与网络安全', 'Communication, Médias & Création': '传播、媒体与创意', 'Formations professionnelles': '职业培训',
