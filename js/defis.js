@@ -8,6 +8,8 @@ import { tablesEnObjets, normaliser, slugType, typeExposantCanonique, TYPES_EXPO
 export const OBJECTIF_PAR_DEFAUT = 100;
 export const CHANCES_BADGE_PAR_DEFAUT = 1;
 export const ESSAIS_PAR_DEFAUT = 2;
+export const TOLERANCE_AVANT_PAR_DEFAUT = 15;
+export const TOLERANCE_APRES_PAR_DEFAUT = 10;
 export const ID_DEFI = /^[a-z0-9-]{1,20}$/i;
 const OUI = ['oui', 'vrai', 'true', 'x', '1'];
 const NON = ['non', 'faux', 'false', '0'];
@@ -96,7 +98,77 @@ export const TYPES_PREUVE = {
       return normaliser(defi.choix[preuve.choix]) === normaliser(reponse.bonne) ? '' : MAUVAISE_REPONSE;
     },
   },
+  // Deux votes autour d'un Événement du Programme (défi 8, la table ronde « Faut-il
+  // avoir peur de l'IA ? »), sans scan : un « avant », jusqu'à `tolerance_avant`
+  // minutes après le début prévu (15), un « après », dès `tolerance_apres` minutes
+  // avant la fin prévue (10). L'Événement est désigné par son titre (colonne
+  // `evenement`) ; ses heures viennent du Programme (lireJeu, option `evenements`),
+  // pour qu'un retard corrigé dans le tableur déplace les fenêtres. La question et
+  // les choix (obligatoires) sont publics ; chaque vote s'enregistre à part, sans
+  // le téléphone (l'avis de la salle, avant et après).
+  'votes-evenement': {
+    lireParams(l) {
+      const evenement = texte(l.evenement);
+      if (!evenement) return { motif: 'evenement vide : le titre d’un Événement du programme' };
+      if (!texte(l.question)) return { motif: 'question vide' };
+      if (!texte(l.choix)) return { motif: 'choix vides : un vote se fait parmi des choix' };
+      const params = { evenement };
+      for (const [col, defaut] of [['tolerance_avant', TOLERANCE_AVANT_PAR_DEFAUT], ['tolerance_apres', TOLERANCE_APRES_PAR_DEFAUT]]) {
+        const brut = texte(l[col]);
+        const n = brut ? Number(brut) : defaut;
+        if (!Number.isInteger(n) || n < 0 || n > 120) return { motif: `${col} illisible : « ${brut} » (minutes, de 0 à 120)` };
+        params[col] = n;
+      }
+      return { params };
+    },
+    concerne: () => false,
+    motif: () => '',
+    // Le vote reçu à l'heure `heure` (l'heure retenue, ms) : { moment, complet } s'il
+    // compte (`complet` : il fait la paire avec un vote déjà reçu), { motif } sinon.
+    // `votes` : les moments déjà reçus de ce Passeport pour ce défi.
+    voter(defi, preuve, { heure, votes }) {
+      // Sans le programme, aucun jugement : une erreur (le Worker répond 5xx, le téléphone
+      // renverra), jamais un refus définitif écrit dans D1.
+      if (!Number.isInteger(defi.params.debut)) throw new Error('heures de l’événement inconnues : lireJeu sans le programme');
+      if (!Number.isInteger(preuve.choix) || !defi.choix[preuve.choix]) return { motif: 'choix attendu' };
+      const moment = momentDuVote(defi, heure);
+      if (!moment) return { motif: 'entre les deux votes' };
+      if (votes.has(moment)) return { motif: `déjà voté ${moment}` };
+      return { moment, complet: votes.has(moment === 'avant' ? 'apres' : 'avant') };
+    },
+  },
 };
+
+// Les deux moments d'un vote : le Worker les écrit dans `validations.motif` d'un vote
+// compté et les renvoie au téléphone. Ne pas les renommer pendant le jeu.
+export const MOMENTS_VOTE = ['avant', 'apres'];
+
+// Les minutes depuis minuit à Paris (fraction comprise) d'un instant en ms : les
+// heures du Programme sont celles de Paris, quel que soit le fuseau du téléphone ou
+// du Worker (UTC). Seule l'heure compte, pas le jour : le jeu est remis à zéro avant
+// le festival et coupé après, et la recette se joue n'importe quel jour (ADR-0020).
+const HEURE_PARIS = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+export function minutesAParis(ms) {
+  const p = Object.fromEntries(HEURE_PARIS.formatToParts(new Date(ms)).map(({ type, value }) => [type, Number(value)]));
+  return p.hour * 60 + p.minute + p.second / 60; // à la seconde : 11:15:00,400 est encore 11:15:00
+}
+
+// Les fenêtres d'un défi `votes-evenement`, en minutes : « avant » jusqu'à
+// `avantJusqua`, « après » dès `apresDes`, bornes comprises.
+export function fenetresDe(defi) {
+  const { debut, fin, tolerance_avant: ta, tolerance_apres: tp } = defi.params;
+  return { avantJusqua: debut + ta, apresDes: fin - tp };
+}
+
+// Le moment d'un vote reçu à l'instant `ms` : 'avant', 'apres', ou null entre les deux.
+export function momentDuVote(defi, ms) {
+  const m = minutesAParis(ms);
+  const { avantJusqua, apresDes } = fenetresDe(defi);
+  // À la seconde près : 11:15:00 est encore « avant », 11:15:01 ne l'est plus.
+  if (m <= avantJusqua) return 'avant';
+  if (m >= apresDes) return 'apres';
+  return null;
+}
 
 // Le motif qui compte un essai de question : le Worker compte ses refus ainsi motivés,
 // dans D1. Ne pas le reformuler pendant le jeu : les essais déjà joués seraient oubliés.
@@ -163,7 +235,7 @@ function lireChancesBadge(valeur) {
 // Les onglets `Défis` et `Infos` (tables brutes, première ligne = en-têtes) → le jeu.
 // `defis` garde aussi les défis désactivés (leurs points comptent toujours) ;
 // `invalides` liste ce qui a été écarté, avec le motif.
-export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
+export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements = null } = {}) {
   const infos = {};
   for (const l of tablesEnObjets(tableInfos)) infos[normaliser(l.cle).replace(/-/g, '_')] = l.valeur;
   const { paliers, motif: motifPaliers } = lirePaliers(infos.paliers);
@@ -202,16 +274,33 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null } = {}) {
     jeu.defis.push({ id, titre: texte(l.titre), points, type_preuve: normaliser(l.type_preuve), actif: !non(l.actif), params, question: texte(l.question), choix, explication: texte(l.explication) });
   }
   // Ce qui se vérifie seulement une fois toutes les lignes lues : le défi désigné
-  // par `different_de` existe ; le stand désigné est au programme (quand il est fourni).
+  // par `different_de` existe ; le stand désigné est au programme, l'Événement d'un
+  // vote aussi, avec ses heures (quand le programme est fourni).
   const ids = new Set(jeu.defis.map((d) => d.id));
   jeu.defis = jeu.defis.filter((d) => {
     let motif = '';
     if (d.params.different_de && !ids.has(d.params.different_de)) motif = `different_de : défi ${d.params.different_de} introuvable`;
     else if (d.type_preuve === 'scan-stand' && exposants && !exposants.some((e) => standCorrespond(d.params.stand, e.cle))) motif = `stand introuvable au programme : ${d.params.nom_stand}`;
+    else if (d.type_preuve === 'votes-evenement' && evenements) motif = placerVotes(d, evenements);
     if (motif) jeu.invalides.push({ id: d.id, motif });
     return !motif;
   });
   return jeu;
+}
+
+// L'Événement d'un défi `votes-evenement` cherché au programme par son titre (casse,
+// accents et espaces ignorés) : ses heures entrent dans les paramètres du défi. Rend
+// le motif qui l'écarte, '' s'il est placé.
+function placerVotes(defi, evenements) {
+  const memes = evenements.filter((e) => normaliser(e.titre) === normaliser(defi.params.evenement));
+  if (!memes.length) return `événement introuvable au programme : ${defi.params.evenement}`;
+  if (memes.length > 1) return `événement au programme ${memes.length} fois : ${defi.params.evenement} (un titre unique pour le vote)`;
+  const [ev] = memes;
+  if (!Number.isInteger(ev.debut) || !Number.isInteger(ev.fin)) return `événement sans heure de début ou de fin : ${ev.titre}`;
+  Object.assign(defi.params, { evenement: ev.titre, debut: ev.debut, fin: ev.fin });
+  const { avantJusqua, apresDes } = fenetresDe(defi);
+  if (apresDes <= avantJusqua) return `fenêtres de vote qui se chevauchent : l’événement dure ${ev.fin - ev.debut} min, les tolérances ${defi.params.tolerance_avant} + ${defi.params.tolerance_apres}`;
+  return '';
 }
 
 // Les bonnes réponses (D1 : défi → { bonne, jeton }) confrontées aux questions du
@@ -259,13 +348,24 @@ export function motifIci(defi, contexte) {
 // `faits`, les défis qu'il a déjà validés (déduits des scans par défaut).
 // `choix` : le numéro du choix envoyé, gardé seulement s'il est dans la liste du
 // défi (une liste raccourcie le jour J ne coûte pas le point).
-export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map() }) {
+// Un vote (`votes-evenement`) : `heure`, l'heure retenue de la validation (ms) ;
+// `votes`, les moments déjà reçus de ce Passeport, par défi (Map défi → Set). Le
+// premier vote reçu a le statut `vote` (compté, pas encore de point), celui qui fait
+// la paire `ok` ; les deux portent leur `moment`.
+export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map() }) {
   const refus = (motif) => ({ statut: 'refus', motif, choix: null });
   if (!jeu.actif) return refus('jeu coupé');
   const defi = jeu.defis.find((d) => d.id === v.defi && d.actif);
   if (!defi) return refus('défi inconnu ou inactif');
+  const { verifier, voter } = TYPES_PREUVE[defi.type_preuve];
+  if (voter) {
+    if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
+    const preuve = v.preuve || {};
+    const r = voter(defi, preuve, { heure, votes: votes.get(defi.id) || new Set() });
+    if (r.motif) return refus(r.motif);
+    return { statut: r.complet ? 'ok' : 'vote', motif: '', choix: preuve.choix, libelle: defi.choix[preuve.choix], moment: r.moment };
+  }
   // Un Type qui se prouve sans Exposant (la question) vérifie sa preuve lui-même.
-  const { verifier } = TYPES_PREUVE[defi.type_preuve];
   if (verifier) {
     if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
     const motif = verifier(defi, v.preuve || {}, { reponse: reponses.get(defi.id) || null, ratees: ratees.get(defi.id) || 0 });

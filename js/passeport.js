@@ -3,12 +3,15 @@
 // Worker CONFIRME : une validation reste « en attente » jusqu'à ce que la réponse
 // du Worker la montre traitée, et la file la renvoie jusque-là.
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
-//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai? }], passeport: { points, defis } | null }
+//   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai?, moment? }], passeport: { points, defis } | null }
 // `essai` : une mauvaise réponse à une question, dite par le Worker (grand-defi 04).
-// statut : attente | ok | deja | refus.
-import { proposable, motifIci, chancesDe, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
+// `moment` : avant | apres, la fenêtre où le Worker a compté un vote (grand-defi 05).
+// statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
+import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, MOMENTS_VOTE, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
-const STATUTS = ['attente', 'ok', 'deja', 'refus'];
+const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
+// Ce que le Worker ajoute à une validation traitée (son 3e élément).
+const marqueDe = (m) => (m === 'essai' ? { essai: true } : MOMENTS_VOTE.includes(m) ? { moment: m } : {});
 const texte = (v) => typeof v === 'string';
 
 export function etatJeuInitial() {
@@ -27,7 +30,7 @@ export function migrerJeu(brut) {
   if (!brut || typeof brut !== 'object') return e;
   e.validations = (Array.isArray(brut.validations) ? brut.validations : [])
     .filter((v) => v && texte(v.id) && texte(v.defi) && v.preuve && typeof v.preuve === 'object')
-    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente', ...(v.essai === true ? { essai: true } : {}) }));
+    .map((v) => ({ id: v.id, defi: v.defi, exposant: texte(v.exposant) ? v.exposant : '', t: Number(v.t) || 0, preuve: preuve(v.preuve.secret, v.preuve.choix), statut: STATUTS.includes(v.statut) ? v.statut : 'attente', ...(v.essai === true ? { essai: true } : {}), ...marqueDe(v.moment) }));
   const p = brut.passeport;
   if (p && typeof p === 'object') e.passeport = { points: Number(p.points) || 0, defis: (Array.isArray(p.defis) ? p.defis : []).filter(texte) };
   return e;
@@ -69,7 +72,7 @@ export function enAttente(etat) {
 // leur statut, les autres restent en attente ; les points sont les siens.
 export function appliquerReponse(etat, passeport) {
   if (!passeport || !Array.isArray(passeport.traitees)) return etat;
-  const traitees = new Map(passeport.traitees.filter((x) => Array.isArray(x) && STATUTS.includes(x[1])).map(([id, statut, marque]) => [id, { statut, ...(marque === 'essai' ? { essai: true } : {}) }]));
+  const traitees = new Map(passeport.traitees.filter((x) => Array.isArray(x) && STATUTS.includes(x[1])).map(([id, statut, marque]) => [id, { statut, ...marqueDe(marque) }]));
   return {
     validations: etat.validations.map((v) => (traitees.has(v.id) ? { ...v, ...traitees.get(v.id) } : v)),
     passeport: { points: Number(passeport.points) || 0, defis: (passeport.defis || []).filter(texte) },
@@ -95,6 +98,58 @@ export function statutDefi(etat, defi, essais = null) {
 }
 
 const essaisDe = (defi) => (defi.type_preuve === 'reponse' && Number.isInteger(defi.params.essais) ? defi.params.essais : null);
+
+// L'état d'un défi dans Mes défis et la jauge, selon son Type. `maintenant` (ms) :
+// sans lui, un vote n'est jamais dit perdu.
+function statutDuDefi(defi, etat, maintenant = null) {
+  if (defi.type_preuve !== 'votes-evenement') return statutDefi(etat, defi.id, essaisDe(defi));
+  const { statut } = etatDesVotes(defi, etat, maintenant);
+  return { valide: 'valide', attente: 'attente', ferme: 'refuse' }[statut] || 'a-faire';
+}
+
+// Les deux votes d'un défi `votes-evenement` vus du téléphone. Un vote compté a le
+// moment que dit le Worker (l'heure retenue peut l'avoir déplacé) ; un vote envoyé,
+// celui qu'estime son heure. Une fenêtre : fait | attente | ouverte | fermee |
+// pas-encore (ces trois-là, seulement avec `maintenant`).
+function etatDesVotes(defi, etat, maintenant) {
+  const miennes = etat.validations.filter((v) => v.defi === defi.id);
+  const valide = (etat.passeport && etat.passeport.defis.includes(defi.id)) || miennes.some((v) => v.statut === 'ok' || v.statut === 'deja');
+  const { avantJusqua, apresDes } = Number.isInteger(defi.params.debut) ? fenetresDe(defi) : { avantJusqua: null, apresDes: null };
+  const m = maintenant === null || avantJusqua === null ? null : minutesAParis(maintenant);
+  const fenetre = (moment) => {
+    const compte = miennes.find((v) => (v.statut === 'vote' || v.statut === 'ok') && v.moment === moment);
+    const envoye = !compte && avantJusqua !== null && miennes.find((v) => v.statut === 'attente' && momentDuVote(defi, v.t) === moment);
+    const vu = compte || envoye;
+    let e = compte ? 'fait' : envoye ? 'attente' : null;
+    if (!e && m !== null) e = moment === 'avant' ? (m <= avantJusqua ? 'ouverte' : 'fermee') : (m >= apresDes ? 'ouverte' : 'pas-encore');
+    return { etat: e, choix: vu ? vu.preuve.choix : null };
+  };
+  const avant = fenetre('avant');
+  const apres = fenetre('apres');
+  const couvert = (f) => f.etat === 'fait' || f.etat === 'attente';
+  let statut = 'ouvert';
+  if (valide) statut = 'valide';
+  else if (couvert(avant) && couvert(apres)) statut = 'attente';
+  else if (avant.etat === 'fermee') statut = 'ferme';
+  return { statut, avant: { ...avant, jusqua: avantJusqua }, apres: { ...apres, des: apresDes } };
+}
+
+// L'écran de vote (grand-defi 05), ou null si ce défi n'est pas un vote. statut :
+// ouvert | attente (le second vote attend son verdict) | valide | ferme (la fenêtre
+// « avant » est passée sans vote : le défi ne peut plus être validé). `fenetres` :
+// { avant: { etat, choix, jusqua }, apres: { etat, choix, des } } (heures en minutes
+// depuis minuit, à Paris). `peutVoter` : le moment d'un vote possible maintenant, ou null.
+// `refuse` : le dernier vote envoyé a été refusé (à l'heure du serveur, hors fenêtre).
+export function voteIci(jeu, etat, id, maintenant) {
+  const defi = jeu && jeu.actif ? jeu.defis.find((d) => d.id === id && d.type_preuve === 'votes-evenement') : null;
+  if (!defi) return null;
+  const { statut, avant, apres } = etatDesVotes(defi, etat, maintenant);
+  const peutVoter = statut === 'ouvert' ? (avant.etat === 'ouverte' ? 'avant' : apres.etat === 'ouverte' ? 'apres' : null) : null;
+  // Le dernier vote refusé par le Worker, s'il n'a pas été suivi d'un autre : l'horloge du
+  // téléphone le plaçait dans une fenêtre, celle du serveur non (téléphone à l'heure fausse).
+  const derniere = etat.validations.filter((v) => v.defi === id).at(-1);
+  return { defi, statut, fenetres: { avant, apres }, peutVoter, refuse: Boolean(derniere && derniere.statut === 'refus') };
+}
 
 // L'écran d'une question (grand-defi 04), ou null si ce défi n'en est pas une.
 // statut : ouvert | attente (une réponse envoyée attend son verdict : pas d'autre
@@ -133,9 +188,10 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [] } = {}) {
 }
 
 // L'écran « Mes défis » : chaque défi actif, dans l'ordre du tableur, et son état.
-export function mesDefis(jeu, etat) {
+// `maintenant` (ms) : un vote dont la fenêtre « avant » est passée sans vote est refusé.
+export function mesDefis(jeu, etat, { maintenant = null } = {}) {
   if (!jeu || !jeu.actif) return [];
-  return jeu.defis.map((defi) => ({ defi, statut: statutDefi(etat, defi.id, essaisDe(defi)) }));
+  return jeu.defis.map((defi) => ({ defi, statut: statutDuDefi(defi, etat, maintenant) }));
 }
 
 // La jauge de l'accueil, ou null : pas de jeu, ou pas encore joué (un Visiteur
@@ -145,7 +201,7 @@ export function mesDefis(jeu, etat) {
 export function jauge(jeu, etat) {
   if (!jeu || !jeu.actif || !etat.validations.length) return null;
   const points = etat.passeport ? etat.passeport.points : 0;
-  const attente = jeu.defis.filter((d) => statutDefi(etat, d.id, essaisDe(d)) === 'attente').reduce((s, d) => s + d.points, 0);
+  const attente = jeu.defis.filter((d) => statutDuDefi(d, etat) === 'attente').reduce((s, d) => s + d.points, 0);
   return { points, attente, objectif: jeu.objectif, ...chancesDe(points, etat.passeport ? etat.passeport.defis : [], jeu) };
 }
 

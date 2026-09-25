@@ -8,7 +8,7 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci } from './passeport.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci } from './passeport.js';
 import { standCorrespond, paliersDe, chancesBadgeDe } from './defis.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
@@ -419,6 +419,7 @@ function commentProuver(etat, d) {
     texte = t('QR du stand %s', e ? e.nom : d.params.nom_stand);
   } else if (d.type_preuve === 'hors-domaines') texte = t('QR d’un stand d’un domaine encore jamais scanné');
   else if (d.type_preuve === 'reponse') texte = `${t(d.params.qr ? 'QR de la question, puis la bonne réponse' : 'Une question, et la bonne réponse')} · ${tn('%s essai', '%s essais', d.params.essais)}`;
+  else if (d.type_preuve === 'votes-evenement') texte = t('Voter avant et après : %s', tt(d.params.evenement));
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
 
@@ -465,7 +466,7 @@ function carnetDeLaFiche(etat, ex, secret) {
 function ecranMesDefis(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
   const jeu = (etat.visite && etat.visite.jeu) || { validations: [], passeport: null };
-  const liste = mesDefis(etat.grandDefi, jeu);
+  const liste = mesDefis(etat.grandDefi, jeu, { maintenant: maintenantMs(etat) });
   if (!liste.length) return `${entete(t('Mes défis'), '', retour)}
     <p class="vide">${h(t('Le Grand Défi n’est pas ouvert.'))}</p>
     <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
@@ -475,7 +476,8 @@ function ecranMesDefis(etat) {
     <ul class="mes-defis">${liste.map(({ defi, statut }) => `<li>
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
       <span class="comment">${h(commentProuver(etat, defi))}${defi.type_preuve === 'reponse' && !defi.params.qr && statut === 'a-faire'
-        ? ` <a href="#/question/${attr(encodeURIComponent(defi.id))}">${h(t('Répondre'))}</a>` : ''}</span>
+        ? ` <a href="#/question/${attr(encodeURIComponent(defi.id))}">${h(t('Répondre'))}</a>` : ''}${defi.type_preuve === 'votes-evenement' && statut === 'a-faire'
+        ? ` <a href="#/vote/${attr(encodeURIComponent(defi.id))}">${h(t('Voter'))}</a>` : ''}</span>
       <span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>
     </li>`).join('')}</ul>
     <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a></div>`;
@@ -514,6 +516,56 @@ function ecranQuestion(etat) {
     <section class="question-defi">
       <p class="question">${h(tt(defi.question))}</p>
       ${corps}${explication}
+    </section>
+    <div class="boutons"><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a></div>`;
+}
+
+// L'heure de l'écran (ms) : celle posée par app.js au rendu, sinon l'horloge.
+const maintenantMs = (etat) => (etat.maintenant && Number.isFinite(etat.maintenant.ms) ? etat.maintenant.ms : Date.now());
+
+// Les deux votes autour d'un Événement (grand-defi 05, le défi 8, la table ronde) :
+// la question, puis une ligne par fenêtre (« avant », jusqu'à début + 15 min ;
+// « après », dès fin − 10 min), avec son état et ses choix quand elle est ouverte.
+// Un choix touché part par son numéro ; le Worker juge l'heure. Sans scan : on y
+// vient depuis Mes défis.
+// Une fenêtre ouverte sans choix à toucher (le défi est validé ou perdu) : fermée pour ce téléphone.
+const ETAT_FENETRE = { attente: 'Vote envoyé', fermee: 'Fermé', ouverte: 'Fermé', 'pas-encore': 'Pas encore ouvert' };
+function ecranVote(etat) {
+  const retour = { href: '#/defis', libelle: t('Mes défis') };
+  const pasOuvert = (message) => `${entete(t('Grand Défi'), '', retour)}
+    <p class="vide">${h(message)}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  if (!etat.grandDefi || !etat.grandDefi.actif) return pasOuvert(t('Le Grand Défi n’est pas ouvert.'));
+  const v = voteIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, etat.route.params.defi, maintenantMs(etat));
+  if (!v) return pasOuvert(t('Ce défi n’est pas un vote.'));
+  const { defi, statut, fenetres, peutVoter, refuse } = v;
+  const verdict = {
+    valide: `<p class="verdict ok">${h(t('Vos deux votes sont comptés !'))} +${h(defi.points)}</p>`,
+    attente: `<p class="verdict attente">${h(t('Vote envoyé : le verdict arrive.'))}</p>`,
+    ferme: `<p class="verdict ferme">${h(t('Défi fermé : le vote « avant » n’a pas été donné à temps.'))}</p>`,
+  }[statut] || (refuse ? `<p class="verdict ferme">${h(t('Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.'))}</p>` : '');
+  const ligne = (moment, nom, quand) => {
+    const f = fenetres[moment];
+    let contenu;
+    if (f.etat === 'fait') contenu = `<span class="etat valide">${h(t('Voté : %s', tt(defi.choix[f.choix] || '')))}</span>`;
+    else if (peutVoter === moment) contenu = `<div class="choix" role="group" aria-label="${attr(tt(defi.question))}">${defi.choix.map((c, i) => `<button class="bouton secondaire" type="button" data-action="voter" data-defi="${attr(defi.id)}" data-choix="${i}">${h(tt(c))}</button>`).join('')}</div>`;
+    else contenu = `<span class="etat ${attr(f.etat || '')}">${h(t(ETAT_FENETRE[f.etat] || 'Pas encore ouvert'))}</span>`;
+    return `<li class="fenetre ${attr(f.etat || '')}"><span class="nom">${h(t(nom))}</span><span class="quand">${h(quand)}</span>${contenu}</li>`;
+  };
+  // L'Événement, lié à sa fiche : par son format quand son titre est la question même.
+  const ev = etat.modele.evenements.find((e) => normaliser(e.titre) === normaliser(defi.params.evenement) && e.debut === defi.params.debut);
+  const memeTitre = ev && normaliser(ev.titre) === normaliser(defi.question);
+  const nomEvenement = h(memeTitre ? t(ev.format) : tt(defi.params.evenement));
+  return `${entete(nomDefi(defi), `+${h(defi.points)}`, retour)}
+    <section class="vote-defi">
+      <p class="question">${h(tt(defi.question))}</p>
+      <p class="evenement">${ev ? `<a href="${attr(lienEvenement(ev.cle))}">${nomEvenement}</a>` : nomEvenement} · ${h(heure(defi.params.debut))} – ${h(heure(defi.params.fin))}</p>
+      ${verdict}
+      <ol class="fenetres">
+        ${ligne('avant', 'Avant', t('jusqu’à %s', heure(fenetres.avant.jusqua)))}
+        ${ligne('apres', 'Après', t('à partir de %s', heure(fenetres.apres.des)))}
+      </ol>
+      <p class="note">${h(t('Chaque vote est compté sans lien avec votre téléphone.'))}</p>
     </section>
     <div class="boutons"><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a></div>`;
 }
@@ -1141,6 +1193,7 @@ export function ecran(etat) {
     case 'defis': return ecranMesDefis(etat);
     case 'regle': return ecranRegle(etat);
     case 'question': return ecranQuestion(etat);
+    case 'vote': return ecranVote(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1149,7 +1202,7 @@ export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
   const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu') }[etat.route.nom];
-  if (etat.route.nom === 'question') {
+  if (etat.route.nom === 'question' || etat.route.nom === 'vote') {
     const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
     return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;
   }

@@ -106,4 +106,7 @@ export default [
   "Règle du jeu", "Au tirage", "%s chance", "%s chances", "Prochaine chance : plus que %s point", "Prochaine chance : plus que %s points", "Badge Explorateur 100 %", "+%s chance", "+%s chances", "Scannez les QR des chevalets pour gagner des points.", "À %s points, vous êtes au tirage de %s.", "À %s points, vous êtes au tirage.", "Plus de points, plus de chances.", "Tous les défis", "Soyez vigilant : plus de chances de gagner avec les instants gagnants, le défi mystère et les autres annonces.", "Lire le règlement du jeu",
   // Grand Défi : la question Parcoursup (grand-defi 04)
   "QR de la question, puis la bonne réponse", "Une question, et la bonne réponse", "%s essai", "%s essais", "Répondre", "Ce défi n’est pas une question.", "Bonne réponse !", "Défi fermé : %s essai utilisé.", "Défi fermé : %s essais utilisés.", "Réponse envoyée : le verdict arrive.", "Scannez le QR de ce défi pour répondre.", "Pas la bonne réponse.", "Essai %s sur %s",
+  // Grand Défi : les votes de la table ronde (grand-defi 05)
+  "Voter avant et après : %s", "Voter", "Ce défi n’est pas un vote.", "Vos deux votes sont comptés !", "Vote envoyé : le verdict arrive.", "Défi fermé : le vote « avant » n’a pas été donné à temps.", "Voté : %s", "Vote envoyé", "Fermé", "Pas encore ouvert", "Avant", "Après", "jusqu’à %s", "à partir de %s", "Chaque vote est compté sans lien avec votre téléphone.",
+  "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.",
 ];

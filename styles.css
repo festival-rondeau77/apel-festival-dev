@@ -330,6 +330,27 @@ main { min-height: 60vh; }
 .question-defi .verdict.attente { color: var(--orange); }
 .question-defi .explication { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--trait); }
 
+/* grand-defi 05 : les deux votes autour d'un Événement, une ligne par fenêtre. */
+.vote-defi { margin: 14px 0 0; padding: 16px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
+.vote-defi .question { margin: 0 0 4px; font-size: 1.15rem; font-weight: 650; }
+.vote-defi .evenement { margin: 0 0 12px; color: var(--encre-2); font-size: 0.92rem; }
+.vote-defi .verdict { margin: 0 0 10px; font-weight: 700; }
+.vote-defi .verdict.ok { color: var(--bleu); }
+.vote-defi .verdict.ferme { color: var(--alerte); }
+.vote-defi .verdict.attente { color: var(--orange); }
+.vote-defi .fenetres { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.vote-defi .fenetre { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 6px 10px; padding: 12px; background: var(--carte); border-radius: 4px 4px 12px 4px; }
+.vote-defi .fenetre .nom { font-weight: 700; }
+.vote-defi .fenetre .quand { color: var(--encre-2); font-size: 0.92rem; }
+.vote-defi .fenetre .etat, .vote-defi .fenetre .choix { grid-column: 1 / -1; }
+.vote-defi .fenetre .etat { font-weight: 650; font-size: 0.95rem; color: var(--encre-2); }
+.vote-defi .fenetre .etat.valide { color: var(--bleu); }
+.vote-defi .fenetre .etat.attente { color: var(--orange); }
+.vote-defi .fenetre.fermee .etat { color: var(--alerte); }
+.vote-defi .choix { display: grid; gap: 8px; }
+.vote-defi .choix .bouton { min-height: 48px; font-size: 1.05rem; }
+.vote-defi .note { margin: 12px 0 0; color: var(--encre-2); font-size: 0.88rem; }
+
 /* grand-defi 03 : au-delà du premier Palier, la jauge compte des Chances ; la Règle du jeu en trois idées. */
 .grand-defi .prochaine { margin: 8px 0 0; font-size: 0.92rem; font-weight: 600; }
 .grand-defi .badge-explorateur { display: inline-block; margin: 10px 0 0; padding: 4px 10px; border-radius: 999px; background: var(--bleu-pale); color: var(--bleu); font-weight: 700; font-size: 0.88rem; }

@@ -1,12 +1,12 @@
 // Navigation par fragment d'URL : « #/programme », « #/evenement/<clé> »,
 // « #/exposant/<clé>?qr=1 », « #/carte/<étiquette>/<jeton> », « #/c/<étiquette> »,
-// « #/question/<défi>/<jeton> », « #/plan?salle=Salle 12 ». Pure.
+// « #/question/<défi>/<jeton> », « #/vote/<défi> », « #/plan?salle=Salle 12 ». Pure.
 import { exposantDeCarte, etiquetteCanonique } from './donnees.js';
 
 const ROUTES = [
   ['', 'accueil'], ['programme', 'programme'], ['evenement', 'evenement'], ['exposants', 'exposants'], ['exposant', 'exposant'],
   ['plan', 'plan'], ['visite', 'visite'], ['preparer', 'preparer'], ['questions', 'questions'], ['aide', 'aide'],
-  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'], ['question', 'question'],
+  ['scanner', 'scanner'], ['rejouer', 'rejouer'], ['defis', 'defis'], ['regle', 'regle'], ['carte', 'carte'], ['c', 'cartePublique'], ['question', 'question'], ['vote', 'vote'],
 ];
 
 // Les routes qui ouvrent la fiche d'un Exposant (voir ficheOuverte).
@@ -28,7 +28,7 @@ export function analyserRoute(hash) {
   if ((nom === 'evenement' || nom === 'exposant') && segments[1]) params.cle = segments[1];
   if ((nom === 'carte' || nom === 'cartePublique') && segments[1]) params.etiquette = segments[1];
   if ((nom === 'carte' || nom === 'question') && segments[2]) params.jeton = segments[2];
-  if (nom === 'question' && segments[1]) params.defi = segments[1];
+  if ((nom === 'question' || nom === 'vote') && segments[1]) params.defi = segments[1];
   return { nom, params, chemin: segments.join('/') };
 }
 

@@ -150,7 +150,7 @@ const el = { main: $('#ecran'), nav: $('#nav'), bandeau: $('#bandeau'), pied: $(
 function calculerMaintenant() {
   const d = new Date();
   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  etat.maintenant = { jourJ: etat.modele.infos.date === iso, minutes: d.getHours() * 60 + d.getMinutes(), iso };
+  etat.maintenant = { jourJ: etat.modele.infos.date === iso, minutes: d.getHours() * 60 + d.getMinutes(), iso, ms: d.getTime() };
 }
 
 function message(texte, { classe = '', duree = 6000, action = null } = {}) {
@@ -353,6 +353,19 @@ function repondre(defi, choix) {
   envoiJeu.envoyer();
 }
 
+// Un vote autour d'un Événement (grand-defi 05) : le numéro du choix touché, et rien
+// d'autre ; l'heure du téléphone part avec, le Worker la retient ou prend l'heure
+// d'arrivée. Seulement dans une fenêtre ouverte, un vote à la fois.
+function voter(defi, choix) {
+  const { nom, params } = etat.route;
+  const v = nom === 'vote' && params.defi === defi ? Passeport.voteIci(etat.grandDefi, etat.visite.jeu, defi, Date.now()) : null;
+  const n = Number(choix);
+  if (!v || !v.peutVoter || !Number.isInteger(n)) return;
+  const val = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: '', secret: '', choix: n, t: Date.now() });
+  modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, val) });
+  envoiJeu.envoyer();
+}
+
 // Rejouer depuis le début (essai, grand-defi 11) : ce téléphone oublie son Passeport
 // et ses validations, puis l'appli redémarre et en tire un nouveau (ID_PASSEPORT est
 // fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
@@ -547,6 +560,7 @@ document.addEventListener('click', (e) => {
     case 'theme': changerTheme(); break;
     case 'valider-defi': validerDefi(cible.dataset.defi, cle, cible.dataset.choix); break;
     case 'repondre': repondre(cible.dataset.defi, cible.dataset.choix); break;
+    case 'voter': voter(cible.dataset.defi, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     default: break;
   }
@@ -1014,6 +1028,8 @@ async function demarrer() {
   envoiJeu.envoyer();
   verifierRappels();
   setInterval(verifierRappels, 30000);
+  // L'écran de vote suit l'horloge : une fenêtre s'ouvre ou se ferme sans geste.
+  setInterval(() => { if (etat.route.nom === 'vote' && document.visibilityState === 'visible') rendre({ conserver: true }); }, 20000);
   window.__festival = { etat, rendre, stats, sources, changerLangue, changerTheme, chargerJeu }; // pour le test de fumée et le débogage
 }
 
