@@ -11,7 +11,7 @@ export default {
   '3e': 'Year 10 (3e)', '2nde': 'Year 11 (2nde)', '1re': 'Year 12 (1re)', 'Terminale': 'Year 13 (Terminale)', 'étudiant': 'student', 'parent': 'parent',
   'Université': 'University', 'Prépa': 'Prep school', 'Lycée': 'High school', 'CFA': 'CFA', 'UFA': 'UFA', 'Association': 'Association',
   'Rez-de-chaussée': 'Ground floor', '1er étage': '1st floor', 'Étage': 'Floor',
-  'Salle': 'Room', 'Auditorium': 'Auditorium', 'Toilettes': 'Toilets', 'Foodtruck': 'Food truck', 'WC': 'WC', 'Café': 'Café', 'Confs': 'Talks', 'Entrée': 'Entrance', 'Entrée libre': 'Free entry',
+  'Salle': 'Room', 'Auditorium': 'Auditorium', 'Toilettes': 'Toilets', 'Foodtruck': 'Food truck', 'WC': 'WC', 'Café': 'Café', 'Confs': 'Talks', 'Entrée': 'Entrance', 'Entrée libre': 'Free entry', 'Passer en thème sombre': 'Switch to dark theme', 'Passer en thème clair': 'Switch to light theme',
 
   'Santé & Soin': 'Health & Care', 'Commerce, Marketing & Management': 'Business, Marketing & Management', 'Banque, Finance & Droit': 'Banking, Finance & Law', 'Ingénierie, Industrie & Sciences': 'Engineering, Industry & Science',
   'Numérique & Cybersécurité': 'Digital & Cybersecurity', 'Communication, Médias & Création': 'Communication, Media & Creative', 'Formations professionnelles': 'Vocational training',

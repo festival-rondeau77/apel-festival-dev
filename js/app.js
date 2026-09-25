@@ -23,6 +23,8 @@ const etat = {
   // La langue affichée (ADR-0012) et les traductions du bandeau jointes à l'état
   // du script ({ en, es, zh }) — celles du tableur passent par tt().
   langue: 'fr', bandeaux: null,
+  // Le thème, clair par défaut (le festival a lieu le jour) ; le sombre est un choix, mémorisé.
+  theme: 'clair',
   // Version du code chargé, et version que le service worker sert réellement.
   // Les deux sont affichées en pied de page : leur écart révèle un cache périmé.
   versionAppli: CONFIG.version, versionSW: null,
@@ -63,6 +65,23 @@ function appliquerLangue(l, { memoriser = false } = {}) {
 }
 definirLanguesProposees(CONFIG.langues || ['fr']);
 appliquerLangue(langueInitiale({ param: parametreLangue(), stockage, navigateur: navigator.languages || navigator.language }));
+
+// Le thème : posé sur <html data-theme> (styles.css) et dans la couleur de la barre du navigateur.
+const CLE_STOCKAGE_THEME = 'festival.theme';
+function appliquerTheme(theme, { memoriser = false } = {}) {
+  etat.theme = theme === 'sombre' ? 'sombre' : 'clair';
+  document.documentElement.dataset.theme = etat.theme === 'sombre' ? 'dark' : 'light';
+  const couleur = document.querySelector('meta[name="theme-color"]');
+  if (couleur) couleur.content = etat.theme === 'sombre' ? '#06182C' : '#F8F8F8';
+  if (memoriser) { try { stockage.setItem(CLE_STOCKAGE_THEME, etat.theme); } catch { /* quota ou navigation privée */ } }
+}
+appliquerTheme((() => { try { return stockage.getItem(CLE_STOCKAGE_THEME); } catch { return null; } })());
+
+function changerTheme() {
+  appliquerTheme(etat.theme === 'sombre' ? 'clair' : 'sombre', { memoriser: true });
+  stats.noter('ecran', `theme:${etat.theme}`);
+  rendre({ conserver: true });
+}
 
 function changerLangue(l) {
   if (!languesProposees().includes(l) || l === etat.langue) return;
@@ -512,6 +531,7 @@ document.addEventListener('click', (e) => {
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
+    case 'theme': changerTheme(); break;
     case 'valider-defi': validerDefi(cible.dataset.defi, cle, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     default: break;
@@ -980,7 +1000,7 @@ async function demarrer() {
   envoiJeu.envoyer();
   verifierRappels();
   setInterval(verifierRappels, 30000);
-  window.__festival = { etat, rendre, stats, sources, changerLangue, chargerJeu }; // pour le test de fumée et le débogage
+  window.__festival = { etat, rendre, stats, sources, changerLangue, changerTheme, chargerJeu }; // pour le test de fumée et le débogage
 }
 
 demarrer();

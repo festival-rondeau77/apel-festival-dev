@@ -188,12 +188,17 @@ export function entete(titre, sous = '', retour = null) {
 // Le sélecteur de langue : quatre pastilles, chacune dans sa propre langue. Sur
 // l'accueil et dans « Besoin d'aide ? » — là où arrive un Visiteur qui ne lit pas
 // le français, et là où il cherche de l'aide. Rien avec une seule langue proposée.
-export function selecteurLangue() {
+// La rangée des réglages, en haut de l'accueil et de « Besoin d'aide ? » : un petit
+// bouton de thème (une icône, sans texte ; clair par défaut, le festival a lieu le
+// jour) et, s'il y en a plusieurs, les langues proposées.
+export function reglagesHaut(etat) {
+  const sombre = etat.theme === 'sombre';
+  const theme = `<button class="theme" type="button" data-action="theme" aria-label="${attr(t(sombre ? 'Passer en thème clair' : 'Passer en thème sombre'))}">${icone(sombre ? 'soleil' : 'lune', 18)}</button>`;
   const proposees = languesProposees();
-  if (proposees.length < 2) return '';
-  return `<div class="langues" role="group" aria-label="${attr(t('Langue'))}">
+  const langues = proposees.length < 2 ? '' : `<div class="langues" role="group" aria-label="${attr(t('Langue'))}">
     ${proposees.map((l) => `<button class="langue" type="button" lang="${l}" data-action="langue" data-valeur="${l}" aria-pressed="${l === langue()}">${h(NOMS_LANGUES[l])}</button>`).join('')}
   </div>`;
+  return `<div class="reglages-haut">${theme}${langues}</div>`;
 }
 
 // ---------------------------------------------------------------- accueil
@@ -234,7 +239,7 @@ export function ecranAccueil(etat) {
     `<a href="${href}" class="${classe}"${ton ? ` data-ton="${attr(ton)}"` : ''}>${icone(ico, 22)}<span>${h(libelle)}${extra}</span></a>`;
   // « Préparer ma visite » et « Besoin d'aide ? » ne sont dans aucune barre de
   // navigation : l'accueil est le seul endroit où on peut les trouver.
-  return `${selecteurLangue()}
+  return `${reglagesHaut(etat)}
   <section class="affiche">
     <div class="filigrane">${fleurApel()}</div>
     <h1>${titreAffiche(tt(infos.nom || "Festival de l'Orientation"))}</h1>
@@ -980,7 +985,7 @@ export function ecranAide(etat) {
     i.contact_tel ? `<a href="tel:${attr(i.contact_tel.replace(/\s/g, ''))}">${h(i.contact_tel)}</a>` : '',
   ].filter(Boolean).join(' · ');
   return `${entete(t("Besoin d'aide ?"), h(i.lieu || ''))}
-  ${selecteurLangue()}
+  ${reglagesHaut(etat)}
   <section class="carte">
     ${blocLien('info', t("Où est l'accueil ?"), salleAccueil ? phraseGuidage(salleAccueil) : (tt(i.entree) || t("À l'entrée du lycée")), lienPlanSalle(salleAccueil ? salleAccueil.nom : 'Accueil'))}
     ${blocLien('toilettes', t('Où sont les toilettes ?'), salleWc ? phraseGuidage(salleWc) : t("Près de l'accueil"), lienPlanSalle(salleWc ? salleWc.nom : 'Toilettes'))}

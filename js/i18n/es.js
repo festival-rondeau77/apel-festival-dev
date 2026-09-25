@@ -11,7 +11,7 @@ export default {
   '3e': '3e (3.º ESO)', '2nde': '2nde (4.º ESO)', '1re': '1re (1.º Bach.)', 'Terminale': 'Terminale (2.º Bach.)', 'étudiant': 'universitario', 'parent': 'padre o madre',
   'Université': 'Universidad', 'Prépa': 'Clase preparatoria', 'Lycée': 'Instituto', 'CFA': 'CFA', 'UFA': 'UFA', 'Association': 'Asociación',
   'Rez-de-chaussée': 'Planta baja', '1er étage': 'Primera planta', 'Étage': 'Planta',
-  'Salle': 'Sala', 'Auditorium': 'Auditorio', 'Toilettes': 'Aseos', 'Foodtruck': 'Food truck', 'WC': 'WC', 'Café': 'Café', 'Confs': 'Confs', 'Entrée': 'Entrada', 'Entrée libre': 'Entrada libre',
+  'Salle': 'Sala', 'Auditorium': 'Auditorio', 'Toilettes': 'Aseos', 'Foodtruck': 'Food truck', 'WC': 'WC', 'Café': 'Café', 'Confs': 'Confs', 'Entrée': 'Entrada', 'Entrée libre': 'Entrada libre', 'Passer en thème sombre': 'Cambiar al tema oscuro', 'Passer en thème clair': 'Cambiar al tema claro',
 
   'Santé & Soin': 'Salud y cuidados', 'Commerce, Marketing & Management': 'Comercio, marketing y gestión', 'Banque, Finance & Droit': 'Banca, finanzas y derecho', 'Ingénierie, Industrie & Sciences': 'Ingeniería, industria y ciencias',
   'Numérique & Cybersécurité': 'Digital y ciberseguridad', 'Communication, Médias & Création': 'Comunicación, medios y creación', 'Formations professionnelles': 'Formación profesional',

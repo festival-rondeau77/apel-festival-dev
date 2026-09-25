@@ -32,6 +32,9 @@ const D = {
   cafe: `<path ${T} d="M4.4 8.4h12v6.2a4.4 4.4 0 0 1-4.4 4.4H8.8a4.4 4.4 0 0 1-4.4-4.4z"/><path ${T} d="M16.4 10.2h1.8a2.4 2.4 0 0 1 0 4.8h-1.8M4.4 21.4h12"/>`,
   // Entrer : une flèche qui passe une porte (la pastille « Entrée libre » de l'accueil).
   entrer: `<path ${T} d="M13.4 4h5a1.4 1.4 0 0 1 1.4 1.4v13.2a1.4 1.4 0 0 1-1.4 1.4h-5M4.2 12h10.6m-3.8-4 4 4-4 4"/>`,
+  // Le thème (clair / sombre) : la lune propose le sombre, le soleil le clair.
+  lune: `<path ${T} d="M19.8 14.6A8 8 0 0 1 9.4 4.2a8 8 0 1 0 10.4 10.4z"/>`,
+  soleil: `<circle ${T} cx="12" cy="12" r="3.8"/><path ${T} d="M12 2.8v2m0 14.4v2M2.8 12h2m14.4 0h2M5.5 5.5l1.4 1.4m10.2 10.2 1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/>`,
   porte: `<path ${T} d="M5.6 21V4.6a1.6 1.6 0 0 1 1.6-1.6h9.6a1.6 1.6 0 0 1 1.6 1.6V21"/><path ${T} d="M3.6 21h16.8M14.6 12.2h.01"/>`,
   train: `<rect ${T} x="5.4" y="3.6" width="13.2" height="12.6" rx="2.6"/><path ${T} d="M5.4 10.8h13.2M8.6 20.4l1.8-4.2m5 4.2-1.8-4.2"/><path ${T} d="M9 13.6h.01M15 13.6h.01"/>`,
   bus: `<rect ${T} x="3.6" y="4.4" width="16.8" height="11.6" rx="2.4"/><path ${T} d="M3.6 11h16.8M7.4 20v-4m9.2 4v-4"/><path ${T} d="M7.4 13.8h.01m9.2 0h.01"/>`,

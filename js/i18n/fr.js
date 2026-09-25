@@ -17,7 +17,7 @@ export default [
   '3e', '2nde', '1re', 'Terminale', 'étudiant', 'parent',
   'Université', 'Prépa', 'Lycée', 'CFA', 'UFA', 'Association',
   'Rez-de-chaussée', '1er étage', 'Étage',
-  'Salle', 'Auditorium', 'Toilettes', 'Foodtruck', 'WC', 'Café', 'Confs', 'Entrée', 'Entrée libre',
+  'Salle', 'Auditorium', 'Toilettes', 'Foodtruck', 'WC', 'Café', 'Confs', 'Entrée', 'Entrée libre', 'Passer en thème sombre', 'Passer en thème clair',
   // villages et domaines (noms longs et courts)
   'Santé & Soin', 'Commerce, Marketing & Management', 'Banque, Finance & Droit', 'Ingénierie, Industrie & Sciences',
   'Numérique & Cybersécurité', 'Communication, Médias & Création', 'Formations professionnelles',

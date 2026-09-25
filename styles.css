@@ -13,7 +13,7 @@
    c'est ce qui fait que l'appli et l'affiche se reconnaissent. */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --framboise: #C90151;
   --turquoise: #01A1A7;
@@ -52,33 +52,34 @@
   --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --framboise: #FF6E9F;
-    --turquoise: #35C6CC;
-    --ambre: #FFB13D;
-    --marine: #7FA6D4;
+/* Le thème sombre est un CHOIX (le petit bouton de l'accueil), pas le réglage du téléphone :
+   les testeurs l'avaient le soir, le festival a lieu en plein jour. Clair par défaut. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --framboise: #FF6E9F;
+  --turquoise: #35C6CC;
+  --ambre: #FFB13D;
+  --marine: #7FA6D4;
 
-    --bleu: #35C6CC;
-    --marque: #002A5E;
-    --bleu-clair: #6FDCE1;
-    --bleu-pale: #0B3B44;
-    --orange: #FFB13D;
-    --orange-pale: #4A3208;
-    --encre: #E9EFF7;
-    --encre-2: #9AACC4;
-    --fond: #06182C;
-    --carte: #0D2440;
-    --trait: #1E3A5C;
-    --alerte: #FF6E9F;
-    --alerte-pale: #4A1026;
-    --z1: #17304F; --z2: #4E1F35; --z3: #4B3717; --z4: #1F3557; --z5: #10424A;
-    --z6: #175A63; --z7: #5E2440; --z8: #5C441C; --z9: #4B3717; --z10: #10424A; --z11: #1E3A5C;
-    --scene: #081E36; --scene-2: #0B2843; --dalle: #102A49; --dalle-cote: #071729; --vide: #040F1D;
-    --neutre: #152E4E; --circul: #11263F; --sol: #0C2038; --parvis: #182A40; --pelouse: #14352A; --route: #0A1A2E;
-    --arbre: #2E6B45; --fantome: #132B47; --contour: #2A4667; --mur: #5C7A9C; --ombre: #000814;
-    --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu-clair);
-  }
+  --bleu: #35C6CC;
+  --marque: #002A5E;
+  --bleu-clair: #6FDCE1;
+  --bleu-pale: #0B3B44;
+  --orange: #FFB13D;
+  --orange-pale: #4A3208;
+  --encre: #E9EFF7;
+  --encre-2: #9AACC4;
+  --fond: #06182C;
+  --carte: #0D2440;
+  --trait: #1E3A5C;
+  --alerte: #FF6E9F;
+  --alerte-pale: #4A1026;
+  --z1: #17304F; --z2: #4E1F35; --z3: #4B3717; --z4: #1F3557; --z5: #10424A;
+  --z6: #175A63; --z7: #5E2440; --z8: #5C441C; --z9: #4B3717; --z10: #10424A; --z11: #1E3A5C;
+  --scene: #081E36; --scene-2: #0B2843; --dalle: #102A49; --dalle-cote: #071729; --vide: #040F1D;
+  --neutre: #152E4E; --circul: #11263F; --sol: #0C2038; --parvis: #182A40; --pelouse: #14352A; --route: #0A1A2E;
+  --arbre: #2E6B45; --fantome: #132B47; --contour: #2A4667; --mur: #5C7A9C; --ombre: #000814;
+  --focus: 0 0 0 3px var(--fond), 0 0 0 5px var(--bleu-clair);
 }
 
 * { box-sizing: border-box; }
@@ -122,7 +123,14 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 /* Le sélecteur de langue : quatre pastilles discrètes, alignées à droite, chacune
    dans sa propre langue. Pas dans la navigation basse — un Visiteur ne change de
    langue qu'une fois, et il la retrouve mémorisée. */
-.langues { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 0 0; }
+.reglages-haut { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 0 0; }
+.langues { display: flex; justify-content: flex-end; gap: 6px; }
+/* Tout petit, une icône : on le voit sans qu'il réclame l'attention. La zone de toucher reste de 30 px, comme les langues. */
+.theme {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; flex: none;
+  border-radius: 50%; border: 1px solid var(--trait); background: transparent; color: var(--encre-2); cursor: pointer;
+}
+.theme svg { width: 16px; height: 16px; }
 .langue { font: inherit; font-size: 0.74rem; font-weight: 650; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--trait); background: transparent; color: var(--encre-2); cursor: pointer; min-height: 30px; }
 .langue[aria-pressed="true"] { background: var(--encre); border-color: var(--encre); color: var(--fond); }
 .entete h1 { font-size: clamp(1.9rem, 8vw, 2.5rem); }
