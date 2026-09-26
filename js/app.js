@@ -1012,7 +1012,7 @@ const rafraichisseurJeu = creerRafraichisseur({
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); rendre({ conserver: true }); }
+  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); envoyerStatsSiDu(); rendre({ conserver: true }); }
   else { envoyerStatsEnArrierePlan(); arreterScanner(); } // la caméra ne tourne pas dans une poche ; le retour la rouvre
 });
 
@@ -1031,9 +1031,12 @@ function verifierRappels() {
 
 // ---------------------------------------------------------------- mesures
 
+// Au passage en arrière-plan, la Salve ne part que si la plus vieille Mesure attend
+// depuis plus de dix minutes (stats.envoiDu, mesures compactes 04) ; sinon la file,
+// gardée sur le téléphone, part au retour ou à la prochaine ouverture.
 function envoyerStatsEnArrierePlan() {
   const url = urlMesures();
-  if (!url || !navigator.sendBeacon || stats.taille() === 0 || mesuresCoupees()) return;
+  if (!url || !navigator.sendBeacon || !stats.envoiDu() || mesuresCoupees()) return;
   const salve = stats.preleverSalve();
   const ok = navigator.sendBeacon(url, new Blob([JSON.stringify(salve)], { type: 'text/plain;charset=utf-8' }));
   if (!ok) stats.remettre(salve);
@@ -1043,6 +1046,8 @@ function envoyerStatsEnArrierePlan() {
 // premier plan, ou par sendBeacon au passage en arrière-plan. Sous la charge
 // mesurée par ADR-0006, chaque requête évitée est un créneau d'exécution rendu.
 setInterval(() => { if (document.visibilityState === 'visible') stats.vider().catch(() => {}); }, CONFIG.intervalleStats);
+// À l'ouverture et au retour au premier plan, la file retenue part si elle a trop attendu.
+function envoyerStatsSiDu() { if (stats.envoiDu()) stats.vider().catch(() => {}); }
 
 // ---------------------------------------------------------------- service worker et nouvelle version
 
@@ -1117,6 +1122,7 @@ async function demarrer() {
   rafraichisseur.demarrer();
   if (JEU_URL) rafraichisseurJeu.demarrer();
   envoiJeu.envoyer();
+  envoyerStatsSiDu();
   verifierRappels();
   setInterval(verifierRappels, 30000);
   // L'écran de vote suit l'horloge : une fenêtre s'ouvre ou se ferme sans geste. De même

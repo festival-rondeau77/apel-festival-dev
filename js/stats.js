@@ -14,6 +14,9 @@ export const CLE_APPAREIL = 'festival.appareil';
 export const CLE_APPAREIL_STATS = 'festival.stats.appareil';
 // « Ne pas envoyer de statistiques » (Besoin d'aide ?), mémorisé sur le téléphone.
 export const CLE_REFUS = 'festival.stats.refus';
+// Âge au-delà duquel la plus vieille Mesure en attente justifie une Salve hors de
+// l'intervalle (mesures compactes 04) : dix minutes, comme CONFIG.intervalleStats.
+export const SEUIL_ENVOI = 10 * 60 * 1000;
 const LONGUEUR_CIBLE = 120;
 const LONGUEUR_DETAIL = 80;
 const LONGUEUR_ORIGINE = 80;
@@ -149,9 +152,18 @@ export function creerStats({ stockage, horloge = () => Date.now(), envoyer, alea
     persister();
   }
 
+  // Faut-il envoyer maintenant (au passage en arrière-plan, au retour, à l'ouverture) ?
+  // Oui seulement si la plus vieille Mesure attend depuis plus que le seuil ; sinon la
+  // file, gardée sur le téléphone, attend la prochaine ouverture ou l'intervalle.
+  function envoiDu({ seuil = SEUIL_ENVOI } = {}) {
+    if (file.length === 0 || refusees()) return false;
+    const plusVieille = Math.min(...file.map((m) => (Number.isFinite(m.t) ? m.t : -Infinity)));
+    return horloge() - plusVieille > seuil;
+  }
+
   return {
     get appareil() { return appareilDuJour(); },
-    noter, vider, preleverSalve, remettre, refusees,
+    noter, vider, preleverSalve, remettre, refusees, envoiDu,
     // Refuser jette aussi ce qui attendait : rien de noté avant le refus ne part après.
     refuser() { ecrire(CLE_REFUS, '1'); file = []; persister(); },
     accepter() { try { stockage.removeItem(CLE_REFUS); } catch { /* stockage indisponible */ } },

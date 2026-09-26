@@ -27,7 +27,7 @@ export const CONFIG = {
   // bin/deploy.sh --cible=dev la réécrit dans la seule copie servie.
   urlPublique: 'https://festival-rondeau77.github.io/apel-festival-dev/',
   // Version de l'appli : change à chaque déploiement (bin/deploy.sh), pilote le cache du service worker.
-  version: '2026.09.26-7aa66a3',
+  version: '2026.09.26-87f6b80',
   // Rafraîchissement des données (ms) et envoi des mesures (ms).
   // intervalleStats est à 180 s, pas 30 : le test de charge du 2026-09-08 a mesuré
   // que l'écriture de l'onglet Stats plafonne vers 2,2 requêtes par seconde (le
@@ -38,12 +38,16 @@ export const CONFIG = {
   // docs/test-de-charge.md, sur la branche worktree-test-de-charge. Ne pas baisser
   // sans les relire : c'est le tiers le plus lourd de la charge, et retarder des
   // mesures ne coûte rien au Visiteur, qui ne les voit jamais.
+  // Depuis le Worker + D1 (mesures compactes 04, ADR-0022) : 600 s. Chaque Salve coûte
+  // des écritures D1 ; dix minutes divisent encore par plus de trois le nombre de Salves,
+  // et au passage en arrière-plan la Salve ne part que si la plus vieille Mesure a plus
+  // de dix minutes (stats.envoiDu, SEUIL_ENVOI de stats.js).
   intervalleDonnees: 60000,
   // Relecture des règles du Grand Défi (défis actifs, objectif) : cinq minutes.
   // Le Passeport, lui, revient avec chaque validation. Le défi mystère (grand-defi
   // 06) demandera une minute : c'est là qu'il faudra recompter les requêtes.
   intervalleJeu: 300000,
-  intervalleStats: 180000,
+  intervalleStats: 600000,
   // Les langues proposées au Visiteur (ADR-0012). Français seul du 2026-09-23
   // (ADR-0016 : sans traduction, une interface à moitié traduite) au 2026-09-25 :
   // le Push traduit désormais les textes du tableur avant de les publier (ticket
