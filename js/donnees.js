@@ -312,9 +312,28 @@ export function attributionDesCartes(tables) {
   return new Map(construireModele(tables).exposants.filter((e) => e.carte).map((e) => [e.carte, e.cle]));
 }
 
+// L'identifiant d'une ligne de Gestion (colonne `id`, ADR-0023) : lettres, chiffres,
+// tirets, soulignés, jamais `:` ni `@`, pour ne pas ressembler à une ancienne clé.
+export const FORMAT_ID = /^[A-Za-z0-9_-]{1,40}$/;
+
 export function construireModele(tables) {
   tables = tables || {};
   const avertissements = [];
+  // La clé d'un Exposant ou d'un Événement vient de son `id` (ADR-0023) : le nom et
+  // l'heure peuvent changer sans qu'il cesse d'être le même. Un Exposant garde son type
+  // devant (`ecole:a1b2c3d4`) : le type est son onglet, pas une étiquette, et les défis
+  // « une École » le lisent là. Sans id lisible et unique (une Publication d'avant la
+  // migration, une saisie fautive que le Push refuse), l'ancienne clé calculée. Un id
+  // ne sert qu'une fois, Exposants et Événements confondus (un seul onglet par ligne).
+  const idsPris = new Set();
+  const cleDe = (brut, repli, ou, prefixe = '') => {
+    const id = texte(brut);
+    if (!id) return repli;
+    if (!FORMAT_ID.test(id)) { avertissements.push({ type: 'id-illisible', valeur: id, ou }); return repli; }
+    if (idsPris.has(id)) { avertissements.push({ type: 'id-en-double', valeur: id, ou }); return repli; }
+    idsPris.add(id);
+    return prefixe + id;
+  };
   const exposantsBruts = tablesEnObjets(tables.exposants);
   const evenementsBruts = tablesEnObjets(tables.evenements);
   const sallesBrutes = tablesEnObjets(tables.salles);
@@ -371,7 +390,7 @@ export function construireModele(tables) {
     }
     const carte = carteDe(e.carte, { village: zone ? zone.nom : village, dejaPrises: cartesPrises, avertissements, ou });
     exposants.push({
-      cle: cleExposant(type, nom), type, typeSlug: slugType(type), nom, carte,
+      cle: cleDe(e.id, cleExposant(type, nom), ou, `${slugType(type)}:`), type, typeSlug: slugType(type), nom, carte,
       organisation: texte(e.organisation), village: zone ? zone.nom : village, villageConnu,
       domaines, domainesConnus: connus,
       sousTitre: texte(e.sous_titre), description: texte(e.description), niveau: texte(e.niveau),
@@ -395,7 +414,7 @@ export function construireModele(tables) {
       .map((n) => exposantsParNom.get(n)).filter(Boolean).map((e) => e.cle);
     const salle = texte(ev.salle);
     evenements.push({
-      cle: cleEvenement(titre, debut), format: formatCanonique(ev.format), titre, domaines, domainesConnus: connus,
+      cle: cleDe(ev.id, cleEvenement(titre, debut), `événement ${titre}`), format: formatCanonique(ev.format), titre, domaines, domainesConnus: connus,
       // Un Moment (l'ouverture) est un repère de la matinée, pas un rendez-vous
       // auquel s'inscrire : ni fin, ni intervenant, ni rappel, ni calendrier. Le
       // modèle le décide une fois pour tous les écrans, qui se contentent de lire.

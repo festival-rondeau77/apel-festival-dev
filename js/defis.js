@@ -470,16 +470,37 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
   jeu.defis = jeu.defis.filter((d) => {
     let motif = '';
     if (d.params.different_de && !ids.has(d.params.different_de)) motif = `different_de : défi ${d.params.different_de} introuvable`;
-    else if (d.type_preuve === 'scan-stand' && exposants && !exposants.some((e) => standCorrespond(d.params.stand, e.cle))) motif = `stand introuvable au programme : ${d.params.nom_stand}`;
-    else if (d.type_preuve === 'votes-evenement' && evenements) motif = placerVotes(d, evenements);
+    else if (d.type_preuve === 'scan-stand' && exposants) {
+      const r = resoudreStand({ stand: d.params.stand, nom: d.params.nom_stand }, exposants);
+      if (r.motif) motif = r.motif;
+      else d.params.stand = r.cle;
+    } else if (d.type_preuve === 'votes-evenement' && evenements) motif = placerVotes(d, evenements);
     else if (d.type_preuve === 'scan-attribue' && exposants) {
-      const absents = d.params.stands.filter((s) => !exposants.some((e) => standCorrespond(s.stand, e.cle)));
-      if (absents.length) motif = `stand introuvable au programme : ${absents.map((s) => s.nom).join(', ')}`;
+      const resolus = d.params.stands.map((s) => ({ s, r: resoudreStand(s, exposants) }));
+      const absents = resolus.filter(({ r }) => r.motif);
+      if (absents.length) motif = absents.map(({ r }) => r.motif).join(' ; ');
+      else for (const { s, r } of resolus) s.stand = r.cle;
     }
     if (motif) jeu.invalides.push({ id: d.id, motif });
     return !motif;
   });
   return jeu;
+}
+
+// Un stand désigné dans le tableur ({ stand, nom } de lireStand) cherché au programme
+// ([{ cle, nom, typeSlug }]) : par son nom (quel que soit le type), ou par `type:nom`.
+// La clé d'un Exposant est son id (ADR-0023) et ne dit plus rien de son nom : c'est ici,
+// une fois, que le nom devient la clé, pour que le téléphone et le Worker comparent des
+// clés. Rend { cle } ou { motif }. Une ancienne clé (`type:nom`, sans id) se reconnaît encore.
+function resoudreStand(s, exposants) {
+  const [type, ...reste] = s.stand.split(':');
+  const parNom = reste.length
+    ? (e) => e.typeSlug === type && normaliser(e.nom) === reste.join(':')
+    : (e) => normaliser(e.nom) === s.stand;
+  const cles = [...new Set(exposants.filter((e) => parNom(e) || standCorrespond(s.stand, e.cle)).map((e) => e.cle))];
+  if (!cles.length) return { motif: `stand introuvable au programme : ${s.nom}` };
+  if (cles.length > 1) return { motif: `stand ambigu : ${s.nom} désigne ${cles.length} exposants (écrire le type, « Entreprise:${s.nom} »)` };
+  return { cle: cles[0] };
 }
 
 // L'Événement d'un défi `votes-evenement` cherché au programme par son titre (casse,
