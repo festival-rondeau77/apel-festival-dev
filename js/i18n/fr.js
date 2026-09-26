@@ -101,7 +101,7 @@ export default [
   // Grand Défi : tous les défis par scan (grand-defi 02)
   "Mes défis", "À faire", "Déjà utilisé pour le défi %s", "Domaine déjà croisé", "Scannez d’abord un autre stand", "Pas pour ce stand", "QR d’une école", "QR d’un pro", "QR d’une entreprise", "QR d’un ancien élève", "QR du stand %s", "QR d’un stand d’un domaine encore jamais scanné", "pas le même que pour le défi %s", "Un même scan valide plusieurs défis ici.", "Votre choix : %s", "Mon carnet", "Ce que je retiens de ce stand…", "Reste sur ce téléphone : rien n’est envoyé.", "Le Grand Défi n’est pas ouvert.",
   // Grand Défi : scanner depuis l'appli (grand-defi 10)
-  'Scanner un QR', 'Scannez les QR des stands pour gagner des points.', 'Visez le QR code du stand.', 'Déjà gagné chez %s', 'Déjà gagné', 'Ouverture de la caméra…', 'Caméra refusée : autorisez-la dans les réglages du navigateur.', 'Pas de caméra disponible sur cet appareil.', 'Ce QR code n’est pas celui d’un stand du festival.',
+  'Scanner un QR', 'Scan QR', 'Scannez les QR des stands pour gagner des points.', 'Visez le QR code du stand.', 'Déjà gagné chez %s', 'Déjà gagné', 'Ouverture de la caméra…', 'La caméra est refusée.', 'La caméra ne s’ouvre pas pour l’instant.', 'Une autre appli l’utilise peut-être : fermez-la, puis touchez Réessayer.', 'Réessayer', 'Recharger la page', 'Touchez Réessayer. Si ça ne suffit pas : touchez « aA » à gauche de l’adresse, Réglages du site web, Caméra : Autoriser, puis Recharger la page.', 'Touchez Réessayer. Si ça ne suffit pas : autorisez la caméra pour ce site (le cadenas à gauche de l’adresse), puis Recharger la page.', 'Pas de caméra disponible sur cet appareil.', 'Ce QR code n’est pas celui d’un stand du festival.',
   // Grand Défi : Chances, Paliers, badge, Règle du jeu (grand-defi 03)
   "Règle du jeu", "Au tirage", "%s chance", "%s chances", "Prochaine chance : plus que %s point", "Prochaine chance : plus que %s points", "Badge Explorateur 100 %", "+%s chance", "+%s chances", "Scannez les QR des chevalets pour gagner des points.", "À %s points, vous êtes au tirage de %s.", "À %s points, vous êtes au tirage.", "Plus de points, plus de chances.", "Tous les défis", "Soyez vigilant : plus de chances de gagner avec les instants gagnants, le défi mystère et les autres annonces.", "Lire le règlement du jeu",
   // Grand Défi : la question Parcoursup (grand-defi 04)
@@ -110,7 +110,7 @@ export default [
   "Voter avant et après : %s", "Voter", "Ce défi n’est pas un vote.", "Vos deux votes sont comptés !", "Vote envoyé : le verdict arrive.", "Défi fermé : le vote « avant » n’a pas été donné à temps.", "Voté : %s", "Vote envoyé", "Fermé", "Pas encore ouvert", "Avant", "Après", "jusqu’à %s", "à partir de %s", "Chaque vote est compté sans lien avec votre téléphone.",
   "Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.",
   // Grand Défi : le défi mystère (grand-defi 06)
-  "Bientôt", "Pas votre stand mystère", "Heure limite passée", "QR de votre stand : %s, jusqu’à %s", "Révélé en cours de matinée", "%s !", "Votre stand : %s",
+  "Bientôt", "Pas votre stand mystère", "Heure limite passée", "Manqué", "le vote « avant » fermait à %s", "l’heure limite était %s", "QR de votre stand : %s, jusqu’à %s", "Révélé en cours de matinée", "%s !", "Votre stand : %s",
   // Accueil : qui organise
   "Organisé par %s",
   // Grand Défi : gagner et remettre (grand-defi 07)

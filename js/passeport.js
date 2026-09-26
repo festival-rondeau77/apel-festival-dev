@@ -112,7 +112,12 @@ export function statutDefi(etat, defi, essais = null) {
 const essaisDe = (defi) => (defi.type_preuve === 'reponse' && Number.isInteger(defi.params.essais) ? defi.params.essais : null);
 
 // L'état d'un défi dans Mes défis et la jauge, selon son Type. `maintenant` (ms) :
-// sans lui, un vote n'est jamais dit perdu, ni un mystère fermé.
+// sans lui, un vote n'est jamais dit manqué, ni un mystère fermé. `manque`
+// (grand-defi 15) : un défi à l'heure fermé sans que le Visiteur ait agi (fenêtre
+// « avant » passée sans vote, heure limite du mystère passée sans le bon scan) ;
+// `refuse` reste au refus d'une preuve envoyée (le Worker l'a rejetée) pour un défi
+// par scan ou une question : un vote ou un mystère refusé reste à faire tant que
+// l'heure court, puis devient manqué.
 function statutDuDefi(defi, etat, maintenant = null) {
   if (parAnnonce(defi)) {
     // Le mystère (grand-defi 06) : un scan sur le mauvais stand ne le ferme pas ;
@@ -120,11 +125,11 @@ function statutDuDefi(defi, etat, maintenant = null) {
     const s = statutDefi(etat, defi.id);
     if (s === 'valide' || s === 'attente') return s;
     if (defi.params.a_venir) return 'a-venir';
-    return maintenant !== null && phaseAnnonce(defi, maintenant) === 'close' ? 'refuse' : 'a-faire';
+    return maintenant !== null && phaseAnnonce(defi, maintenant) === 'close' ? 'manque' : 'a-faire';
   }
   if (defi.type_preuve !== 'votes-evenement') return statutDefi(etat, defi.id, essaisDe(defi));
   const { statut } = etatDesVotes(defi, etat, maintenant);
-  return { valide: 'valide', attente: 'attente', ferme: 'refuse' }[statut] || 'a-faire';
+  return { valide: 'valide', attente: 'attente', ferme: 'manque' }[statut] || 'a-faire';
 }
 
 // Les deux votes d'un défi `votes-evenement` vus du téléphone. Un vote compté a le
@@ -210,7 +215,7 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [], appareil 
 }
 
 // L'écran « Mes défis » : chaque défi actif, dans l'ordre du tableur, et son état.
-// `maintenant` (ms) : un vote dont la fenêtre « avant » est passée sans vote est refusé.
+// `maintenant` (ms) : un vote dont la fenêtre « avant » est passée sans vote est manqué.
 // Les instants gagnants n'y sont pas (grand-defi 08) : ils ne rapportent aucun point, et
 // n'existent que le temps de leur annonce.
 export function mesDefis(jeu, etat, { maintenant = null } = {}) {

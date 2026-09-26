@@ -9,7 +9,7 @@ import { contient as visiteContient, matinee, suggestions, questionsPour, texteA
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
 import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, instantIci, annoncesEnCours, gainsARemettre, gainEnCours, messageAbsent, etatJeuInitial } from './passeport.js';
-import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis } from './defis.js';
+import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis, fenetresDe } from './defis.js';
 import { afficherCode, urlRemise } from './gains.js';
 import { encoderQR, qrEnSvg } from './qr.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
@@ -287,13 +287,14 @@ export function ecranAccueil(etat) {
 // La jauge de l'accueil (grand-defi 01) : seulement pour qui a joué, et jamais
 // quand le jeu est coupé. Les points confirmés par le Worker, et à part ceux qui
 // attendent sa réponse.
-// Le bouton « Scanner un QR » (grand-defi 10) l'accompagne dès que le jeu est
-// ouvert : scanner DANS l'appli garde le même Passeport, là où un lecteur de QR du
+// Le bouton « Scan QR » (grand-defi 10 ; libellé court depuis le 13, pour que les
+// trois liens tiennent sur une ligne) l'accompagne dès que le jeu est ouvert :
+// scanner DANS l'appli garde le même Passeport, là où un lecteur de QR du
 // téléphone ouvre souvent une fenêtre cloisonnée. Avant la première validation,
 // il vient seul, avec une phrase ; jeu coupé, rien.
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Règle du jeu'))}</a>${rejouerOuvert(etat.modele.infos)
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Règle du jeu'))}</a>${rejouerOuvert(etat.modele.infos)
     ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
   if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
@@ -356,7 +357,7 @@ function ecranRegle(etat) {
       </div></li>
       <li class="idee">${icone('cloche', 28)}<div><p>${h(t('Soyez vigilant : plus de chances de gagner avec les instants gagnants, le défi mystère et les autres annonces.'))}</p></div></li>
     </ol>
-    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a>${reglement
+    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a>${reglement
       ? `<a class="bouton secondaire" href="${url(reglement)}" target="_blank" rel="noopener">${icone('document', 19)}${h(t('Lire le règlement du jeu'))}</a>` : ''}</div>`;
 }
 
@@ -389,14 +390,33 @@ function ecranRejouer(etat) {
 // une phrase française, clé de t()). app.js y branche la caméra (getUserMedia) et
 // lit les images (BarcodeDetector, sinon js/vendor/jsqr.js, ADR-0017) ; aucun
 // style en ligne (CSP, sécurité 06).
+// Caméra refusée pour de bon (grand-defi 12, etat.ui.scannerBloque = 'refusee') : le
+// chemin du réglage, celui de Safari sur iPhone (etat.ui.surIOS) ou le cadenas
+// ailleurs, et deux boutons : Réessayer, Recharger la page (sur iPhone, seul un
+// rechargement fait reposer la question après un « Ne pas autoriser »).
+// Caméra occupée ('occupee' : prise par une autre appli, ouverture interrompue) : Réessayer seul.
 export function ecranScanner(etat) {
+  const bloque = etat.ui.scannerBloque;
+  const aide = bloque === 'refusee' ? (etat.ui.surIOS
+    ? 'Touchez Réessayer. Si ça ne suffit pas : touchez « aA » à gauche de l’adresse, Réglages du site web, Caméra : Autoriser, puis Recharger la page.'
+    : 'Touchez Réessayer. Si ça ne suffit pas : autorisez la caméra pour ce site (le cadenas à gauche de l’adresse), puis Recharger la page.')
+    : bloque === 'occupee' ? 'Une autre appli l’utilise peut-être : fermez-la, puis touchez Réessayer.' : '';
   return `${entete(t('Scanner un QR'), '', retourDepuis(etat.route.params.de, { href: '#/', libelle: t('Accueil') }))}
   <div class="scanner"><video id="scanner-video" playsinline muted></video><div class="viseur" aria-hidden="true"></div></div>
-  <p class="scanner-etat" id="scanner-etat" role="status">${h(t(etat.ui.messageScanner || 'Visez le QR code du stand.'))}</p>`;
+  <p class="scanner-etat" id="scanner-etat" role="status">${h(t(etat.ui.messageScanner || 'Visez le QR code du stand.'))}</p>
+  ${aide ? `<p class="scanner-aide">${h(t(aide))}</p>
+  <div class="boutons"><button class="bouton" type="button" data-action="reessayer-scanner">${h(t('Réessayer'))}</button>${bloque === 'refusee'
+    ? `<button class="bouton secondaire" type="button" data-action="recharger">${h(t('Recharger la page'))}</button>` : ''}</div>` : ''}`;
 }
 
 const nomDefi = (d) => (/^\d+$/.test(d.id) ? `${t('Défi %s', d.id)} · ${tt(d.titre)}` : tt(d.titre));
-const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé', 'a-faire': 'À faire', 'a-venir': 'Bientôt' };
+const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé', manque: 'Manqué', 'a-faire': 'À faire', 'a-venir': 'Bientôt' };
+// Un défi à l'heure manqué (grand-defi 15) : l'heure qu'il fallait respecter, dite
+// dans sa ligne de Mes défis. « Refusé » accuserait ; le Visiteur est juste arrivé tard.
+function heureManquee(defi) {
+  if (defi.type_preuve === 'votes-evenement') return t('le vote « avant » fermait à %s', heure(fenetresDe(defi).avantJusqua));
+  return t('l’heure limite était %s', heure(defi.params.actif_a));
+}
 // « Validé » ici ; gagné sur un autre stand, on dit lequel : sur la fiche d'une
 // 2e école, « Validé » laissait croire qu'on venait de le valider là.
 function etatDuDefi(etat, ex, statut, chez) {
@@ -531,7 +551,7 @@ function defisDeLaFiche(etat, ex, secret) {
     <ul>${ici.map(({ defi, statut, validable, raison, chez }) => {
       const choix = defi.choix || [];
       return `<li>
-      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
+      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>${defi.consigne ? `<p class="consigne">${h(tt(defi.consigne))}</p>` : ''}
       ${!validable
         ? `<span class="etat ${attr(raison ? 'pas-ici' : statut)}">${h(raison ? raisonAffichee(raison) : etatDuDefi(etat, ex, statut, chez))}</span>`
         : choix.length
@@ -540,6 +560,15 @@ function defisDeLaFiche(etat, ex, secret) {
     </li>`;
     }).join('')}</ul>
   </section>`;
+}
+
+// Sous les défis de la fiche ouverte par un QR du jeu (grand-defi 13) : repartir
+// scanner, ou voir Mes défis, sans chercher le retour. Aussi quand aucun défi ne se
+// prouve ici (« Déjà gagné » partout, pas votre stand mystère) : c'est justement là
+// qu'on cherche la sortie. Jamais sur une fiche ouverte depuis la liste ou un lien public.
+function rescanner(etat, secret) {
+  if (!secret || !etat.grandDefi || !etat.grandDefi.actif) return '';
+  return `<div class="rescan"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a></div>`;
 }
 
 // Le carnet : ce que le Visiteur retient d'un stand. Sur la fiche ouverte par QR
@@ -567,13 +596,13 @@ function ecranMesDefis(etat) {
   const sous = j && j.auTirage ? `${t('Au tirage')} · ${tn('%s chance', '%s chances', j.chances)}` : `${j ? j.points : 0} / ${etat.grandDefi.objectif}`;
   return `${entete(t('Mes défis'), h(sous), retour)}
     <ul class="mes-defis">${liste.map(({ defi, statut }) => `<li>
-      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>
+      <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>${defi.consigne ? `<span class="consigne">${h(tt(defi.consigne))}</span>` : ''}
       <span class="comment">${h(commentProuver(etat, defi))}${defi.type_preuve === 'reponse' && !defi.params.qr && statut === 'a-faire'
         ? ` <a href="#/question/${attr(encodeURIComponent(defi.id))}">${h(t('Répondre'))}</a>` : ''}${defi.type_preuve === 'votes-evenement' && statut === 'a-faire'
-        ? ` <a href="#/vote/${attr(encodeURIComponent(defi.id))}">${h(t('Voter'))}</a>` : ''}</span>
+        ? ` <a href="#/vote/${attr(encodeURIComponent(defi.id))}">${h(t('Voter'))}</a>` : ''}${statut === 'manque' ? ` · ${h(heureManquee(defi))}` : ''}</span>
       <span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>
     </li>`).join('')}</ul>
-    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scanner un QR'))}</a></div>`;
+    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a></div>`;
 }
 
 // Une question (grand-defi 04, le défi 7, QR affiché à l’entrée et à la sortie), ouverte par son QR spécial
@@ -890,6 +919,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
     ${defisDeLaFiche(etat, ex, secret)}
+    ${rescanner(etat, secret)}
     ${carnetDeLaFiche(etat, ex, secret)}
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>

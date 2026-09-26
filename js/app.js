@@ -5,7 +5,7 @@ import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
 import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APPAREIL } from './stats.js';
 import * as Passeport from './passeport.js';
-import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR } from './scan.js';
+import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR, suiteApresErreurCamera } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { nouveauJeton, empreinteDe, afficherCode, JETON } from './gains.js';
 import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
@@ -39,6 +39,8 @@ const etat = {
     recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, feuillePlan: null, suggestionsOuvertes: false,
     filtresOuverts: false, etapePreparer: 0, bandeauFerme: '',
     messageScanner: '', // la phrase de l'écran scanner (grand-defi 10), clé de t()
+    scannerBloque: null, // caméra bloquée pour de bon (grand-defi 12) : 'refusee' | 'pas-de-camera' | null
+    surIOS: false,       // iPhone ou iPad : l'écran du refus dit le chemin de Safari (aA)
   },
   reseau: { enErreur: false, refus: null },
   maintenant: { jourJ: false, minutes: 0 },
@@ -214,7 +216,7 @@ function appliquerRoute() {
     scrollAvant = positions.get(etat.route.nom);
   }
   const p = etat.route.params;
-  if (etat.route.nom === 'scanner' && precedente !== 'scanner') { scanner.bloque = false; etat.ui.messageScanner = ''; }
+  if (etat.route.nom === 'scanner' && precedente !== 'scanner') { scanner.bloque = false; scanner.essais = 0; etat.ui.messageScanner = ''; etat.ui.scannerBloque = null; }
   if (etat.route.nom === 'plan') {
     etat.ui.salleAllumee = p.salle || null;
     // « village » et « zone » désignent la même chose : le second est l'ancien
@@ -464,7 +466,9 @@ window.addEventListener('online', () => envoiJeu.envoyer());
 // dev sur le dev, réécrite par deploy.sh). Chemin compris : sur github.io, dev,
 // prod et maquettes partagent un hôte.
 const BASES_APPLI = [location.href, CONFIG.urlPublique];
-const scanner = { flux: null, session: 0, ouverture: false, minuteur: null, bloque: false, detecteur: undefined, jsQR: null, toile: null };
+// `aMarche` : la caméra a déjà marché dans cette page ; `essais` : les nouveaux essais
+// après une erreur (grand-defi 12 : un seul, puis on dit pourquoi).
+const scanner = { flux: null, session: 0, ouverture: false, minuteur: null, bloque: false, detecteur: undefined, jsQR: null, toile: null, aMarche: false, essais: 0 };
 
 function messageScanner(cle) {
   if (etat.ui.messageScanner === cle) return;
@@ -501,12 +505,15 @@ async function lireImage(video) {
 
 // Appelé à chaque rendu de l'écran scanner : ouvre la caméra la première fois,
 // la rebranche ensuite. Après un refus, on ne redemande pas à chaque rendu :
-// il faut revenir sur l'écran (appliquerRoute remet `bloque` à faux).
+// il faut revenir sur l'écran (appliquerRoute remet `bloque` à faux) ou toucher
+// Réessayer. Jamais pendant que la page n'est pas visible (grand-defi 12) : WebKit
+// refuse alors la caméra (NotAllowedError) sans que le Visiteur ait rien touché ;
+// le retour au premier plan rend de nouveau, et rouvre.
 async function demarrerScanner() {
   const video = $('#scanner-video');
-  if (!video || scanner.bloque) return;
+  if (!video || scanner.bloque || document.visibilityState !== 'visible') return;
   if (scanner.flux) { if (video.srcObject !== scanner.flux) { video.srcObject = scanner.flux; video.play().catch(() => {}); } return; }
-  if (scanner.ouverture) return;
+  if (scanner.ouverture || scanner.minuteur) return; // ouverture en cours, ou nouvel essai qui attend sa seconde : un rendu ne le brûle pas
   scanner.ouverture = true;
   const moi = ++scanner.session;
   const encore = () => scanner.session === moi && etat.route.nom === 'scanner';
@@ -519,12 +526,23 @@ async function demarrerScanner() {
   } catch (e) {
     if (flux) flux.getTracks().forEach((p) => p.stop());
     if (!encore()) return;
-    scanner.ouverture = false; scanner.bloque = true;
-    messageScanner(e && e.name === 'NotAllowedError' ? 'Caméra refusée : autorisez-la dans les réglages du navigateur.' : 'Pas de caméra disponible sur cet appareil.');
+    scanner.ouverture = false;
+    const suite = suiteApresErreurCamera({ nom: e && e.name, aMarche: scanner.aMarche, essais: scanner.essais });
+    if (suite === 'reessayer') {
+      // Une fois, en silence, une seconde plus tard ; arreterScanner() annule ce minuteur.
+      scanner.essais += 1;
+      scanner.minuteur = setTimeout(() => { scanner.minuteur = null; if (encore()) demarrerScanner(); }, 1000);
+      return;
+    }
+    scanner.bloque = true;
+    etat.ui.scannerBloque = suite;
+    messageScanner({ refusee: 'La caméra est refusée.', occupee: 'La caméra ne s’ouvre pas pour l’instant.' }[suite] || 'Pas de caméra disponible sur cet appareil.');
     return;
   }
   if (!encore()) { flux.getTracks().forEach((p) => p.stop()); return; } // quitté pendant l'ouverture
   scanner.ouverture = false;
+  scanner.aMarche = true;
+  scanner.essais = 0;
   scanner.flux = flux;
   const courante = $('#scanner-video');
   if (courante) { courante.srcObject = flux; courante.play().catch(() => {}); }
@@ -553,7 +571,8 @@ function arreterScanner() {
   if (scanner.flux) scanner.flux.getTracks().forEach((p) => p.stop());
   scanner.flux = null;
   scanner.ouverture = false;
-  scanner.session++; // toute boucle ou ouverture en cours devient caduque
+  scanner.essais = 0; // le prochain retour a droit à son nouvel essai
+  scanner.session++; // toute boucle, ouverture ou nouvel essai en cours devient caduque
 }
 
 // ---------------------------------------------------------------- gestes
@@ -625,6 +644,9 @@ document.addEventListener('click', (e) => {
     case 'etape': etat.ui.etapePreparer = Number(valeur) || 0; rendre(); break;
     case 'avis': stats.noter('clic_avis'); break;
     case 'refus-stats': if (stats.refusees()) stats.accepter(); else stats.refuser(); etat.statsRefusees = stats.refusees(); rendre({ conserver: true }); break;
+    // Caméra refusée (grand-defi 12) : redemander ; le rendu de l'écran scanner rouvre la caméra.
+    case 'reessayer-scanner': scanner.bloque = false; scanner.essais = 0; etat.ui.scannerBloque = null; etat.ui.messageScanner = ''; rendre({ conserver: true }); break;
+    // « Recharger la page » du scanner : le cas 'recharger' ci-dessous (il active aussi une nouvelle version en attente).
     case 'site': stats.noter('clic_site', cle); break;
     case 'recharger': rechargerNouvelleVersion(); break;
     case 'langue': changerLangue(valeur); break;
@@ -1113,8 +1135,9 @@ async function demarrer() {
   // cible, et en detail comment l'appli est ouverte, sur quelle famille d'appareil,
   // et dans quelle langue — ce qui dira combien de Visiteurs ne lisent pas le français.
   etat.statsRefusees = stats.refusees();
-  stats.noter('ouverture', initial ? initial.source : 'aucune',
-    `${installee ? 'installee' : 'navigateur'}·${plateforme(navigator.userAgent, navigator.maxTouchPoints)}·${langue()}`);
+  const famille = plateforme(navigator.userAgent, navigator.maxTouchPoints);
+  etat.ui.surIOS = famille === 'ios'; // l'écran « caméra refusée » (grand-defi 12)
+  stats.noter('ouverture', initial ? initial.source : 'aucune', `${installee ? 'installee' : 'navigateur'}·${famille}·${langue()}`);
   appliquerRoute();
   demarre = true;
   enregistrerServiceWorker();

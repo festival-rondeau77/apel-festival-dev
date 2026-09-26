@@ -322,13 +322,23 @@ main { min-height: 60vh; }
 .defis-ici .plusieurs { margin: 0 0 10px; color: var(--encre-2); font-size: 0.95rem; }
 .defis-ici .etat.pas-ici { color: var(--encre-2); font-style: italic; }
 .defis-ici .question { flex: 1 1 100%; margin: 0; font-weight: 600; }
+/* La consigne d'un défi (grand-defi 14) : une phrase de Gestion, sous le titre, avant la question et les boutons. */
+.defis-ici .consigne, .mes-defis .consigne { margin: 0; color: var(--encre-2); font-size: 0.92rem; line-height: 1.35; }
+.defis-ici .consigne { flex: 1 1 100%; }
+.mes-defis .consigne { grid-column: 1 / -1; }
 .defis-ici .choix { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; }
 .defis-ici .choix .bouton { min-width: 52px; min-height: 44px; padding: 6px 12px; font-size: 1.3rem; }
 .carnet { margin: 18px 0 0; }
 .carnet .titre-section { margin-top: 0; }
 .carnet textarea { width: 100%; box-sizing: border-box; min-height: 5.5em; padding: 10px 12px; border: 1px solid var(--trait); border-radius: 10px; font: inherit; background: var(--carte); color: inherit; resize: vertical; }
 .carnet .note { margin: 6px 0 0; color: var(--encre-2); font-size: 0.88rem; }
-.grand-defi .mes-defis-lien, .grand-defi .regle-lien { display: inline-block; margin: 12px 0 0 14px; font-weight: 650; }
+/* Serré (grand-defi 13) : « Scan QR · Mes défis · Règle du jeu » sur une ligne dès 360 px de large
+   (la carte offre viewport − 77 px : 283 à 360, 298 à 375, 313 à 390 ; les trois mesurent 280, Chrome headless). */
+.grand-defi .mes-defis-lien, .grand-defi .regle-lien { display: inline-block; margin: 12px 0 0 6px; font-weight: 650; font-size: 0.92rem; }
+.grand-defi .scanner-lien { margin-top: 12px; padding-inline: 12px; gap: 6px; font-size: 0.94rem; }
+/* Sous les défis de la fiche ouverte par un QR du jeu (grand-defi 13) : repartir scanner. */
+.rescan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 0; }
+.rescan .mes-defis-lien { font-weight: 650; }
 .mes-defis { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
 .mes-defis li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
 .mes-defis .nom { font-weight: 650; }
@@ -336,6 +346,7 @@ main { min-height: 60vh; }
 .mes-defis .comment { color: var(--encre-2); font-size: 0.92rem; }
 .mes-defis .etat { font-weight: 650; font-size: 0.9rem; color: var(--encre-2); text-align: right; }
 .mes-defis .etat.attente { color: var(--orange); }
+.mes-defis .etat.manque { color: var(--orange); } /* arrivé trop tard, pas fautif (grand-defi 15) */
 /* grand-defi 04 : la question du QR spécial. */
 .question-defi { margin: 14px 0 0; padding: 16px; background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
 .question-defi .question { margin: 0 0 12px; font-size: 1.15rem; font-weight: 650; }
@@ -400,11 +411,12 @@ main { min-height: 60vh; }
 
 /* Le scanner (grand-defi 10) : l'invitation de l'accueil, le bouton sous la jauge, l'écran caméra. */
 .grand-defi.invitation p { margin: 6px 0 12px; color: var(--encre-2); }
-.grand-defi .scanner-lien { margin-top: 12px; }
 .scanner { position: relative; margin: 14px 0 0; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 62vh; width: 100%; }
 .scanner video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .scanner .viseur { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35); pointer-events: none; }
 .scanner-etat { margin: 12px 0 0; color: var(--encre-2); font-weight: 600; text-align: center; }
+.scanner-aide { margin: 10px 0 0; color: var(--encre-2); font-size: 0.92rem; line-height: 1.45; text-align: center; } /* caméra refusée (grand-defi 12) */
+.scanner-aide + .boutons { justify-content: center; }
 
 .commencer { margin: 30px 0 0; }
 .commencer p { margin: 0 0 12px; color: var(--encre-2); }

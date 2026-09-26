@@ -66,3 +66,24 @@ export function lireAvecJsQR(jsQR, pixels, largeur, hauteur, zone) {
   const entier = jsQR(pixels, largeur, hauteur, { inversionAttempts: 'dontInvert' });
   return entier && dans(centreJsQR(entier.location), zone) ? entier.data : null;
 }
+
+// Après une erreur d'ouverture de la caméra (grand-defi 12) : que faire.
+// `nom` : le nom de l'erreur du navigateur ; `aMarche` : la caméra a déjà marché
+// dans cette page ; `essais` : les nouveaux essais déjà tentés depuis.
+// - `reessayer` : une fois, en silence, une seconde plus tard. Un refus après un
+//   succès n'est presque jamais un réglage : l'onglet revenu d'arrière-plan
+//   n'était pas encore visible pour WebKit, la caméra était prise par une autre
+//   appli, ou un « non » touché par mégarde à une redemande. Le navigateur
+//   mémorise un vrai refus pour la page : l'essai échoue alors aussitôt, sans
+//   seconde bulle.
+// - `refusee` : le dire, avec le chemin du réglage et les boutons Réessayer /
+//   Recharger (sur iPhone, seul un rechargement fait reposer la question).
+// - `occupee` : la caméra existe mais ne s'ouvre pas (prise par une autre appli,
+//   ouverture interrompue) : le dire, avec Réessayer.
+// - `pas-de-camera` : aucune caméra, réessayer n'y changerait rien.
+export function suiteApresErreurCamera({ nom, aMarche, essais }) {
+  const passager = nom === 'NotAllowedError' || nom === 'NotReadableError' || nom === 'AbortError';
+  if (passager && aMarche && essais < 1) return 'reessayer';
+  if (nom === 'NotAllowedError') return 'refusee';
+  return passager ? 'occupee' : 'pas-de-camera';
+}

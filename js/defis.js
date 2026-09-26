@@ -461,7 +461,7 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
     }
     const { choix, motif: motifChoix } = lireChoix(l.choix);
     if (motifChoix) { ecarter(motifChoix); continue; }
-    jeu.defis.push({ id, titre: texte(l.titre), points, type_preuve: normaliser(l.type_preuve), actif: !non(l.actif), params, question: texte(l.question), choix, explication: texte(l.explication) });
+    jeu.defis.push({ id, titre: texte(l.titre), points, type_preuve: normaliser(l.type_preuve), actif: !non(l.actif), params, question: texte(l.question), choix, explication: texte(l.explication), consigne: texte(l.consigne) });
   }
   // Ce qui se vérifie seulement une fois toutes les lignes lues : le défi désigné
   // par `different_de` existe ; le stand désigné est au programme, l'Événement d'un
@@ -541,7 +541,7 @@ export function avecReponses(jeu, reponses = new Map()) {
 // à `maintenant` (ms) ne dit que son titre et ses points : ni stands, ni heures.
 export function jeuPublic(jeu, { maintenant = null } = {}) {
   const cache = (d) => parAnnonce(d) && (maintenant === null || phaseAnnonce(d, maintenant) === 'a-venir');
-  const defis = jeu.defis.filter((d) => d.actif).map(({ actif, ...d }) => (cache(d) ? { ...d, params: { a_venir: true }, question: '', choix: [], explication: '' } : d));
+  const defis = jeu.defis.filter((d) => d.actif).map(({ actif, ...d }) => (cache(d) ? { ...d, params: { a_venir: true }, question: '', choix: [], explication: '', consigne: '' } : d));
   return { actif: jeu.actif && defis.length > 0, objectif: jeu.objectif, paliers: jeu.paliers, chances_badge: jeu.chances_badge, defis };
 }
 
