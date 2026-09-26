@@ -12,6 +12,7 @@
 // `moment` : avant | apres, la fenêtre où le Worker a compté un vote (grand-defi 05).
 // statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
 import { lireGain, afficherCode } from './gains.js';
+import { rejouerDemande } from './donnees.js';
 import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, avecPoints, MOMENTS_VOTE, DELAI_TIRAGE_INSTANT, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
@@ -357,9 +358,10 @@ export function creerEnvoi({ envoyer, obtenir, modifier, planifier = setTimeout,
 }
 
 // Rejouer depuis le début (essai du Grand Défi, grand-defi 11) : seulement quand le
-// classeur servi le permet (`Infos.rejouer` = oui). Posé dans le classeur d'essai,
-// jamais dans Gestion : à la bascule, le bouton disparaît seul.
+// classeur servi le permet (`Infos.rejouer` = oui). Dans Gestion pendant l'essai,
+// vidé avant J−7 (le Push le refuse ensuite). La même lecture que le Push
+// (`rejouerDemande`, ticket appsheet 02).
 export function rejouerOuvert(infos) {
-  return /^(oui|yes|1|vrai|true)$/i.test(String((infos && infos.rejouer) || '').trim());
+  return Boolean(infos) && rejouerDemande(infos.rejouer);
 }
 

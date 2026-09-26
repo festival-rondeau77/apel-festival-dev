@@ -3,7 +3,7 @@
 // dessin, la recherche depuis le plan, la phrase de guidage, le contenu d'une
 // Salle ou d'un Village. Pure : aucune mesure d'écran ici, l'adaptateur passe la
 // taille de la scène et applique les coordonnées au SVG (ADR-0013).
-import { normaliser, contient, ETAGES, ETAGE_PAR_DEFAUT } from './donnees.js';
+import { normaliser, contient, cleDePorte, ETAGES, ETAGE_PAR_DEFAUT } from './donnees.js';
 import { BATIMENT, CENTRE } from './batiment.js';
 import { t, tt } from './i18n.js';
 
@@ -28,11 +28,9 @@ const ESTIME_PLAT = (k) => HAUTEUR[k] === 0;
 
 // ---------------------------------------------------------------- jointure tableur ↔ relevé
 
-// La clé de porte : « Salle 110 », « salle 110 » et « 110 » désignent la même
-// porte. Le tableur peut écrire l'un ou l'autre, le relevé écrit le numéro nu.
-export function cleDePorte(nom) {
-  return normaliser(nom).replace(/^salle-(?=\d)/, '');
-}
+// La clé de porte (« Salle 110 » = « 110 ») vit dans donnees.js depuis le ticket
+// appsheet 02 : la même règle rapproche la salle d'un exposant de l'onglet Salles.
+export { cleDePorte };
 
 // La scène : les Étages du relevé, chaque Pièce jointe à la Salle du tableur qui
 // porte son nom, les Salles que le relevé ne connaît pas mises à part.

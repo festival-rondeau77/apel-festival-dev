@@ -231,6 +231,32 @@ export function publicInclut(publics, niveau) {
 
 // ---------------------------------------------------------------- zones et salles
 
+// La clé de porte : « Salle 110 », « salle 110 » et « 110 » désignent la même
+// porte. Le tableur peut écrire l'un ou l'autre, le relevé écrit le numéro nu.
+// Une seule règle, pour le plan (ADR-0013) comme pour la salle d'un exposant ou
+// d'un événement rapprochée de l'onglet Salles (ticket appsheet 02).
+export function cleDePorte(nom) {
+  return normaliser(nom).replace(/^salle-(?=\d)/, '');
+}
+
+// `Infos.rejouer` (le bouton des testeurs, grand-defi 11) : `oui` seul, casse, accents et
+// ponctuation près, lu par le téléphone comme par le Push (ticket appsheet 02) ; `true` ou
+// `1` échapperaient au refus de J−7.
+export function rejouerDemande(valeur) {
+  return normaliser(valeur) === 'oui';
+}
+
+// Les libellés de zone du plan (Params K) : `N · Nom` de chacun des onze villages.
+export const LIBELLES_ZONES = VILLAGES.map((v) => `${v.numero} · ${v.nom}`);
+
+// Une zone du plan telle que le Push l'accepte : vide, ou `N · Nom` d'un village
+// connu (séparateur, casse et accents près). Un nom seul créerait une zone à part,
+// un numéro seul renommerait le village, un couple inconnu ferait un faux village.
+export function zoneConnue(libelle) {
+  const n = normaliser(libelle);
+  return !n || LIBELLES_ZONES.some((z) => normaliser(z) === n);
+}
+
 function zoneDepuisLibelle(libelle) {
   const t = texte(libelle);
   if (!t) return null;
@@ -240,7 +266,9 @@ function zoneDepuisLibelle(libelle) {
 }
 
 // Une Zone du plan EST un Village : même numéro, même nom. La liste par défaut
-// donne les onze villages ; le tableur fait foi sur le nom, et peut en ajouter.
+// donne les onze villages. L'appli reste tolérante (une Publication d'avant, le
+// secours) : le tableur fait foi sur le nom, et peut en ajouter ; mais le Push
+// refuse toute zone qui n'est pas `N · Nom` d'un village connu (`zoneConnue`).
 const VILLAGE_PAR_NUMERO = new Map(VILLAGES.map((v) => [v.numero, v]));
 
 function construireZones(sallesBrutes) {
@@ -259,7 +287,7 @@ function construireZones(sallesBrutes) {
     if (!z) continue;
     const id = z.numero === null ? z.nom : z.numero;
     if (!zones.has(id)) zones.set(id, neuve(z.numero, z.nom));
-    else if (z.numero !== null && z.nom) zones.get(id).nom = z.nom; // le tableur fait foi sur le nom
+    else if (z.numero !== null && z.nom) zones.get(id).nom = z.nom; // le tableur fait foi sur le nom (refusé au Push s'il diffère)
   }
   return zones;
 }
@@ -363,9 +391,18 @@ export function construireModele(tables) {
     sallesParCle.set(salle.cle, salle);
     if (zone) zone.salles.push(salle);
   }
+  // Par la clé de porte aussi, comme le plan : « Salle 110 » d'un côté, « 110 » de
+  // l'autre, c'est la même salle, et son village s'applique. Deux Salles de même porte
+  // (« Salle 110 » et « 110 ») : la dernière gagne, comme sur le plan, et on le signale.
+  const sallesParPorte = new Map();
+  for (const s of salles) {
+    const porte = cleDePorte(s.nom);
+    if (sallesParPorte.has(porte)) avertissements.push({ type: 'salle-en-double', valeur: `${sallesParPorte.get(porte).nom} / ${s.nom}`, ou: `salle ${s.nom}` });
+    sallesParPorte.set(porte, s);
+  }
   const zones = [...zonesParId.values()].sort((a, b) => (a.numero ?? 99) - (b.numero ?? 99));
   const zoneDeSalle = (nomSalle) => {
-    const s = sallesParCle.get(normaliser(nomSalle));
+    const s = sallesParCle.get(normaliser(nomSalle)) || sallesParPorte.get(cleDePorte(nomSalle));
     return s ? s.zone : null;
   };
 
