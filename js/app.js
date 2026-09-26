@@ -423,6 +423,20 @@ function voter(defi, choix) {
   envoiJeu.envoyer();
 }
 
+// Une réponse à un instant gagnant (grand-defi 08) : enregistrée au geste (son heure
+// part avec elle), envoyée dans la minute, à un moment tiré au hasard, pour qu'une salle
+// entière qui répond à la même seconde n'arrive pas d'un coup au Worker. Tout de suite sur
+// la machine. Un autre envoi (retour du réseau, autre validation) peut l'emporter plus tôt.
+function repondreInstant(defi, choix) {
+  const { nom, params } = etat.route;
+  const q = nom === 'instant' && params.defi === defi ? Passeport.instantIci(etat.grandDefi, etat.visite.jeu, defi, Date.now()) : null;
+  const n = Number(choix);
+  if (!q || q.statut !== 'ouvert' || !Number.isInteger(n)) return;
+  const v = Passeport.nouvelleValidation({ id: identifiantAleatoire(), defi, exposant: '', secret: '', choix: n, t: Date.now() });
+  modifierVisite({ ...etat.visite, jeu: Passeport.ajouterValidation(etat.visite.jeu, v) });
+  setTimeout(() => envoiJeu.envoyer(), JEU_LOCAL ? 0 : Passeport.delaiEnvoiInstant(Math.random()));
+}
+
 // Rejouer depuis le début (essai, grand-defi 11) : ce téléphone oublie son Passeport
 // et ses validations, puis l'appli redémarre et en tire un nouveau (ID_PASSEPORT est
 // fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
@@ -618,6 +632,7 @@ document.addEventListener('click', (e) => {
     case 'valider-defi': validerDefi(cible.dataset.defi, cle, cible.dataset.choix); break;
     case 'repondre': repondre(cible.dataset.defi, cible.dataset.choix); break;
     case 'voter': voter(cible.dataset.defi, cible.dataset.choix); break;
+    case 'repondre-instant': repondreInstant(cible.dataset.defi, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     case 'copier-message': copierMessage(cible.dataset.code); break;
     default: break;
@@ -980,7 +995,7 @@ async function rafraichirDonnees() {
     if (Array.isArray(r.annonces)) etat.annonces = r.annonces;
     if (JEU_URL && Passeport.jeuARecharger(etat.grandDefi, r.annonces)) chargerJeu().catch((e) => journal('jeu indisponible', e));
     // Un Tirage a eu lieu (grand-defi 07) : ce téléphone a-t-il gagné ?
-    if (JEU_URL && Passeport.gainsARelire(etat.visite.jeu, r.tirage)) demanderGains(r.tirage);
+    if (JEU_URL && Passeport.gainsARelire(etat.visite.jeu, r.tirage, Date.now())) demanderGains(r.tirage);
     if (r.change) installerTables(r.tables, r.version, r.source);
     else { etat.derniereMaj = Date.now(); etat.source = r.source; }
   }
@@ -1104,8 +1119,9 @@ async function demarrer() {
   envoiJeu.envoyer();
   verifierRappels();
   setInterval(verifierRappels, 30000);
-  // L'écran de vote suit l'horloge : une fenêtre s'ouvre ou se ferme sans geste.
-  setInterval(() => { if (etat.route.nom === 'vote' && document.visibilityState === 'visible') rendre({ conserver: true }); }, 20000);
+  // L'écran de vote suit l'horloge : une fenêtre s'ouvre ou se ferme sans geste. De même
+  // l'instant gagnant (sa fenêtre) et le Lot flash (son compte à rebours), grand-defi 08.
+  setInterval(() => { if (['vote', 'instant', 'gagne'].includes(etat.route.nom) && document.visibilityState === 'visible') rendre({ conserver: true }); }, 20000);
   window.__festival = { etat, rendre, stats, sources, changerLangue, changerTheme, chargerJeu, rafraichirDonnees }; // pour le test de fumée et le débogage
 }
 

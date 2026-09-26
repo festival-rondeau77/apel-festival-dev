@@ -48,7 +48,10 @@ export function urlRemise(urlWorker, code, jeton = '') {
 
 // Un gain tel que le Worker le rend au téléphone : { code, sorte, lot, remis } (remis :
 // l'heure de la Remise en ms, ou null), vérifié avant d'être cru. null s'il ne se lit pas.
+// Un Lot flash porte aussi `echeance` (grand-defi 08) : jusqu'à quand il attend à
+// l'accueil (ms), ou null (il attend).
 export function lireGain(g) {
   if (!g || typeof g !== 'object' || !CODE_PUBLIC.test(g.code) || !SORTES.includes(g.sorte) || !Number.isInteger(g.lot) || g.lot < 1) return null;
-  return { code: g.code, sorte: g.sorte, lot: g.lot, remis: Number.isFinite(g.remis) && g.remis > 0 ? g.remis : null };
+  const ms = (x) => (Number.isFinite(x) && x > 0 ? x : null);
+  return { code: g.code, sorte: g.sorte, lot: g.lot, remis: ms(g.remis), ...(g.sorte === 'flash' ? { echeance: ms(g.echeance) } : {}) };
 }

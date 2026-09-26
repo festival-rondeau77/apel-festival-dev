@@ -4,7 +4,7 @@
 // du Worker la montre traitée, et la file la renvoie jusque-là.
 // L'état vit dans Ma visite (clé `jeu`, schéma 3 de visite.js) :
 //   { validations: [{ id, defi, exposant, t, preuve: { secret, choix? }, statut, essai?, moment? }], passeport: { points, defis } | null,
-//     gains: [{ code, sorte, lot, remis }], tirageVu, jetonReconnu }
+//     gains: [{ code, sorte, lot, remis, echeance? }], tirageVu, jetonReconnu }
 // `gains` : ce que le Worker dit que ce téléphone a gagné (grand-defi 07), `tirageVu` la
 // marque du dernier Tirage pour lequel il a demandé, `jetonReconnu` : le Worker connaît
 // l'empreinte de son jeton (sinon, pas de QR : le code public seul).
@@ -12,7 +12,7 @@
 // `moment` : avant | apres, la fenêtre où le Worker a compté un vote (grand-defi 05).
 // statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
 import { lireGain, afficherCode } from './gains.js';
-import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, MOMENTS_VOTE, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
+import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, avecPoints, MOMENTS_VOTE, DELAI_TIRAGE_INSTANT, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
 // Ce que le Worker ajoute à une validation traitée (son 3e élément).
@@ -210,10 +210,37 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [], appareil 
 
 // L'écran « Mes défis » : chaque défi actif, dans l'ordre du tableur, et son état.
 // `maintenant` (ms) : un vote dont la fenêtre « avant » est passée sans vote est refusé.
+// Les instants gagnants n'y sont pas (grand-defi 08) : ils ne rapportent aucun point, et
+// n'existent que le temps de leur annonce.
 export function mesDefis(jeu, etat, { maintenant = null } = {}) {
   if (!jeu || !jeu.actif) return [];
-  return jeu.defis.map((defi) => ({ defi, statut: statutDuDefi(defi, etat, maintenant) }));
+  return jeu.defis.filter(avecPoints).map((defi) => ({ defi, statut: statutDuDefi(defi, etat, maintenant) }));
 }
+
+// L'écran d'un instant gagnant (grand-defi 08), ou null si ce défi n'en est pas un.
+// statut : a-venir | ouvert (les choix) | repondu (enregistrée au geste, envoyée ou non :
+// le téléphone ne sait pas si elle est juste) | refuse (arrivée hors de la fenêtre, à
+// l'heure du jeu) | ferme (fermé sans réponse). `fermeture`, `tirage` : en minutes à Paris.
+// `choix` : le numéro du choix donné.
+export function instantIci(jeu, etat, id, maintenant) {
+  const defi = jeu && jeu.actif ? jeu.defis.find((d) => d.id === id && d.type_preuve === 'instant') : null;
+  if (!defi) return null;
+  const donnee = etat.validations.filter((v) => v.defi === id).find((v) => v.statut !== 'refus') || null;
+  const refusee = etat.validations.find((v) => v.defi === id && v.statut === 'refus');
+  const aVenir = defi.params.a_venir || phaseAnnonce(defi, maintenant) === 'a-venir';
+  let statut = 'ouvert';
+  if (donnee || (etat.passeport && etat.passeport.defis.includes(id))) statut = 'repondu';
+  else if (refusee) statut = 'refuse';
+  else if (aVenir) statut = 'a-venir';
+  else if (phaseAnnonce(defi, maintenant) === 'close') statut = 'ferme';
+  const fermeture = Number.isInteger(defi.params.actif_a) ? defi.params.actif_a : null;
+  return { defi, statut, fermeture, tirage: fermeture === null ? null : fermeture + DELAI_TIRAGE_INSTANT, choix: donnee ? donnee.preuve.choix ?? null : null };
+}
+
+// Une réponse à un instant part dans la minute, à un moment tiré au hasard (`alea`, de
+// 0 à 1) : 600 téléphones qui répondent à la même seconde n'envoient pas à la même seconde.
+// L'heure du geste part avec elle : le Worker la retient (moins de dix minutes d'écart).
+export const delaiEnvoiInstant = (alea) => Math.floor(Math.min(Math.max(alea, 0), 0.99999) * 60_000);
 
 // Le bandeau d'annonce (grand-defi 06) : chaque défi annoncé en ce moment (le
 // mystère, révélé par le Worker), pas encore fait par ce téléphone :
@@ -221,13 +248,15 @@ export function mesDefis(jeu, etat, { maintenant = null } = {}) {
 // Annoncé, c'est ce que dit l'horloge du téléphone OU la dernière liste du Worker
 // (`annonces`, de ?action=etat) : un téléphone en retard de quelques minutes voit le
 // bandeau quand le Worker annonce ; son heure limite, elle, reste celle de son horloge.
+// Un instant gagnant (grand-defi 08) : [{ defi, instant: true, jusqua }], tant que ce
+// téléphone n'a pas répondu.
 export function annoncesEnCours(jeu, etat, { appareil = '', maintenant = null, annonces = [] } = {}) {
   if (!jeu || !jeu.actif || maintenant === null) return [];
   const annonce = (d) => { const p = phaseAnnonce(d, maintenant); return p === 'ouverte' || (p === 'a-venir' && annonces.includes(d.id)); };
   return jeu.defis
     .filter((d) => parAnnonce(d) && annonce(d) && !['valide', 'attente'].includes(statutDefi(etat, d.id)))
-    .map((defi) => ({ defi, stand: standAttribue(defi, appareil), jusqua: defi.params.actif_a }))
-    .filter((a) => a.stand);
+    .map((defi) => (defi.type_preuve === 'instant' ? { defi, instant: true, jusqua: defi.params.actif_a } : { defi, stand: standAttribue(defi, appareil), jusqua: defi.params.actif_a }))
+    .filter((a) => a.instant || a.stand);
 }
 
 // Le Worker annonce un défi (`annonces` de ?action=etat) que le jeu gardé ne connaît
@@ -247,13 +276,17 @@ export function jauge(jeu, etat) {
   return { points, attente, objectif: jeu.objectif, ...chancesDe(points, etat.passeport ? etat.passeport.defis : [], jeu) };
 }
 
+// Un gain encore à remettre à `maintenant` (ms) : ni remis, ni un Lot flash dont le délai
+// est passé (grand-defi 08 : un remplaçant est tiré). Sans `maintenant`, seul `remis` compte.
+export const gainEnCours = (g, maintenant = null) => !g.remis && !(maintenant !== null && Number.isFinite(g.echeance) && maintenant > g.echeance);
+
 // Faut-il demander ses gains au Worker (`?action=gain`, grand-defi 07) ? Quand l'état
 // porte la marque d'un Tirage que ce téléphone n'a pas encore vue, s'il a joué (qui n'a
 // rien validé n'a rien pu gagner : 600 téléphones ne demandent pas pour rien) ; et, tant
-// qu'un lot n'est pas remis, à chaque état : l'écran dira « Lot remis ».
-export function gainsARelire(jeu, marque) {
+// qu'un lot est à remettre, à chaque état : l'écran dira « Lot remis ».
+export function gainsARelire(jeu, marque, maintenant = null) {
   if (!jeu) return false;
-  if ((jeu.gains || []).some((g) => !g.remis)) return true;
+  if ((jeu.gains || []).some((g) => gainEnCours(g, maintenant))) return true;
   return Boolean(marque) && marque !== jeu.tirageVu && jeu.validations.length > 0;
 }
 
@@ -262,7 +295,7 @@ export function appliquerGains(jeu, rep, marque) {
   return { ...jeu, gains: lireGains(rep && rep.gains), tirageVu: texte(marque) ? marque : jeu.tirageVu || '', jetonReconnu: !rep || rep.jeton_reconnu !== false };
 }
 
-export const gainsARemettre = (jeu) => ((jeu && jeu.gains) || []).filter((g) => !g.remis);
+export const gainsARemettre = (jeu, maintenant = null) => ((jeu && jeu.gains) || []).filter((g) => gainEnCours(g, maintenant));
 
 // Le nom du lot dans le mail à l'école : en français, quelle que soit la langue de l'appli.
 const nomDuLotPourLEcole = (g) => (g.sorte === 'flash' ? 'Lot flash' : `Grand lot n° ${g.lot}`);

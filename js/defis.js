@@ -10,6 +10,12 @@ export const CHANCES_BADGE_PAR_DEFAUT = 1;
 export const ESSAIS_PAR_DEFAUT = 2;
 export const TOLERANCE_AVANT_PAR_DEFAUT = 15;
 export const TOLERANCE_APRES_PAR_DEFAUT = 10;
+// Un instant gagnant dure cinq minutes, sauf `actif_a` rempli (grand-defi 08).
+export const DUREE_INSTANT = 5;
+export const LOTS_FLASH_MAX_PAR_DEFAUT = 1;
+// Le tirage d'un instant, en minutes après sa fermeture (le Worker tire, le téléphone l'annonce).
+export const DELAI_TIRAGE_INSTANT = 2;
+export const HEURE_TIRAGE_PAR_DEFAUT = 13 * 60;
 export const ID_DEFI = /^[a-z0-9-]{1,20}$/i;
 const OUI = ['oui', 'vrai', 'true', 'x', '1'];
 const NON = ['non', 'faux', 'false', '0'];
@@ -75,7 +81,7 @@ export const TYPES_PREUVE = {
   // seul stand. Il vaut entre l'annonce (`actif_de`, une heure de Paris ; vide = pas
   // encore annoncé) et l'heure limite (`actif_a`), bornes comprises. Avant l'annonce, le
   // téléphone ne reçoit ni les stands ni les heures (jeuPublic) ; l'annonce est un
-  // Type qui a `annonce` (grand-defi 08 : les instants gagnants suivront).
+  // Type qui a `annonce` (les instants gagnants aussi, grand-defi 08).
   'scan-attribue': {
     annonce: true,
     lireParams(l) {
@@ -105,6 +111,43 @@ export const TYPES_PREUVE = {
       return s && standCorrespond(s.stand, exposant) ? '' : 'pas votre stand';
     },
   },
+  // Un instant gagnant (grand-defi 08) : une question à choix, posée par une annonce à
+  // l'heure `actif_de` (vide = pas encore programmé), pendant cinq minutes (jusqu'à
+  // `actif_a` si la colonne est remplie). Pas un Défi : aucun point, hors du badge
+  // (`sansPoints`). La réponse est enregistrée, juste ou non, sans que le téléphone le
+  // sache (motif `juste` | `faux`, gardé dans D1) ; le Worker tire un gagnant parmi les
+  // bonnes réponses deux minutes après la fermeture (worker/src/instants.js). La bonne
+  // réponse vit dans D1 comme celle d'une question (`reponses`, portée par le Push).
+  instant: {
+    annonce: true,
+    sansPoints: true,
+    bonneReponse: true,
+    lireParams(l) {
+      if (!texte(l.question)) return { motif: 'question vide' };
+      if (!texte(l.choix)) return { motif: 'choix vides : la bonne réponse doit en être un' };
+      const sansHeure = !Array.isArray(l.actif_de) && texte(l.actif_de) === '';
+      if (sansHeure) return { params: { actif_de: null, actif_a: null } };
+      const de = lireHeure(l.actif_de);
+      if (de === null) return { motif: `actif_de illisible : « ${texte(l.actif_de)} » (l’heure de l’instant, 10:00 ; vide = pas encore programmé)` };
+      const aVide = !Array.isArray(l.actif_a) && texte(l.actif_a) === '';
+      const a = aVide ? de + DUREE_INSTANT : lireHeure(l.actif_a);
+      if (a === null) return { motif: `actif_a illisible : « ${texte(l.actif_a)} » (la fin de l’instant ; vide = ${DUREE_INSTANT} minutes)` };
+      if (de >= a) return { motif: `actif_de (${texte(l.actif_de)}) doit être avant actif_a (${texte(l.actif_a)})` };
+      return { params: { actif_de: de, actif_a: a } };
+    },
+    concerne: () => false,
+    motif: () => '',
+    // La réponse reçue à l'heure retenue `heure` : { motif } si elle ne compte pas, sinon
+    // { juste }. `reponse` : la ligne D1 de l'instant.
+    repondre(defi, preuve, { heure, reponse }) {
+      if (!reponse) return { motif: 'bonne réponse non saisie' };
+      const phase = phaseAnnonce(defi, heure);
+      if (phase === 'a-venir') return { motif: 'pas encore ouvert' };
+      if (phase === 'close') return { motif: 'instant fermé' };
+      if (!Number.isInteger(preuve.choix) || !defi.choix[preuve.choix]) return { motif: 'réponse attendue' };
+      return { juste: normaliser(defi.choix[preuve.choix]) === normaliser(reponse.bonne) };
+    },
+  },
   // Le QR d'un exposant dont aucun Domaine n'apparaît parmi ceux des scans déjà
   // validés (défi 9). Les centres d'intérêt du Visiteur ne partent jamais : seuls
   // ses scans comptent, ceux de CE stand compris. Sortir de sa zone de confort
@@ -130,6 +173,7 @@ export const TYPES_PREUVE = {
   // `qr_requis` (oui par défaut) : sans le jeton du QR, la réponse ne vaut rien.
   // Aucune fiche d'exposant ne la propose : elle a son propre écran (`#/question`).
   reponse: {
+    bonneReponse: true,
     lireParams(l) {
       if (!texte(l.question)) return { motif: 'question vide' };
       if (!texte(l.choix)) return { motif: 'choix vides : la bonne réponse doit en être un' };
@@ -225,10 +269,10 @@ export function phaseAnnonce(defi, ms) {
   return m <= a ? 'ouverte' : 'close';
 }
 
-// Ce défi vient-il par une annonce (le mystère ; les instants gagnants suivront) ?
+// Ce défi vient-il par une annonce (le mystère, les instants gagnants) ?
 export const parAnnonce = (defi) => Boolean(defi && TYPES_PREUVE[defi.type_preuve] && TYPES_PREUVE[defi.type_preuve].annonce);
 
-// Les défis annoncés en ce moment (leurs id) : ce que le Worker joint à `?action=etat`,
+// Les défis annoncés en ce moment (leurs id ; le mystère et les instants gagnants) : ce que le Worker joint à `?action=etat`,
 // que les téléphones ouverts interrogent chaque minute.
 export function annoncesDe(jeu, ms) {
   if (!jeu || !jeu.actif) return [];
@@ -265,6 +309,18 @@ export function momentDuVote(defi, ms) {
 // Le motif qui compte un essai de question : le Worker compte ses refus ainsi motivés,
 // dans D1. Ne pas le reformuler pendant le jeu : les essais déjà joués seraient oubliés.
 export const MAUVAISE_REPONSE = 'mauvaise réponse';
+
+// Les motifs d'une réponse à un instant gagnant (grand-defi 08), écrits dans
+// `validations.motif` : le tirage ne prend que les `juste`. Jamais envoyés au téléphone.
+// Ne pas les renommer pendant le jeu.
+export const REPONSE_INSTANT = { juste: 'juste', faux: 'faux' };
+
+// Ce défi rapporte-t-il des points et compte-t-il pour le badge ? Non pour un instant
+// gagnant. Un défi sans Type connu (le barème du Tirage n'en porte pas) : oui.
+// Ce défi a-t-il une bonne réponse dans D1 (`reponses`, portée par le Push) ? Une question,
+// un instant gagnant.
+export const aBonneReponse = (defi) => Boolean(TYPES_PREUVE[defi && defi.type_preuve] && TYPES_PREUVE[defi.type_preuve].bonneReponse);
+export const avecPoints = (defi) => !(TYPES_PREUVE[defi && defi.type_preuve] && TYPES_PREUVE[defi.type_preuve].sansPoints);
 
 // Un stand désigné par sa clé complète, ou par le seul nom (quel que soit le type).
 export function standCorrespond(stand, exposant) {
@@ -334,6 +390,25 @@ function lireGrandsLots(valeur) {
   return { lots: n };
 }
 
+// `delai_lot_flash` (grand-defi 08) : les minutes qu'a le gagnant d'un instant pour venir
+// à l'accueil. Vide : jusqu'à l'heure du tirage (`heure_tirage`, 13 h).
+function lireDelaiFlash(valeur) {
+  const brut = texte(valeur);
+  if (!brut) return { delai: null };
+  const n = Number(brut);
+  if (!Number.isInteger(n) || n < 1 || n > 240) return { delai: null, motif: `delai_lot_flash illisible : « ${brut} » (minutes, de 1 à 240 ; vide = jusqu’à l’heure du tirage)` };
+  return { delai: n };
+}
+
+// `lots_flash_max` : les Lots flash qu'un même téléphone peut gagner. Vide : 1.
+function lireLotsFlashMax(valeur) {
+  const brut = texte(valeur);
+  if (!brut) return { max: LOTS_FLASH_MAX_PAR_DEFAUT };
+  const n = Number(brut);
+  if (!Number.isInteger(n) || n < 1 || n > 20) return { max: LOTS_FLASH_MAX_PAR_DEFAUT, motif: `lots_flash_max illisible : « ${brut} » (de 1 à 20)` };
+  return { max: n };
+}
+
 // Les onglets `Défis` et `Infos` (tables brutes, première ligne = en-têtes) → le jeu.
 // `defis` garde aussi les défis désactivés (leurs points comptent toujours) ;
 // `invalides` liste ce qui a été écarté, avec le motif.
@@ -343,10 +418,19 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
   const { paliers, motif: motifPaliers } = lirePaliers(infos.paliers);
   const { chances: chancesBadge, motif: motifBadge } = lireChancesBadge(infos.chances_badge);
   const { lots: grandsLots, motif: motifLots } = lireGrandsLots(infos.grands_lots);
-  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, grands_lots: grandsLots, defis: [], invalides: [] };
+  const { delai: delaiFlash, motif: motifDelai } = lireDelaiFlash(infos.delai_lot_flash);
+  const { max: lotsFlashMax, motif: motifMax } = lireLotsFlashMax(infos.lots_flash_max);
+  // L'heure du grand tirage, texte libre pour la règle (« 13 h ») : illisible, 13 h.
+  // Elle borne aussi l'attente d'un Lot flash sans délai : illisible, elle est signalée.
+  const heureLue = lireHeure(infos.heure_tirage);
+  const heureTirage = heureLue ?? HEURE_TIRAGE_PAR_DEFAUT;
+  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, grands_lots: grandsLots, delai_lot_flash: delaiFlash, lots_flash_max: lotsFlashMax, heure_tirage: heureTirage, defis: [], invalides: [] };
   if (motifPaliers) jeu.invalides.push({ id: 'paliers', motif: motifPaliers });
   if (motifBadge) jeu.invalides.push({ id: 'chances_badge', motif: motifBadge });
   if (motifLots) jeu.invalides.push({ id: 'grands_lots', motif: motifLots });
+  if (motifDelai) jeu.invalides.push({ id: 'delai_lot_flash', motif: motifDelai });
+  if (motifMax) jeu.invalides.push({ id: 'lots_flash_max', motif: motifMax });
+  if (heureLue === null && texte(infos.heure_tirage)) jeu.invalides.push({ id: 'heure_tirage', motif: `heure_tirage illisible : « ${texte(infos.heure_tirage)} » (13 h, 13:00)` });
   const entetes = Array.isArray(tableDefis) && Array.isArray(tableDefis[0]) ? tableDefis[0].map((e) => normaliser(e).replace(/-/g, '_')) : [];
   // gviz rend la PREMIÈRE feuille quand l'onglet demandé n'existe pas : sans ces
   // en-têtes, ce n'est pas l'onglet Défis, et il n'y a pas de jeu.
@@ -362,10 +446,12 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
     if (!ID_DEFI.test(id)) { ecarter('identifiant illisible (lettres, chiffres, tirets)'); continue; }
     if (vus.has(id)) { ecarter('identifiant en double'); continue; }
     vus.add(id);
-    const points = texte(l.points) === '' ? NaN : Number(l.points);
-    if (!Number.isInteger(points) || points < 0 || points > 1000) { ecarter(`points illisibles : « ${texte(l.points)} »`); continue; }
     const type = TYPES_PREUVE[normaliser(l.type_preuve)];
+    // Un instant gagnant ne rapporte rien : points vides ou 0.
+    const points = texte(l.points) === '' ? (type && type.sansPoints ? 0 : NaN) : Number(l.points);
+    if (!Number.isInteger(points) || points < 0 || points > 1000) { ecarter(`points illisibles : « ${texte(l.points)} »`); continue; }
     if (!type) { ecarter(`type de preuve inconnu : « ${texte(l.type_preuve)} »`); continue; }
+    if (type.sansPoints && points !== 0) { ecarter(`un instant gagnant ne rapporte pas de points : 0 ou vide, et non ${points}`); continue; }
     const { params, motif } = type.lireParams(l);
     if (motif) { ecarter(motif); continue; }
     const different = texte(l.different_de);
@@ -412,13 +498,13 @@ function placerVotes(defi, evenements) {
 }
 
 // Les bonnes réponses (D1 : défi → { bonne, jeton }) confrontées aux questions du
-// tableur : une question sans bonne réponse saisie, ou dont la bonne réponse n'est
+// tableur (et aux instants gagnants, grand-defi 08) : une question sans bonne réponse saisie, ou dont la bonne réponse n'est
 // plus parmi ses choix (choix réécrits), est écartée et signalée, jamais proposée.
 // La comparaison ignore casse, accents et espaces. Rend { jeu, reponses }.
 export function avecReponses(jeu, reponses = new Map()) {
   const invalides = [];
   const defis = jeu.defis.filter((d) => {
-    if (d.type_preuve !== 'reponse') return true;
+    if (!aBonneReponse(d)) return true;
     const r = reponses.get(d.id);
     if (!r) invalides.push({ id: d.id, motif: 'bonne réponse non saisie (Gestion, Défis, colonne bonne_reponse, puis Push)' });
     // Sans citer la réponse : `invalides` est public (GET ?action=jeu).
@@ -463,12 +549,21 @@ export function motifIci(defi, contexte) {
 // premier vote reçu a le statut `vote` (compté, pas encore de point), celui qui fait
 // la paire `ok` ; les deux portent leur `moment`.
 // Le défi mystère (`scan-attribue`) : `appareil`, le Passeport qui envoie ; jugé à `heure`.
+// Un instant gagnant (`instant`) : statut `ok` et motif `juste` | `faux`, jugé à `heure`.
 export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map(), appareil = '' }) {
   const refus = (motif) => ({ statut: 'refus', motif, choix: null });
   if (!jeu.actif) return refus('jeu coupé');
   const defi = jeu.defis.find((d) => d.id === v.defi && d.actif);
   if (!defi) return refus('défi inconnu ou inactif');
-  const { verifier, voter } = TYPES_PREUVE[defi.type_preuve];
+  const { verifier, voter, repondre } = TYPES_PREUVE[defi.type_preuve];
+  // Un instant gagnant : la réponse est enregistrée, juste ou non, le motif le dit au
+  // tirage (jamais au téléphone).
+  if (repondre) {
+    if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
+    const r = repondre(defi, v.preuve || {}, { heure, reponse: reponses.get(defi.id) || null });
+    if (r.motif) return refus(r.motif);
+    return { statut: 'ok', motif: r.juste ? REPONSE_INSTANT.juste : REPONSE_INSTANT.faux, choix: null, libelle: '' };
+  }
   if (voter) {
     if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
     const preuve = v.preuve || {};
@@ -507,13 +602,13 @@ export const chancesBadgeDe = (jeu) => (Number.isInteger(jeu.chances_badge) ? je
 
 // Les Chances d'un Passeport au Tirage (grand-defi 03) : une par Palier atteint, et
 // celles du badge « Explorateur 100 % » quand tous les défis ACTIFS sont validés (un
-// défi désactivé sort de la condition). Rien avant le premier Palier : 100 points
+// défi désactivé sort de la condition, un instant gagnant n'y entre pas). Rien avant le premier Palier : 100 points
 // font entrer au Tirage, le badge seul non. `manque` : les points jusqu'au prochain
 // Palier, null au-delà du dernier. `jeu` : le jeu lu ou le jeu public.
 export function chancesDe(points, idsValides, jeu) {
   const paliers = paliersDe(jeu);
   const faits = new Set(idsValides);
-  const actifs = jeu.defis.filter((d) => d.actif !== false);
+  const actifs = jeu.defis.filter((d) => d.actif !== false && avecPoints(d));
   const badge = actifs.length > 0 && actifs.every((d) => faits.has(d.id));
   const auTirage = points >= paliers[0];
   const chances = auTirage ? paliers.filter((p) => p <= points).length + (badge ? chancesBadgeDe(jeu) : 0) : 0;

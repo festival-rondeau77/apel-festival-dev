@@ -8,7 +8,7 @@ import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, c
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
-import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, annoncesEnCours, gainsARemettre, messageAbsent, etatJeuInitial } from './passeport.js';
+import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, instantIci, annoncesEnCours, gainsARemettre, gainEnCours, messageAbsent, etatJeuInitial } from './passeport.js';
 import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis } from './defis.js';
 import { afficherCode, urlRemise } from './gains.js';
 import { encoderQR, qrEnSvg } from './qr.js';
@@ -426,7 +426,12 @@ const nomDuStand = (etat, s) => { const e = exposantDuStand(etat, s); return e ?
 export function bandeauAnnonces(etat) {
   poserLangue(etat);
   const jeu = (etat.visite && etat.visite.jeu) || { validations: [], passeport: null };
-  return bandeauGain(etat, jeu) + annoncesEnCours(etat.grandDefi, jeu, { appareil: etat.appareil, maintenant: maintenantMs(etat), annonces: etat.annonces || [] }).map(({ defi, stand, jusqua }) => {
+  return bandeauGain(etat, jeu) + annoncesEnCours(etat.grandDefi, jeu, { appareil: etat.appareil, maintenant: maintenantMs(etat), annonces: etat.annonces || [] }).map(({ defi, stand, jusqua, instant }) => {
+    // Un instant gagnant (grand-defi 08) : l'écran de sa question, sauf sur cet écran-là.
+    if (instant) {
+      if (etat.route.nom === 'instant' && etat.route.params.defi === defi.id) return '';
+      return `<a class="annonce-defi" href="#/instant/${attr(encodeURIComponent(defi.id))}"><strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Une question, un lot à gagner'))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span></a>`;
+    }
     const e = exposantDuStand(etat, stand);
     const corps = `<strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Votre stand : %s', nomDuStand(etat, stand)))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span>`;
     return e ? `<a class="annonce-defi" href="${lienExposant(e.cle)}">${corps}</a>` : `<p class="annonce-defi">${corps}</p>`;
@@ -436,7 +441,7 @@ export function bandeauAnnonces(etat) {
 // « Vous avez gagné ! » (grand-defi 07), en tête des annonces, jusqu'à la Remise : un
 // lien vers l'écran du lot, sauf sur cet écran-là.
 function bandeauGain(etat, jeu) {
-  const [g] = gainsARemettre(jeu);
+  const [g] = gainsARemettre(jeu, maintenantMs(etat));
   if (!g || etat.route.nom === 'gagne') return '';
   return `<a class="annonce-gain" href="#/gagne"><strong>${h(t('Vous avez gagné !'))}</strong> <span>${h(nomDuLot(g))} · ${h(t('Voir mon lot'))}</span></a>`;
 }
@@ -461,19 +466,29 @@ function ecranGagne(etat) {
   const i = etat.modele.infos || {};
   const { worker = '', jeton = '' } = etat.remise || {};
   const qr = jeu.jetonReconnu !== false && worker && jeton;
+  const maintenant = maintenantMs(etat);
   const lot = (g) => {
-    if (g.remis) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ok">${h(t('Lot remis · %s', heure(minutesAParis(g.remis))))}</p></section>`;
+    if (g.remis) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ok">${h(t('Lot remis · %s', heure(Math.floor(minutesAParis(g.remis)))))}</p></section>`;
+    // Un Lot flash (grand-defi 08) : venir tout de suite, avant l'échéance ; passé ce délai,
+    // un autre gagnant est tiré. Pas de mail : il se retire sur place.
+    if (g.sorte === 'flash' && !gainEnCours(g, maintenant)) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ferme">${h(t('Délai dépassé : le lot est remis en jeu.'))}</p></section>`;
     const mail = messageAbsent(g, { email: i.contact_email, festival: i.nom || undefined });
+    const minutes = Number.isFinite(g.echeance) ? Math.max(1, Math.ceil((g.echeance - maintenant) / 60_000)) : null;
+    const delai = g.sorte !== 'flash' ? ''
+      : minutes === null ? `<p class="verdict attente">${h(t('Venez à l’accueil pour le retirer.'))}</p>`
+        : `<p class="verdict attente">${h(t('Venez à l’accueil avant %s.', heure(Math.floor(minutesAParis(g.echeance)))))} <strong>${h(tn('Encore %s minute', 'Encore %s minutes', minutes))}</strong></p>`;
+    const absent = g.sorte === 'flash' ? '' : `<h3>${h(t('Déjà parti ?'))}</h3>
+      <p>${h(t('Votre lot reste réservé. Écrivez à l’école avec votre code, votre nom et un moyen de vous joindre. Moins de 15 ans : demandez à un parent.'))}</p>
+      <div class="boutons">${mail.mailto ? `<a class="bouton secondaire" href="${url(mail.mailto)}">${icone('document', 19)}${h(t('Je suis déjà parti'))}</a>` : ''}<button class="bouton secondaire" type="button" data-action="copier-message" data-code="${attr(g.code)}">${h(t('Copier le message'))}</button></div>`;
     return `<section class="gagne">
       <p class="lot">${h(nomDuLot(g))}</p>
+      ${delai}
       ${qr ? `<div class="qr-gain" role="img" aria-label="${attr(t('QR à montrer à l’accueil'))}">${qrEnSvg(encoderQR(urlRemise(worker, g.code, jeton), 'M'), { marge: 4, echelle: 6 })}</div>
       <p>${h(t('Montrez ce QR à l’accueil : un organisateur le scanne et vous remet votre lot.'))}</p>`
         : `<p>${h(t('Montrez ce code à l’accueil : un organisateur le saisit et vous remet votre lot.'))}</p>`}
       <p class="code-gain">${h(t('Votre code : %s', TROU)).replace(TROU, `<strong>${h(afficherCode(g.code))}</strong>`)}</p>
       ${qr ? `<p class="note">${h(t('Si le QR ne se lit pas, donnez ce code à l’organisateur.'))}</p>` : ''}
-      <h3>${h(t('Déjà parti ?'))}</h3>
-      <p>${h(t('Votre lot reste réservé. Écrivez à l’école avec votre code, votre nom et un moyen de vous joindre. Moins de 15 ans : demandez à un parent.'))}</p>
-      <div class="boutons">${mail.mailto ? `<a class="bouton secondaire" href="${url(mail.mailto)}">${icone('document', 19)}${h(t('Je suis déjà parti'))}</a>` : ''}<button class="bouton secondaire" type="button" data-action="copier-message" data-code="${attr(g.code)}">${h(t('Copier le message'))}</button></div>
+      ${absent}
     </section>`;
   };
   return `${entete(t('Vous avez gagné !'), '', retour)}
@@ -596,6 +611,37 @@ function ecranQuestion(etat) {
       ${corps}${explication}
     </section>
     <div class="boutons"><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a></div>`;
+}
+
+// Un instant gagnant (grand-defi 08), ouvert par le bandeau d'annonce
+// (`#/instant/<défi>`) : la question et ses choix pendant la fenêtre ; une réponse
+// touchée est enregistrée tout de suite et part dans la minute. Le téléphone ne sait
+// pas si elle est juste : le Worker tire un gagnant parmi les bonnes réponses deux
+// minutes après la fermeture, et seul le gagnant l'apprend (« Vous avez gagné ! »).
+function ecranInstant(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  const pasOuvert = (message) => `${entete(t('Instant gagnant'), '', retour)}
+    <p class="vide">${h(message)}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  if (!etat.grandDefi || !etat.grandDefi.actif) return pasOuvert(t('Le Grand Défi n’est pas ouvert.'));
+  const q = instantIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || etatJeuInitial(), etat.route.params.defi, maintenantMs(etat));
+  if (!q) return pasOuvert(t('Ce défi n’est pas un instant gagnant.'));
+  const { defi, statut, fermeture, tirage, choix } = q;
+  if (statut === 'a-venir') return pasOuvert(t('Cet instant gagnant n’a pas encore commencé.'));
+  let corps;
+  if (statut === 'ouvert') {
+    corps = `<p class="essai">${h(t('Répondez avant %s : un gagnant est tiré parmi les bonnes réponses.', heure(fermeture)))}</p>
+    <div class="choix" role="group" aria-label="${attr(tt(defi.question))}">${defi.choix.map((c, i) => `<button class="bouton secondaire" type="button" data-action="repondre-instant" data-defi="${attr(defi.id)}" data-choix="${i}">${h(tt(c))}</button>`).join('')}</div>`;
+  } else if (statut === 'repondu') {
+    corps = `<p class="verdict attente">${h(t('Réponse enregistrée : %s', tt(defi.choix[choix] || '')))}</p>
+    <p>${h(t('Tirage vers %s parmi les bonnes réponses : si vous gagnez, l’appli vous le dit.', heure(tirage)))}</p>`;
+  } else if (statut === 'refuse') corps = `<p class="verdict ferme">${h(t('Réponse arrivée trop tard : l’instant était fermé.'))}</p>`;
+  else corps = `<p class="verdict ferme">${h(t('Cet instant gagnant est fermé.'))}</p>`;
+  return `${entete(tt(defi.titre), h(t('Lot flash')), retour)}
+    <section class="question-defi">
+      <p class="question">${h(tt(defi.question))}</p>
+      ${corps}
+    </section>`;
 }
 
 // L'heure de l'écran (ms) : celle posée par app.js au rendu, sinon l'horloge.
@@ -1273,6 +1319,7 @@ export function ecran(etat) {
     case 'question': return ecranQuestion(etat);
     case 'vote': return ecranVote(etat);
     case 'gagne': return ecranGagne(etat);
+    case 'instant': return ecranInstant(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1280,7 +1327,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu'), gagne: t('Vous avez gagné !') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu'), gagne: t('Vous avez gagné !'), instant: t('Instant gagnant') }[etat.route.nom];
   if (etat.route.nom === 'question' || etat.route.nom === 'vote') {
     const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
     return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;
