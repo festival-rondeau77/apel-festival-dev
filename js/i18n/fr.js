@@ -1,9 +1,9 @@
 // La référence : chaque texte fixe de l'appli, tel qu'il est écrit dans le code
 // (rendu.js, plan.js, visite.js, app.js, index.html) et dans les énumérations
 // du modèle (villages, domaines, formats, publics, organisations, étages…).
-// Un test vérifie que en.js, es.js et zh.js traduisent chacun de ces textes, et
-// qu'aucun t('…') du code n'est absent d'ici. Ajouter une phrase = l'ajouter
-// dans les quatre fichiers.
+// Un test vérifie que en.js, es.js, zh.js et de.js traduisent chacun de ces textes,
+// et qu'aucun t('…') du code n'est absent d'ici. Ajouter une phrase = l'ajouter
+// dans les cinq fichiers.
 export default [
   // navigation, écrans, retours
   'Accueil', 'Plan', 'Exposants', 'Programme', 'Ma visite',

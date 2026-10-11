@@ -33,7 +33,7 @@ function lireSignauxDuJeu(rep) {
   return s;
 }
 
-// Les traductions du bandeau que le script joint à l'état ({ en, es, zh }), ou null.
+// Les traductions du bandeau que le script joint à l'état ({ en, es, zh, de }), ou null.
 // Le bandeau du jour J ne peut pas attendre le passage du traducteur : le script
 // le traduit à la volée, et c'est ici qu'on le recueille (ADR-0012).
 export function bandeauxDe(rep) {

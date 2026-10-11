@@ -1,4 +1,4 @@
-// Module i18n : l'appli en quatre langues (ADR-0012). Le FRANÇAIS reste la
+// Module i18n : l'appli en cinq langues (ADR-0012 ; l'allemand depuis le 2026-10-11). Le FRANÇAIS reste la
 // référence et la clé de tout — clés stables, QR codes, Ma visite, empreinte de
 // version ne changent pas. La traduction est une couche de lecture :
 //   t(texte)   les textes fixes de l'appli, dictionnaires statiques de i18n/
@@ -10,22 +10,23 @@ import { minutesEnHeure } from './donnees.js';
 import en from './i18n/en.js';
 import es from './i18n/es.js';
 import zh from './i18n/zh.js';
+import de from './i18n/de.js';
 
-export const LANGUES = ['fr', 'en', 'es', 'zh'];
+export const LANGUES = ['fr', 'en', 'es', 'zh', 'de'];
 export const LANGUE_PAR_DEFAUT = 'fr';
-export const LOCALES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES', zh: 'zh-CN' };
+export const LOCALES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES', zh: 'zh-CN', de: 'de-DE' };
 // Le nom de chaque langue DANS cette langue : c'est ce qu'un Visiteur qui ne lit
 // pas le français doit reconnaître d'un coup d'œil sur le sélecteur.
-export const NOMS_LANGUES = { fr: 'Français', en: 'English', es: 'Español', zh: '中文' };
+export const NOMS_LANGUES = { fr: 'Français', en: 'English', es: 'Español', zh: '中文', de: 'Deutsch' };
 export const CLE_STOCKAGE_LANGUE = 'festival.langue';
 
-const DICOS = { fr: {}, en, es, zh };
+const DICOS = { fr: {}, en, es, zh, de };
 
 let langueCourante = LANGUE_PAR_DEFAUT;
 // Les langues que l'appli PROPOSE (CONFIG.langues) : toutes par défaut dans ce module,
 // pour que les dictionnaires restent testés ; l'adaptateur les restreint au démarrage.
 let proposees = LANGUES.slice();
-let traductions = new Map(); // texte français → { en, es, zh }
+let traductions = new Map(); // texte français → { en, es, zh, de }
 
 export function langue() { return langueCourante; }
 export function languesProposees() { return proposees.slice(); }
@@ -48,7 +49,7 @@ export function definirTraductions(dictionnaire) {
   traductions = dictionnaire instanceof Map ? dictionnaire : new Map();
 }
 
-// « fr-FR », « en-US », « zh-Hans-CN » → « fr », « en », « zh » ; inconnue → null.
+// « fr-FR », « en-US », « zh-Hans-CN », « de-AT » → « fr », « en », « zh », « de » ; inconnue → null.
 export function langueDepuis(code) {
   const c = String(code || '').toLowerCase().split(/[-_]/)[0];
   return LANGUES.includes(c) ? c : null;

@@ -507,16 +507,18 @@ export function versionDe(tables) {
 
 // ---------------------------------------------------------------- traductions
 
-// La table `traductions` (en-têtes fr, en, es, zh — produite par le script
-// Apps Script, ADR-0012) devient un dictionnaire : texte français → { en, es, zh }.
-// Tolérante : table absente, vide ou sans en-tête → dictionnaire vide, jamais
-// une erreur ; l'appli affiche alors le français.
+// La table `traductions` (en-têtes fr, en, es, zh, de — produite par le script
+// Apps Script, ADR-0012) devient un dictionnaire : texte français → { en, es, zh, de }.
+// Lue par en-tête, jamais par position. Tolérante : table absente, vide ou sans
+// en-tête → dictionnaire vide, jamais une erreur ; une colonne absente (une
+// Publication d'avant l'allemand, sans `de`) → cette langue vide ; l'appli
+// affiche alors le français.
 export function dictionnaireDepuis(tables) {
   const dico = new Map();
   for (const l of tablesEnObjets(tables && tables.traductions)) {
     const fr = texte(l.fr);
     if (!fr) continue;
-    dico.set(fr, { en: texte(l.en), es: texte(l.es), zh: texte(l.zh) });
+    dico.set(fr, { en: texte(l.en), es: texte(l.es), zh: texte(l.zh), de: texte(l.de) });
   }
   return dico;
 }

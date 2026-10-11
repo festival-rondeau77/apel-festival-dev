@@ -5,7 +5,7 @@
   <!-- Sécurité 06 : seconde ligne de défense derrière l'échappement du rendu (innerHTML).
        Ni script ni style en ligne ; le réseau ne va qu'au site, aux deux Workers et au
        classeur public (secours gviz). GitHub Pages n'émet aucun en-tête : d'où la balise. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://festival-jeu.festival-e23.workers.dev https://festival-jeu-dev.festival-e23.workers.dev https://docs.google.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://festival-jeu.festival-e23.workers.dev https://festival-jeu-dev.festival-e23.workers.dev https://docs.google.com https://cloudflareinsights.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Festival de l'Orientation</title>

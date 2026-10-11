@@ -135,11 +135,12 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 .annonce-gain strong { font-weight: 800; }
 
 .entete { padding: 26px 0 14px; }
-/* Le sélecteur de langue : quatre pastilles discrètes, alignées à droite, chacune
-   dans sa propre langue. Pas dans la navigation basse — un Visiteur ne change de
-   langue qu'une fois, et il la retrouve mémorisée. */
+/* Le sélecteur de langue : cinq pastilles discrètes, alignées à droite, chacune
+   dans sa propre langue ; sur un téléphone étroit, elles passent à la ligne. Pas
+   dans la navigation basse — un Visiteur ne change de langue qu'une fois, et il la
+   retrouve mémorisée. */
 .reglages-haut { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 0 0; }
-.langues { display: flex; justify-content: flex-end; gap: 6px; }
+.langues { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; }
 /* Tout petit, une icône : on le voit sans qu'il réclame l'attention. La zone de toucher reste de 30 px, comme les langues. */
 .theme {
   display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; flex: none;
@@ -149,6 +150,10 @@ h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.0
 .langue { font: inherit; font-size: 0.74rem; font-weight: 650; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--trait); background: transparent; color: var(--encre-2); cursor: pointer; min-height: 30px; }
 .langue[aria-pressed="true"] { background: var(--encre); border-color: var(--encre); color: var(--fond); }
 .entete h1 { font-size: clamp(1.9rem, 8vw, 2.5rem); }
+/* L'allemand a des mots composés qui peuvent dépasser une ligne de téléphone en capitales :
+   coupés plutôt que rognés, en allemand seulement — le français ne bouge pas. Pas de césure
+   automatique : elle coupait « STUDI-UM » là où un retour à la ligne suffisait. */
+html:lang(de) h1, html:lang(de) h2 { overflow-wrap: break-word; }
 .entete .sous { color: var(--encre-2); margin: 8px 0 0; font-size: 0.95rem; line-height: 1.35; }
 .retour {
   display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 650;

@@ -22,7 +22,7 @@ const etat = {
   route: analyserRoute(location.hash),
   modele: construireModele({}), tables: null, version: null, source: null, derniereMaj: null, bandeau: '',
   // La langue affichée (ADR-0012) et les traductions du bandeau jointes à l'état
-  // du script ({ en, es, zh }) — celles du tableur passent par tt().
+  // du script ({ en, es, zh, de }) — celles du tableur passent par tt().
   langue: 'fr', bandeaux: null,
   // Le thème, clair par défaut (le festival a lieu le jour) ; le sombre est un choix, mémorisé.
   theme: 'clair',
@@ -643,7 +643,7 @@ document.addEventListener('click', (e) => {
     case 'suggestions': etat.ui.suggestionsOuvertes = !etat.ui.suggestionsOuvertes; rendre({ conserver: true }); break;
     case 'etape': etat.ui.etapePreparer = Number(valeur) || 0; rendre(); break;
     case 'avis': stats.noter('clic_avis'); break;
-    case 'refus-stats': if (stats.refusees()) stats.accepter(); else stats.refuser(); etat.statsRefusees = stats.refusees(); rendre({ conserver: true }); break;
+    case 'refus-stats': if (stats.refusees()) stats.accepter(); else stats.refuser(); etat.statsRefusees = stats.refusees(); chargerCompteurVisites(); rendre({ conserver: true }); break;
     // Caméra refusée (grand-defi 12) : redemander ; le rendu de l'écran scanner rouvre la caméra.
     case 'reessayer-scanner': scanner.bloque = false; scanner.essais = 0; etat.ui.scannerBloque = null; etat.ui.messageScanner = ''; rendre({ conserver: true }); break;
     // « Recharger la page » du scanner : le cas 'recharger' ci-dessous (il active aussi une nouvelle version en attente).
@@ -1121,6 +1121,22 @@ async function enregistrerServiceWorker() {
 
 // ---------------------------------------------------------------- démarrage
 
+// Le compteur de visites de Cloudflare Web Analytics (analytics 01, ADR-0024), en plus des
+// mesures d'usage du Worker : il compte les ouvertures de l'appli (visiteurs, pays, appareils)
+// dans la console Cloudflare, sans cookie. Chargé seulement si la copie servie porte un jeton
+// (la prod, bin/deploy.sh) et si le téléphone n'a pas refusé les statistiques. Refuser après
+// coup vaut à la prochaine ouverture : un script chargé ne se décharge pas. `spa: false` : les
+// écrans sont des #routes, que Cloudflare ne verrait pas ; les mesures du Worker les comptent.
+function chargerCompteurVisites() {
+  if (!CONFIG.analytics || etat.statsRefusees || document.getElementById('compteur-visites')) return;
+  const s = document.createElement('script');
+  s.id = 'compteur-visites';
+  s.defer = true;
+  s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  s.dataset.cfBeacon = JSON.stringify({ token: CONFIG.analytics, spa: false });
+  document.head.appendChild(s);
+}
+
 async function demarrer() {
   // Le snapshot embarqué est lu avant le premier rendu (instantané une fois en cache) ;
   // chargerInitial() choisit entre lui et le cache local, le plus récent gagne.
@@ -1135,6 +1151,7 @@ async function demarrer() {
   // cible, et en detail comment l'appli est ouverte, sur quelle famille d'appareil,
   // et dans quelle langue — ce qui dira combien de Visiteurs ne lisent pas le français.
   etat.statsRefusees = stats.refusees();
+  chargerCompteurVisites();
   const famille = plateforme(navigator.userAgent, navigator.maxTouchPoints);
   etat.ui.surIOS = famille === 'ios'; // l'écran « caméra refusée » (grand-defi 12)
   stats.noter('ouverture', initial ? initial.source : 'aucune', `${installee ? 'installee' : 'navigateur'}·${famille}·${langue()}`);
