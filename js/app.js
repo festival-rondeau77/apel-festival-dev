@@ -382,9 +382,9 @@ async function copierMessage(code) {
   const { sujet, corps } = Passeport.messageAbsent(g, { email: adresse, festival: i.nom || undefined });
   try {
     await navigator.clipboard.writeText(`${adresse ? `${adresse}\n` : ''}${sujet}\n\n${corps}`);
-    message(echapper(adresse ? t('Message copié : collez-le dans un mail à %s.', adresse) : t('Message copié : collez-le dans un mail à l’école.')));
+    message(echapper(adresse ? t('Message copié : colle-le dans un mail à %s.', adresse) : t('Message copié : colle-le dans un mail à l’école.')));
   } catch {
-    message(echapper(t('Copie impossible : écrivez à l’école avec votre code %s.', afficherCode(code))), { classe: 'orange' });
+    message(echapper(t('Copie impossible : écris à l’école avec ton code %s.', afficherCode(code))), { classe: 'orange' });
   }
 }
 
@@ -546,7 +546,7 @@ async function demarrerScanner() {
   scanner.flux = flux;
   const courante = $('#scanner-video');
   if (courante) { courante.srcObject = flux; courante.play().catch(() => {}); }
-  messageScanner('Visez le QR code du stand.');
+  messageScanner('Vise le QR code du stand.');
   const tour = async () => {
     if (scanner.session !== moi) return;
     let texte = null;

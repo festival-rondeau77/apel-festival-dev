@@ -258,6 +258,7 @@ export function ecranAccueil(etat) {
   </section>
   <nav class="grille-boutons" aria-label="${attr(t("Aller à l'essentiel"))}">
     ${bouton('#/plan', 'plan', t('Plan du festival'), { classe: 'principal', ton: 'explorer' })}
+    ${carteGrandDefi(etat)}
     ${bouton('#/exposants', 'exposants', t('Les exposants'), { ton: 'echanger' })}
     ${bouton('#/programme', 'programme', t('Le programme'), { ton: 'informer' })}
   </nav>
@@ -266,7 +267,6 @@ export function ecranAccueil(etat) {
     ${bouton('#/aide', 'aide', t("Besoin d'aide ?"))}
     ${nb ? bouton('#/visite', 'visite', t('Ma visite'), { ton: 'construire', extra: `<span class="compte">${h(tn('%s élément', '%s éléments', nb))}</span>` }) : ''}
   </nav>
-  ${carteGrandDefi(etat)}
   ${prochain ? `<section class="prochain" aria-labelledby="prochain-titre">
     <p class="etiquette${prochain.enCours ? ' en-cours' : ''}">${h(prochain.enCours ? t('En ce moment') : (maintenant.jourJ ? t('Prochain événement') : t('Le festival commence par')))}</p>
     <div class="carte-prochain">
@@ -290,18 +290,18 @@ export function ecranAccueil(etat) {
 // Le bouton « Scan QR » (grand-defi 10 ; libellé court depuis le 13, pour que les
 // trois liens tiennent sur une ligne) l'accompagne dès que le jeu est ouvert :
 // scanner DANS l'appli garde le même Passeport, là où un lecteur de QR du
-// téléphone ouvre souvent une fenêtre cloisonnée. Avant la première validation,
-// il vient seul, avec une phrase ; jeu coupé, rien.
+// téléphone ouvre souvent une fenêtre cloisonnée. Jeu coupé, rien.
+// Depuis le ticket 16, la carte vit DANS la grille des boutons, sous le plan : un
+// testeur sur ordinateur ne l'avait pas vue en bas de l'écran. Avant la première
+// validation, c'est une tuile ambre, « Le Grand Défi · Participe et gagne des
+// cadeaux ! · Viens jouer », qui mène à « Comment ça marche » (le Scan QR y est).
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Règle du jeu'))}</a>${rejouerOuvert(etat.modele.infos)
+  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Comment ça marche'))}</a>${rejouerOuvert(etat.modele.infos)
     ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
-  if (!j) return `<section class="grand-defi invitation" aria-labelledby="grand-defi-titre">
-    <h2 id="grand-defi-titre">${h(t('Grand Défi'))}</h2>
-    <p>${h(t('Scannez les QR des stands pour gagner des points.'))}</p>
-    ${scanner}
-  </section>`;
+  if (!j) return `<a class="grand-defi-tuile" href="#/regle">${icone('cadeau', 26)}<span class="texte"><strong>${h(t('Le Grand Défi'))}</strong><span class="teasing">${h(t('Participe et gagne des cadeaux !'))}</span></span><span class="cta">${h(t('Viens jouer'))}</span></a>${rejouerOuvert(etat.modele.infos)
+    ? `<a class="rejouer-lien seule" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
   if (j.auTirage) return `<section class="grand-defi" aria-labelledby="grand-defi-titre">
     <h2 id="grand-defi-titre">${h(t('Mon grand défi'))}</h2>
     ${scoreChances(etat.grandDefi, j)}
@@ -332,14 +332,16 @@ function scoreChances(jeu, j) {
     ${j.badge ? `<p class="badge-explorateur">${h(t('Badge Explorateur 100 %'))}${bonus ? ` · ${h(tn('+%s chance', '+%s chances', bonus))}` : ''}</p>` : ''}`;
 }
 
-// La Règle du jeu (grand-defi 03) : trois idées, ultra simples, tirées des mêmes
-// données que le jeu (ADR-0015) — le premier Palier, les Paliers et leurs Chances,
-// celles du badge, l'heure du Tirage (`Infos.heure_tirage`, écrite telle quelle).
-// Le détail est au règlement : `Infos.reglement_jeu_url`, à défaut celui du festival.
+// « Comment ça marche » (grand-defi 03, les mots du testeur depuis le 16) : trois idées,
+// ultra simples, tirées des mêmes données que le jeu (ADR-0015) — le premier Palier,
+// les Paliers et leurs Chances, celles du badge, l'heure du Tirage (`Infos.heure_tirage`,
+// écrite telle quelle). Puis « À gagner » (`Infos.lots`, `;` sépare, chaque lot traduit
+// par le tableur) quand l'APEL l'a rempli, le Scan QR, le règlement
+// (`Infos.reglement_jeu_url`, à défaut celui du festival) et qui organise.
 function ecranRegle(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
   const jeu = etat.grandDefi;
-  if (!jeu || !jeu.actif) return `${entete(t('Règle du jeu'), '', retour)}
+  if (!jeu || !jeu.actif) return `${entete(t('Comment ça marche'), '', retour)}
     <p class="vide">${h(t('Le Grand Défi n’est pas ouvert.'))}</p>
     <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   const i = etat.modele.infos || {};
@@ -347,18 +349,25 @@ function ecranRegle(etat) {
   const bonus = chancesBadgeDe(jeu);
   const heure = String(i.heure_tirage || '').trim();
   const reglement = i.reglement_jeu_url || i.reglement_url;
-  return `${entete(t('Règle du jeu'), '', retour)}
+  const lots = String(i.lots || '').split(';').map((l) => l.trim()).filter(Boolean);
+  const organisateur = String(i.organisateur || '').split(';').map((x) => x.trim()).filter(Boolean).join(', ');
+  return `${entete(t('Comment ça marche'), '', retour)}
     <ol class="regle">
-      <li class="idee">${icone('qr', 28)}<div><p>${h(t('Scannez les QR des chevalets pour gagner des points.'))}</p></div></li>
+      <li class="idee">${icone('qr', 28)}<div><p>${h(t('Scanne les QR codes sur les stands que tu visites.'))}</p></div></li>
       <li class="idee">${icone('visite', 28)}<div>
-        <p>${h(heure ? t('À %s points, vous êtes au tirage de %s.', paliers[0], heure) : t('À %s points, vous êtes au tirage.', paliers[0]))} ${h(t('Plus de points, plus de chances.'))}</p>
+        <p>${h(t('Plus tu marques de points, plus tu as de chances de gagner !'))} ${h(heure ? t('Marque au moins %s points pour participer au tirage au sort de %s.', paliers[0], heure) : t('Marque au moins %s points pour participer au tirage au sort.', paliers[0]))}</p>
         <ul class="paliers">${paliers.map((p, k) => `<li><strong>${h(p)}</strong> <span>${h(tn('%s chance', '%s chances', k + 1))}</span></li>`).join('')}${bonus
           ? `<li><strong>${h(t('Tous les défis'))}</strong> <span>${h(tn('+%s chance', '+%s chances', bonus))}</span></li>` : ''}</ul>
       </div></li>
-      <li class="idee">${icone('cloche', 28)}<div><p>${h(t('Soyez vigilant : plus de chances de gagner avec les instants gagnants, le défi mystère et les autres annonces.'))}</p></div></li>
+      <li class="idee">${icone('cloche', 28)}<div><p>${h(t('Reste vigilant ! Plus de chances de gagner avec les Instants Gagnants, le Défi Mystère et toutes les annonces.'))}</p></div></li>
     </ol>
-    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a>${reglement
-      ? `<a class="bouton secondaire" href="${url(reglement)}" target="_blank" rel="noopener">${icone('document', 19)}${h(t('Lire le règlement du jeu'))}</a>` : ''}</div>`;
+    ${lots.length ? `<section class="lots" aria-labelledby="lots-titre">
+      <h2 class="titre-section" id="lots-titre">${icone('cadeau', 22)}${h(t('À gagner'))}</h2>
+      <ul>${lots.map((l) => `<li>${h(tt(l))}</li>`).join('')}</ul>
+    </section>` : ''}
+    <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a>${reglement
+      ? `<a class="bouton secondaire" href="${url(reglement)}" target="_blank" rel="noopener">${icone('document', 19)}${h(t('Lire le règlement du jeu'))}</a>` : ''}</div>
+    ${organisateur ? `<p class="regle-organisateur">${h(t('Jeu gratuit organisé par %s', organisateur))}</p>` : ''}`;
 }
 
 // Rejouer depuis le début, pendant l'essai seulement : ce que le bouton efface (le
@@ -379,7 +388,7 @@ function ecranRejouer(etat) {
       <ul>
         <li>${h(t('Les points de ce téléphone (%s) sont effacés.', points))}</li>
         <li>${h(t('Les défis redeviennent à faire.'))}</li>
-        <li>${h(t('Ma visite et vos questions restent.'))}</li>
+        <li>${h(t('Ma visite et tes questions restent.'))}</li>
       </ul>
       <div class="boutons"><button class="bouton" type="button" data-action="rejouer">${h(t('Tout effacer et rejouer'))}</button><a class="bouton secondaire" href="#/">${h(t('Annuler'))}</a></div>
       <p class="note">${h(t("Ce bouton n'existe que pendant l'essai : il disparaîtra avant le festival."))}</p>
@@ -398,12 +407,12 @@ function ecranRejouer(etat) {
 export function ecranScanner(etat) {
   const bloque = etat.ui.scannerBloque;
   const aide = bloque === 'refusee' ? (etat.ui.surIOS
-    ? 'Touchez Réessayer. Si ça ne suffit pas : touchez « aA » à gauche de l’adresse, Réglages du site web, Caméra : Autoriser, puis Recharger la page.'
-    : 'Touchez Réessayer. Si ça ne suffit pas : autorisez la caméra pour ce site (le cadenas à gauche de l’adresse), puis Recharger la page.')
-    : bloque === 'occupee' ? 'Une autre appli l’utilise peut-être : fermez-la, puis touchez Réessayer.' : '';
+    ? 'Touche Réessayer. Si ça ne suffit pas : touche « aA » à gauche de l’adresse, Réglages du site web, Caméra : Autoriser, puis Recharger la page.'
+    : 'Touche Réessayer. Si ça ne suffit pas : autorise la caméra pour ce site (le cadenas à gauche de l’adresse), puis Recharger la page.')
+    : bloque === 'occupee' ? 'Une autre appli l’utilise peut-être : ferme-la, puis touche Réessayer.' : '';
   return `${entete(t('Scanner un QR'), '', retourDepuis(etat.route.params.de, { href: '#/', libelle: t('Accueil') }))}
   <div class="scanner"><video id="scanner-video" playsinline muted></video><div class="viseur" aria-hidden="true"></div></div>
-  <p class="scanner-etat" id="scanner-etat" role="status">${h(t(etat.ui.messageScanner || 'Visez le QR code du stand.'))}</p>
+  <p class="scanner-etat" id="scanner-etat" role="status">${h(t(etat.ui.messageScanner || 'Vise le QR code du stand.'))}</p>
   ${aide ? `<p class="scanner-aide">${h(t(aide))}</p>
   <div class="boutons"><button class="bouton" type="button" data-action="reessayer-scanner">${h(t('Réessayer'))}</button>${bloque === 'refusee'
     ? `<button class="bouton secondaire" type="button" data-action="recharger">${h(t('Recharger la page'))}</button>` : ''}</div>` : ''}`;
@@ -430,8 +439,8 @@ function etatDuDefi(etat, ex, statut, chez) {
 function raisonAffichee(raison) {
   const lie = /^même exposant que le défi (.+)$/.exec(raison);
   if (lie) return t('Déjà utilisé pour le défi %s', lie[1]);
-  if (raison === 'aucun scan avant') return t('Scannez d’abord un autre stand');
-  if (raison === 'pas votre stand') return t('Pas votre stand mystère');
+  if (raison === 'aucun scan avant') return t('Scanne d’abord un autre stand');
+  if (raison === 'pas votre stand') return t('Pas ton stand mystère');
   if (raison === 'heure limite passée') return t('Heure limite passée');
   return raison === 'domaine déjà croisé' ? t('Domaine déjà croisé') : t('Pas pour ce stand');
 }
@@ -453,7 +462,7 @@ export function bandeauAnnonces(etat) {
       return `<a class="annonce-defi" href="#/instant/${attr(encodeURIComponent(defi.id))}"><strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Une question, un lot à gagner'))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span></a>`;
     }
     const e = exposantDuStand(etat, stand);
-    const corps = `<strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Votre stand : %s', nomDuStand(etat, stand)))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span>`;
+    const corps = `<strong>${h(t('%s !', tt(defi.titre)))}</strong> <span>${h(t('Ton stand : %s', nomDuStand(etat, stand)))}</span> <span class="limite">· ${h(t('jusqu’à %s', heure(jusqua)))}</span>`;
     return e ? `<a class="annonce-defi" href="${lienExposant(e.cle)}">${corps}</a>` : `<p class="annonce-defi">${corps}</p>`;
   }).join('');
 }
@@ -463,7 +472,7 @@ export function bandeauAnnonces(etat) {
 function bandeauGain(etat, jeu) {
   const [g] = gainsARemettre(jeu, maintenantMs(etat));
   if (!g || etat.route.nom === 'gagne') return '';
-  return `<a class="annonce-gain" href="#/gagne"><strong>${h(t('Vous avez gagné !'))}</strong> <span>${h(nomDuLot(g))} · ${h(t('Voir mon lot'))}</span></a>`;
+  return `<a class="annonce-gain" href="#/gagne"><strong>${h(t('Tu as gagné !'))}</strong> <span>${h(nomDuLot(g))} · ${h(t('Voir mon lot'))}</span></a>`;
 }
 
 // Un trou dans une phrase traduite, comblé de HTML après échappement.
@@ -495,23 +504,23 @@ function ecranGagne(etat) {
     const mail = messageAbsent(g, { email: i.contact_email, festival: i.nom || undefined });
     const minutes = Number.isFinite(g.echeance) ? Math.max(1, Math.ceil((g.echeance - maintenant) / 60_000)) : null;
     const delai = g.sorte !== 'flash' ? ''
-      : minutes === null ? `<p class="verdict attente">${h(t('Venez à l’accueil pour le retirer.'))}</p>`
-        : `<p class="verdict attente">${h(t('Venez à l’accueil avant %s.', heure(Math.floor(minutesAParis(g.echeance)))))} <strong>${h(tn('Encore %s minute', 'Encore %s minutes', minutes))}</strong></p>`;
+      : minutes === null ? `<p class="verdict attente">${h(t('Viens à l’accueil pour le retirer.'))}</p>`
+        : `<p class="verdict attente">${h(t('Viens à l’accueil avant %s.', heure(Math.floor(minutesAParis(g.echeance)))))} <strong>${h(tn('Encore %s minute', 'Encore %s minutes', minutes))}</strong></p>`;
     const absent = g.sorte === 'flash' ? '' : `<h3>${h(t('Déjà parti ?'))}</h3>
-      <p>${h(t('Votre lot reste réservé. Écrivez à l’école avec votre code, votre nom et un moyen de vous joindre. Moins de 15 ans : demandez à un parent.'))}</p>
+      <p>${h(t('Ton lot reste réservé. Écris à l’école avec ton code, ton nom et un moyen de te joindre. Moins de 15 ans : demande à un parent.'))}</p>
       <div class="boutons">${mail.mailto ? `<a class="bouton secondaire" href="${url(mail.mailto)}">${icone('document', 19)}${h(t('Je suis déjà parti'))}</a>` : ''}<button class="bouton secondaire" type="button" data-action="copier-message" data-code="${attr(g.code)}">${h(t('Copier le message'))}</button></div>`;
     return `<section class="gagne">
       <p class="lot">${h(nomDuLot(g))}</p>
       ${delai}
       ${qr ? `<div class="qr-gain" role="img" aria-label="${attr(t('QR à montrer à l’accueil'))}">${qrEnSvg(encoderQR(urlRemise(worker, g.code, jeton), 'M'), { marge: 4, echelle: 6 })}</div>
-      <p>${h(t('Montrez ce QR à l’accueil : un organisateur le scanne et vous remet votre lot.'))}</p>`
-        : `<p>${h(t('Montrez ce code à l’accueil : un organisateur le saisit et vous remet votre lot.'))}</p>`}
-      <p class="code-gain">${h(t('Votre code : %s', TROU)).replace(TROU, `<strong>${h(afficherCode(g.code))}</strong>`)}</p>
-      ${qr ? `<p class="note">${h(t('Si le QR ne se lit pas, donnez ce code à l’organisateur.'))}</p>` : ''}
+      <p>${h(t('Montre ce QR à l’accueil : un organisateur le scanne et te remet ton lot.'))}</p>`
+        : `<p>${h(t('Montre ce code à l’accueil : un organisateur le saisit et te remet ton lot.'))}</p>`}
+      <p class="code-gain">${h(t('Ton code : %s', TROU)).replace(TROU, `<strong>${h(afficherCode(g.code))}</strong>`)}</p>
+      ${qr ? `<p class="note">${h(t('Si le QR ne se lit pas, donne ce code à l’organisateur.'))}</p>` : ''}
       ${absent}
     </section>`;
   };
-  return `${entete(t('Vous avez gagné !'), '', retour)}
+  return `${entete(t('Tu as gagné !'), '', retour)}
     ${gains.map(lot).join('')}`;
 }
 
@@ -531,7 +540,7 @@ function commentProuver(etat, d) {
   else if (d.type_preuve === 'votes-evenement') texte = t('Voter avant et après : %s', tt(d.params.evenement));
   else if (d.type_preuve === 'scan-attribue') {
     const s = standAttribue(d, etat.appareil);
-    texte = s ? t('QR de votre stand : %s, jusqu’à %s', nomDuStand(etat, s), heure(d.params.actif_a)) : t('Révélé en cours de matinée');
+    texte = s ? t('QR de ton stand : %s, jusqu’à %s', nomDuStand(etat, s), heure(d.params.actif_a)) : t('Révélé en cours de matinée');
   }
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
@@ -555,7 +564,7 @@ function defisDeLaFiche(etat, ex, secret) {
       ${!validable
         ? `<span class="etat ${attr(raison ? 'pas-ici' : statut)}">${h(raison ? raisonAffichee(raison) : etatDuDefi(etat, ex, statut, chez))}</span>`
         : choix.length
-          ? `${defi.question ? `<p class="question">${h(tt(defi.question))}</p>` : ''}<div class="choix" role="group" aria-label="${attr(defi.question ? tt(defi.question) : nomDefi(defi))}">${choix.map((c, i) => `<button class="bouton secondaire" type="button" ${action(defi, i)} aria-label="${attr(t('Votre choix : %s', tt(c)))}">${h(tt(c))}</button>`).join('')}</div>`
+          ? `${defi.question ? `<p class="question">${h(tt(defi.question))}</p>` : ''}<div class="choix" role="group" aria-label="${attr(defi.question ? tt(defi.question) : nomDefi(defi))}">${choix.map((c, i) => `<button class="bouton secondaire" type="button" ${action(defi, i)} aria-label="${attr(t('Ton choix : %s', tt(c)))}">${h(tt(c))}</button>`).join('')}</div>`
           : `<button class="bouton" type="button" ${action(defi)}>${h(t('Valider'))}</button>`}
     </li>`;
     }).join('')}</ul>
@@ -625,7 +634,7 @@ function ecranQuestion(etat) {
   if (statut === 'valide') corps = `<p class="verdict ok">${h(t('Bonne réponse !'))} +${h(defi.points)}</p>`;
   else if (statut === 'ferme') corps = `<p class="verdict ferme">${h(tn('Défi fermé : %s essai utilisé.', 'Défi fermé : %s essais utilisés.', essais))}</p>`;
   else if (statut === 'attente') corps = `<p class="verdict attente">${h(t('Réponse envoyée : le verdict arrive.'))}</p>`;
-  else if (!peutRepondre) corps = `<p class="verdict">${h(t('Scannez le QR de ce défi pour répondre.'))}</p>`;
+  else if (!peutRepondre) corps = `<p class="verdict">${h(t('Scanne le QR de ce défi pour répondre.'))}</p>`;
   else {
     corps = `${essai > 1 ? `<p class="verdict rate">${h(t('Pas la bonne réponse.'))}</p>` : ''}
     <p class="essai">${h(t('Essai %s sur %s', essai, essais))}</p>
@@ -659,11 +668,11 @@ function ecranInstant(etat) {
   if (statut === 'a-venir') return pasOuvert(t('Cet instant gagnant n’a pas encore commencé.'));
   let corps;
   if (statut === 'ouvert') {
-    corps = `<p class="essai">${h(t('Répondez avant %s : un gagnant est tiré parmi les bonnes réponses.', heure(fermeture)))}</p>
+    corps = `<p class="essai">${h(t('Réponds avant %s : un gagnant est tiré parmi les bonnes réponses.', heure(fermeture)))}</p>
     <div class="choix" role="group" aria-label="${attr(tt(defi.question))}">${defi.choix.map((c, i) => `<button class="bouton secondaire" type="button" data-action="repondre-instant" data-defi="${attr(defi.id)}" data-choix="${i}">${h(tt(c))}</button>`).join('')}</div>`;
   } else if (statut === 'repondu') {
     corps = `<p class="verdict attente">${h(t('Réponse enregistrée : %s', tt(defi.choix[choix] || '')))}</p>
-    <p>${h(t('Tirage vers %s parmi les bonnes réponses : si vous gagnez, l’appli vous le dit.', heure(tirage)))}</p>`;
+    <p>${h(t('Tirage vers %s parmi les bonnes réponses : si tu gagnes, l’appli te le dit.', heure(tirage)))}</p>`;
   } else if (statut === 'refuse') corps = `<p class="verdict ferme">${h(t('Réponse arrivée trop tard : l’instant était fermé.'))}</p>`;
   else corps = `<p class="verdict ferme">${h(t('Cet instant gagnant est fermé.'))}</p>`;
   return `${entete(tt(defi.titre), h(t('Lot flash')), retour)}
@@ -693,10 +702,10 @@ function ecranVote(etat) {
   if (!v) return pasOuvert(t('Ce défi n’est pas un vote.'));
   const { defi, statut, fenetres, peutVoter, refuse } = v;
   const verdict = {
-    valide: `<p class="verdict ok">${h(t('Vos deux votes sont comptés !'))} +${h(defi.points)}</p>`,
+    valide: `<p class="verdict ok">${h(t('Tes deux votes sont comptés !'))} +${h(defi.points)}</p>`,
     attente: `<p class="verdict attente">${h(t('Vote envoyé : le verdict arrive.'))}</p>`,
     ferme: `<p class="verdict ferme">${h(t('Défi fermé : le vote « avant » n’a pas été donné à temps.'))}</p>`,
-  }[statut] || (refuse ? `<p class="verdict ferme">${h(t('Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifiez l’heure de votre téléphone.'))}</p>` : '');
+  }[statut] || (refuse ? `<p class="verdict ferme">${h(t('Vote refusé : à l’heure du jeu, il tombait hors de la fenêtre. Vérifie l’heure de ton téléphone.'))}</p>` : '');
   const ligne = (moment, nom, quand) => {
     const f = fenetres[moment];
     let contenu;
@@ -718,7 +727,7 @@ function ecranVote(etat) {
         ${ligne('avant', 'Avant', t('jusqu’à %s', heure(fenetres.avant.jusqua)))}
         ${ligne('apres', 'Après', t('à partir de %s', heure(fenetres.apres.des)))}
       </ol>
-      <p class="note">${h(t('Chaque vote est compté sans lien avec votre téléphone.'))}</p>
+      <p class="note">${h(t('Chaque vote est compté sans lien avec ton téléphone.'))}</p>
     </section>
     <div class="boutons"><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a></div>`;
 }
@@ -915,7 +924,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   const formations = ex.type === 'École' && ex.sousTitre ? tt(ex.sousTitre).split(/;/).map((s) => s.trim()).filter(Boolean) : [];
   const questionsType = questionsPour(etat.visite, modele, ex.type);
   return `<article class="fiche">
-    ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Vous venez de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}` : ''}</span></p>` : ''}
+    ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Tu viens de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
     ${defisDeLaFiche(etat, ex, secret)}
@@ -1357,7 +1366,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Règle du jeu'), gagne: t('Vous avez gagné !'), instant: t('Instant gagnant') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Comment ça marche'), gagne: t('Tu as gagné !'), instant: t('Instant gagnant') }[etat.route.nom];
   if (etat.route.nom === 'question' || etat.route.nom === 'vote') {
     const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
     return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;

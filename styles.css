@@ -25,6 +25,7 @@
   --bleu-clair: #01A1A7;
   --bleu-pale: #DFF3F4;
   --orange: #B36F00;      /* ambre assombri : lisible en texte, l'ambre pur reste aux aplats */
+  --sur-ambre: #1B1200;   /* le texte posé sur un aplat ambre (la tuile du Grand Défi), dans les deux thèmes */
   --orange-pale: #FDF0D8;
   --encre: #0A2647;
   --encre-2: #55627A;
@@ -297,11 +298,23 @@ main { min-height: 60vh; }
 
 /* Le Grand Défi (grand-defi 01) : la jauge de l'accueil, même carte que le
    prochain événement, filet ambre — la couleur des repères. Elle n'existe que
-   pour qui a joué. */
+   pour qui a joué. Depuis le ticket 16, elle est DANS la grille des boutons, sous
+   le plan, pleine largeur : avant elle, la tuile d'invitation, le seul aplat ambre
+   de l'accueil (un testeur sur ordinateur n'avait pas vu la carte en bas d'écran). */
 .grand-defi {
   margin: 26px 0 0; background: var(--carte); border: 1px solid var(--trait); border-left: 4px solid var(--ambre);
   border-radius: 6px 6px 18px 6px; padding: 14px 16px;
 }
+.grille-boutons .grand-defi { grid-column: span 2; margin: 0; }
+.grille-boutons a.grand-defi-tuile {
+  grid-column: span 2; flex-direction: row; align-items: center; gap: 12px; min-height: 68px;
+  background: var(--ambre); border-color: var(--ambre); border-left: 4px solid var(--orange); color: var(--sur-ambre);
+}
+.grille-boutons a.grand-defi-tuile svg { color: var(--sur-ambre); width: 26px; height: 26px; flex: none; }
+.grille-boutons a.grand-defi-tuile .texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.grille-boutons a.grand-defi-tuile .teasing { font-family: var(--texte); font-weight: 600; font-size: 0.82rem; letter-spacing: 0; }
+.grille-boutons a.grand-defi-tuile .cta { margin-left: auto; flex: none; font-family: var(--texte); font-weight: 800; font-size: 0.82rem; padding: 6px 10px; border-radius: 999px; background: var(--sur-ambre); color: #FFE7B8; white-space: nowrap; }
+.grille-boutons a.rejouer-lien.seule { grid-column: span 2; display: inline-block; min-height: 0; margin: -2px 0 0 10px; padding: 0 0 2px; background: none; border: 0; border-radius: 0; font-family: var(--texte); font-weight: 400; font-size: 0.85rem; letter-spacing: 0; color: var(--encre-2); text-decoration: underline; }
 .grand-defi h2 { font-size: 0.8rem; color: var(--encre-2); font-weight: 650; margin: 0; font-family: var(--texte); letter-spacing: 0; }
 .grand-defi .score { margin: 4px 0 10px; font-family: var(--display); font-size: 1.1rem; color: var(--encre-2); font-variant-numeric: tabular-nums; }
 .grand-defi .score strong { font-size: 1.8rem; font-weight: 800; color: var(--orange); letter-spacing: -0.02em; }
@@ -414,8 +427,14 @@ main { min-height: 60vh; }
 .regle .paliers span { font-size: 0.82rem; color: var(--encre-2); }
 .regle + .boutons { margin-top: 18px; }
 
-/* Le scanner (grand-defi 10) : l'invitation de l'accueil, le bouton sous la jauge, l'écran caméra. */
-.grand-defi.invitation p { margin: 6px 0 12px; color: var(--encre-2); }
+/* « À gagner » (grand-defi 16) : la liste des lots du tableur, et qui organise, sous « Comment ça marche ». */
+.lots { margin: 14px 0 0; padding: 14px 16px; background: var(--carte); border: 1px solid var(--trait); border-radius: 6px 6px 18px 6px; }
+.lots .titre-section { margin: 0; display: flex; align-items: center; gap: 8px; }
+.lots .titre-section svg { color: var(--orange); }
+.lots ul { margin: 8px 0 0; padding-left: 22px; }
+.lots li { margin: 4px 0; }
+.regle-organisateur { margin: 16px 0 0; font-size: 0.88rem; color: var(--encre-2); }
+/* Le scanner (grand-defi 10) : le bouton sous la jauge, l'écran caméra. */
 .scanner { position: relative; margin: 14px 0 0; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 62vh; width: 100%; }
 .scanner video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .scanner .viseur { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35); pointer-events: none; }
