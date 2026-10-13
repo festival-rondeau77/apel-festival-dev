@@ -247,33 +247,35 @@ main { min-height: 60vh; }
 .grille-boutons { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 14px 0 0; }
 /* Le second groupe est plus bas et plus plat : ce sont des outils, pas la vedette. */
 .grille-boutons.secondaires { margin-top: 9px; }
-.grille-boutons.secondaires a { min-height: 62px; flex-direction: row; align-items: center; gap: 12px; font-size: 0.96rem; }
-.grille-boutons a {
+.grille-boutons.secondaires > a { min-height: 62px; flex-direction: row; align-items: center; gap: 12px; font-size: 0.96rem; }
+/* Enfants directs seulement : depuis le ticket 16 la carte du Grand Défi vit dans la
+   grille, et ses propres liens (Scan QR, Mes défis, Comment ça marche) ne sont pas des tuiles. */
+.grille-boutons > a {
   display: flex; flex-direction: column; justify-content: space-between; gap: 14px; min-height: 84px;
   padding: 14px; border-radius: 6px 6px 18px 6px; background: var(--carte); border: 1px solid var(--trait);
   text-decoration: none; color: var(--encre); font-family: var(--display); font-weight: 800; font-size: 1.02rem; letter-spacing: -0.015em;
 }
-.grille-boutons a svg { width: 22px; height: 22px; color: var(--bleu); }
+.grille-boutons > a svg { width: 22px; height: 22px; color: var(--bleu); }
 /* Les quatre verbes de l'affiche, dans leurs couleurs : explorer (ambre) pour le
    plan, échanger (turquoise) pour les exposants, s'informer (framboise) pour le
    programme, construire (marine) pour la visite et sa préparation. Une barre
    colorée suffit : remplir six boutons de six couleurs ferait sapin de Noël. */
-.grille-boutons a[data-ton] { border-left: 4px solid var(--ton, var(--trait)); }
-.grille-boutons a[data-ton] svg { color: var(--ton); }
-.grille-boutons a[data-ton="explorer"] { --ton: var(--ambre); }
-.grille-boutons a[data-ton="echanger"] { --ton: var(--turquoise); }
-.grille-boutons a[data-ton="informer"] { --ton: var(--framboise); }
-.grille-boutons a[data-ton="construire"] { --ton: var(--marine); }
-.grille-boutons a.principal { background: var(--marque); border-color: var(--marque); color: #fff; grid-column: span 2; min-height: 76px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
-.grille-boutons a.principal svg { color: #fff; width: 26px; height: 26px; }
-.grille-boutons a.principal[data-ton] { border-left: 4px solid var(--ambre); }
-.grille-boutons a.principal[data-ton] svg { color: #fff; }
-.grille-boutons a .compte { display: block; font-family: var(--texte); font-weight: 600; font-size: 0.8rem; color: var(--encre-2); margin-top: 3px; }
+.grille-boutons > a[data-ton] { border-left: 4px solid var(--ton, var(--trait)); }
+.grille-boutons > a[data-ton] svg { color: var(--ton); }
+.grille-boutons > a[data-ton="explorer"] { --ton: var(--ambre); }
+.grille-boutons > a[data-ton="echanger"] { --ton: var(--turquoise); }
+.grille-boutons > a[data-ton="informer"] { --ton: var(--framboise); }
+.grille-boutons > a[data-ton="construire"] { --ton: var(--marine); }
+.grille-boutons > a.principal { background: var(--marque); border-color: var(--marque); color: #fff; grid-column: span 2; min-height: 76px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+.grille-boutons > a.principal svg { color: #fff; width: 26px; height: 26px; }
+.grille-boutons > a.principal[data-ton] { border-left: 4px solid var(--ambre); }
+.grille-boutons > a.principal[data-ton] svg { color: #fff; }
+.grille-boutons > a .compte { display: block; font-family: var(--texte); font-weight: 600; font-size: 0.8rem; color: var(--encre-2); margin-top: 3px; }
 /* Un dernier bouton orphelin prenait toute la largeur — utile quand la grille en
    comptait six, faux depuis qu'elle en compte trois, le premier occupant déjà les
    deux colonnes : « Le programme » se retrouvait seul sur une ligne, texte à droite.
    La règle ne s'applique donc plus qu'au groupe secondaire. */
-.grille-boutons.secondaires a:last-child:nth-child(odd) { grid-column: span 2; }
+.grille-boutons.secondaires > a:last-child:nth-child(odd) { grid-column: span 2; }
 
 /* Le prochain rendez-vous se lit comme les boutons du dessus : une carte, le
    même coin cassé, un filet de couleur à gauche — framboise, la couleur du
@@ -306,15 +308,15 @@ main { min-height: 60vh; }
   border-radius: 6px 6px 18px 6px; padding: 14px 16px;
 }
 .grille-boutons .grand-defi { grid-column: span 2; margin: 0; }
-.grille-boutons a.grand-defi-tuile {
+.grille-boutons > a.grand-defi-tuile {
   grid-column: span 2; flex-direction: row; align-items: center; gap: 12px; min-height: 68px;
   background: var(--ambre); border-color: var(--ambre); border-left: 4px solid #B36F00; color: var(--sur-ambre); /* barre fixe : --orange vaut --ambre en sombre */
 }
-.grille-boutons a.grand-defi-tuile svg { color: var(--sur-ambre); width: 26px; height: 26px; flex: none; }
-.grille-boutons a.grand-defi-tuile .texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.grille-boutons a.grand-defi-tuile .teasing { font-family: var(--texte); font-weight: 600; font-size: 0.82rem; letter-spacing: 0; }
-.grille-boutons a.grand-defi-tuile .cta { margin-left: auto; flex: none; font-family: var(--texte); font-weight: 800; font-size: 0.82rem; padding: 6px 10px; border-radius: 999px; background: var(--sur-ambre); color: #FFE7B8; white-space: nowrap; }
-.grille-boutons a.rejouer-lien.seule { grid-column: span 2; display: inline-block; min-height: 0; margin: -2px 0 0 10px; padding: 0 0 2px; background: none; border: 0; border-radius: 0; font-family: var(--texte); font-weight: 400; font-size: 0.85rem; letter-spacing: 0; color: var(--encre-2); text-decoration: underline; }
+.grille-boutons > a.grand-defi-tuile svg { color: var(--sur-ambre); width: 26px; height: 26px; flex: none; }
+.grille-boutons > a.grand-defi-tuile .texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.grille-boutons > a.grand-defi-tuile .teasing { font-family: var(--texte); font-weight: 600; font-size: 0.82rem; letter-spacing: 0; }
+.grille-boutons > a.grand-defi-tuile .cta { margin-left: auto; flex: none; font-family: var(--texte); font-weight: 800; font-size: 0.82rem; padding: 6px 10px; border-radius: 999px; background: var(--sur-ambre); color: #FFE7B8; white-space: nowrap; }
+.grille-boutons > a.rejouer-lien.seule { grid-column: span 2; display: inline-block; min-height: 0; margin: -2px 0 0 10px; padding: 0 0 2px; background: none; border: 0; border-radius: 0; font-family: var(--texte); font-weight: 400; font-size: 0.85rem; letter-spacing: 0; color: var(--encre-2); text-decoration: underline; }
 .grand-defi h2 { font-size: 0.8rem; color: var(--encre-2); font-weight: 650; margin: 0; font-family: var(--texte); letter-spacing: 0; }
 .grand-defi .score { margin: 4px 0 10px; font-family: var(--display); font-size: 1.1rem; color: var(--encre-2); font-variant-numeric: tabular-nums; }
 .grand-defi .score strong { font-size: 1.8rem; font-weight: 800; color: var(--orange); letter-spacing: -0.02em; }
@@ -350,10 +352,12 @@ main { min-height: 60vh; }
 .carnet .titre-section { margin-top: 0; }
 .carnet textarea { width: 100%; box-sizing: border-box; min-height: 5.5em; padding: 10px 12px; border: 1px solid var(--trait); border-radius: 10px; font: inherit; background: var(--carte); color: inherit; resize: vertical; }
 .carnet .note { margin: 6px 0 0; color: var(--encre-2); font-size: 0.88rem; }
-/* Serré (grand-defi 13) : « Scan QR · Mes défis · Règle du jeu » sur une ligne dès 360 px de large
-   (la carte offre viewport − 77 px : 283 à 360, 298 à 375, 313 à 390 ; les trois mesurent 280, Chrome headless). */
-.grand-defi .mes-defis-lien, .grand-defi .regle-lien { display: inline-block; margin: 12px 0 0 6px; font-weight: 650; font-size: 0.92rem; }
-.grand-defi .scanner-lien { margin-top: 12px; padding-inline: 12px; gap: 6px; font-size: 0.94rem; }
+/* Serré (grand-defi 13, 16) : « Scan QR · Mes défis · Comment ça marche » sur une rangée
+   qui replie en gardant l'alignement (la carte offre viewport − 77 px : 283 à 360, 313 à 390 ;
+   « Comment ça marche » passe à la ligne sous 420 px, comme le « Rejouer » de l'essai). */
+.grand-defi .liens-jeu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 0; }
+.grand-defi .mes-defis-lien, .grand-defi .regle-lien { font-weight: 650; font-size: 0.92rem; }
+.grand-defi .scanner-lien { padding-inline: 12px; gap: 6px; font-size: 0.94rem; }
 /* Sous les défis de la fiche ouverte par un QR du jeu (grand-defi 13) : repartir scanner. */
 .rescan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 0; }
 .rescan .mes-defis-lien { font-weight: 650; }
@@ -884,7 +888,7 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
 @media (min-width: 620px) {
   .appli { max-width: 700px; }
   .grille-boutons { grid-template-columns: repeat(3, 1fr); }
-  .grille-boutons a.principal, .grille-boutons a.grand-defi-tuile, .grille-boutons .grand-defi, .grille-boutons a.rejouer-lien.seule { grid-column: span 3; }
+  .grille-boutons > a.principal, .grille-boutons > a.grand-defi-tuile, .grille-boutons .grand-defi, .grille-boutons > a.rejouer-lien.seule { grid-column: span 3; }
   .fiche dl, .fiche .description { max-width: 62ch; }
 }
 @media (min-width: 1040px) {
@@ -906,7 +910,7 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appe
 .aide-bloc:hover h3 { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Rejouer depuis le début, pendant l'essai (grand-defi 11) : discret sous le scanner. */
-.grand-defi .rejouer-lien { display: inline-block; margin: 12px 0 0 14px; font-size: 0.85rem; color: var(--encre-2); text-decoration: underline; }
+.grand-defi .rejouer-lien { font-size: 0.85rem; color: var(--encre-2); text-decoration: underline; }
 .rejouer ul { margin: 12px 0 18px; padding-left: 1.2em; display: grid; gap: 6px; }
 .rejouer .note { margin-top: 16px; color: var(--encre-2); font-size: 0.9rem; }
 

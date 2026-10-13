@@ -297,8 +297,10 @@ export function ecranAccueil(etat) {
 // cadeaux ! · Viens jouer », qui mène à « Comment ça marche » (le Scan QR y est).
 function carteGrandDefi(etat) {
   if (!etat.grandDefi || !etat.grandDefi.actif) return '';
-  const scanner = `<a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Comment ça marche'))}</a>${rejouerOuvert(etat.modele.infos)
-    ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
+  // Les liens sous la jauge : une rangée qui replie proprement (« Comment ça marche »
+  // est plus long que « Règle du jeu », il passe à la ligne sur un téléphone étroit).
+  const scanner = `<div class="liens-jeu"><a class="bouton scanner-lien" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="mes-defis-lien" href="#/defis">${h(t('Mes défis'))}</a><a class="regle-lien" href="#/regle">${h(t('Comment ça marche'))}</a>${rejouerOuvert(etat.modele.infos)
+    ? `<a class="rejouer-lien" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}</div>`;
   const j = jauge(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [] });
   if (!j) return `<a class="grand-defi-tuile" href="#/regle">${icone('cadeau', 26)}<span class="texte"><strong>${h(t('Le Grand Défi'))}</strong><span class="teasing">${h(t('Participe et gagne des cadeaux !'))}</span></span><span class="cta">${h(t('Viens jouer'))}</span></a>${rejouerOuvert(etat.modele.infos)
     ? `<a class="rejouer-lien seule" href="#/rejouer">${h(t("Rejouer depuis le début (essai)"))}</a>` : ''}`;
