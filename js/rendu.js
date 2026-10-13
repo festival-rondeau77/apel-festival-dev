@@ -335,8 +335,8 @@ function scoreChances(jeu, j) {
 // « Comment ça marche » (grand-defi 03, les mots du testeur depuis le 16) : trois idées,
 // ultra simples, tirées des mêmes données que le jeu (ADR-0015) — le premier Palier,
 // les Paliers et leurs Chances, celles du badge, l'heure du Tirage (`Infos.heure_tirage`,
-// écrite telle quelle). Puis « À gagner » (`Infos.lots`, `;` sépare, chaque lot traduit
-// par le tableur) quand l'APEL l'a rempli, le Scan QR, le règlement
+// écrite telle quelle). Puis « À gagner » (`Infos.lots`, la cellule traduite par le
+// tableur, puis coupée sur `;`) quand l'APEL l'a rempli, le Scan QR, le règlement
 // (`Infos.reglement_jeu_url`, à défaut celui du festival) et qui organise.
 function ecranRegle(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
@@ -349,7 +349,8 @@ function ecranRegle(etat) {
   const bonus = chancesBadgeDe(jeu);
   const heure = String(i.heure_tirage || '').trim();
   const reglement = i.reglement_jeu_url || i.reglement_url;
-  const lots = String(i.lots || '').split(';').map((l) => l.trim()).filter(Boolean);
+  // Le tableur traduit la cellule `lots` entière (revue du 16) : traduire d'abord, couper ensuite.
+  const lots = tt(i.lots).split(';').map((l) => l.trim()).filter(Boolean);
   const organisateur = String(i.organisateur || '').split(';').map((x) => x.trim()).filter(Boolean).join(', ');
   return `${entete(t('Comment ça marche'), '', retour)}
     <ol class="regle">
@@ -363,7 +364,7 @@ function ecranRegle(etat) {
     </ol>
     ${lots.length ? `<section class="lots" aria-labelledby="lots-titre">
       <h2 class="titre-section" id="lots-titre">${icone('cadeau', 22)}${h(t('À gagner'))}</h2>
-      <ul>${lots.map((l) => `<li>${h(tt(l))}</li>`).join('')}</ul>
+      <ul>${lots.map((l) => `<li>${h(l)}</li>`).join('')}</ul>
     </section>` : ''}
     <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a><a class="bouton secondaire" href="#/defis">${h(t('Mes défis'))}</a>${reglement
       ? `<a class="bouton secondaire" href="${url(reglement)}" target="_blank" rel="noopener">${icone('document', 19)}${h(t('Lire le règlement du jeu'))}</a>` : ''}</div>

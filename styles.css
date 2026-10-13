@@ -308,7 +308,7 @@ main { min-height: 60vh; }
 .grille-boutons .grand-defi { grid-column: span 2; margin: 0; }
 .grille-boutons a.grand-defi-tuile {
   grid-column: span 2; flex-direction: row; align-items: center; gap: 12px; min-height: 68px;
-  background: var(--ambre); border-color: var(--ambre); border-left: 4px solid var(--orange); color: var(--sur-ambre);
+  background: var(--ambre); border-color: var(--ambre); border-left: 4px solid #B36F00; color: var(--sur-ambre); /* barre fixe : --orange vaut --ambre en sombre */
 }
 .grille-boutons a.grand-defi-tuile svg { color: var(--sur-ambre); width: 26px; height: 26px; flex: none; }
 .grille-boutons a.grand-defi-tuile .texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -884,7 +884,7 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
 @media (min-width: 620px) {
   .appli { max-width: 700px; }
   .grille-boutons { grid-template-columns: repeat(3, 1fr); }
-  .grille-boutons a.principal { grid-column: span 3; }
+  .grille-boutons a.principal, .grille-boutons a.grand-defi-tuile, .grille-boutons .grand-defi, .grille-boutons a.rejouer-lien.seule { grid-column: span 3; }
   .fiche dl, .fiche .description { max-width: 62ch; }
 }
 @media (min-width: 1040px) {
