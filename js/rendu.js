@@ -350,7 +350,7 @@ function ecranRegle(etat) {
   const heure = String(i.heure_tirage || '').trim();
   const reglement = i.reglement_jeu_url || i.reglement_url;
   // Le tableur traduit la cellule `lots` entière (revue du 16) : traduire d'abord, couper ensuite.
-  const lots = tt(i.lots).split(';').map((l) => l.trim()).filter(Boolean);
+  const lots = tt(i.lots).split(/[;；]/).map((l) => l.trim()).filter(Boolean); // « ； » : le point-virgule chinois
   const organisateur = String(i.organisateur || '').split(';').map((x) => x.trim()).filter(Boolean).join(', ');
   return `${entete(t('Comment ça marche'), '', retour)}
     <ol class="regle">
