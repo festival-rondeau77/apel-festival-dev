@@ -1,12 +1,12 @@
 // Service worker : l'appli entière en cache à l'installation (cache d'abord,
 // réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
 // secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.10.13-9925435';
+const VERSION = '2026.10.14-1ba3684';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
   './', './index.html', './reglement-jeu.html', './styles.css', './manifest.webmanifest',
-  './js/app.js', './js/erreurs.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js', './js/scan.js', './js/gains.js', './js/qr.js', './js/vendor/jsqr.js',
+  './js/rideau.js', './js/app.js', './js/erreurs.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js', './js/scan.js', './js/gains.js', './js/qr.js', './js/vendor/jsqr.js',
   './js/i18n.js', './js/i18n/fr.js', './js/i18n/en.js', './js/i18n/es.js', './js/i18n/zh.js', './js/i18n/de.js',
   './icones/icone.svg', './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png', './icones/icone-180.png',
   './logos/apel-fleur.webp', './logos/rondeau.webp', './logos/saint-colomban.webp',
@@ -50,6 +50,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin || e.request.method !== 'GET') return; // Google et le reste : jamais interceptés
   if (url.pathname.endsWith('/jeu')) return; // le Worker local de npm run servir : jamais en cache
+  // Le teaser et sa musique (ticket teaser 02) : jamais interceptés ni en cache. Safari demande
+  // l'audio par requêtes partielles (206), que cache.put refuse ; et le teaser n'a pas besoin du hors-ligne.
+  if (url.pathname.endsWith('/teaser.html') || url.pathname.endsWith('/teaser-musique.mp3')) return;
   if (url.pathname.endsWith('/data/snapshot.json')) {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE_DONNEES);

@@ -2,6 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <!-- Le rideau (ticket teaser 02) : jusqu'à l'ouverture de l'appli, renvoie au teaser tout le monde
+       sauf les testeurs (?testeurs une fois), la machine de dev et les routes profondes. Chargé avant
+       tout le reste. La date d'ouverture est dans ce fichier ; le rideau tombe seul. -->
+  <script src="./js/rideau.js"></script>
   <!-- Sécurité 06 : seconde ligne de défense derrière l'échappement du rendu (innerHTML).
        Ni script ni style en ligne ; le réseau ne va qu'au site, aux deux Workers et au
        classeur public (secours gviz). GitHub Pages n'émet aucun en-tête : d'où la balise. -->

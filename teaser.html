@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- Le rideau (ticket teaser 02) : porte la date d'ouverture (window.FESTIVAL_OUVERTURE) et, passé
+     cette date, renvoie à l'appli. Chargé en premier, comme dans index.html. -->
+<script src="./js/rideau.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="Festival de l'Orientation – samedi 14 novembre 2026, Bussy Saint-Georges. L'appli arrive bientôt.">
+<meta name="theme-color" content="#080f2e">
+<title>Festival de l'Orientation</title>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════════════════════╗
+  ║  TEASER « Festival de l'Orientation » — page autonome (un fichier HTML + un mp3)      ║
+  ║  Page de garde de l'appli jusqu'à l'ouverture (ticket teaser 02, js/rideau.js)        ║
+  ╚══════════════════════════════════════════════════════════════════════════════════════╝
+
+  PLAN DU FICHIER (chercher le titre de section dans le fichier)
+    <style>  ---------- Réglage principal          couleurs de la charte (--pink, --sky, --orange…)
+             ---------- Fond                       dégradé animé + anneau
+             ---------- Overlays cinéma            bandes noires haut/bas, badge « Teaser officiel », public visé, grain, barre de progression
+             ---------- Scène                      styles des textes (display, kicker, stamp…)
+             ---------- Animations d'entrée        .pop .drop .slam .wipe .rise .glitch .type .flip
+             ---------- Compte à rebours           bloc « L'appli ouvre dans »
+             ---------- Indice son                 pastille « Touche l'écran pour le son »
+             ---------- Crédit musique             « Music by … » + égaliseur, dans la bande noire du bas
+             ---------- Bouton son                 haut-parleur stylisé à droite de la bande du bas (coupe / remet)
+    <body>   <audio>                               LE FICHIER MUSIQUE (attribut src, à côté de la page)
+             #hint / #credit / #mute               indice son, crédit (texte et lien de l'artiste ici), bouton son (icône SVG)
+             #countdown                            libellés du compte à rebours
+             #overlays                             textes du badge et du public visé
+    <script> ================= RÉGLAGES            OPEN_AT (date d'ouverture) et SCENES (le texte de chaque scène, sa durée, ses couleurs)
+             ================= Moteur de scènes    enchaînement, boucle
+             ================= Compte à rebours    calcul et affichage
+             ================= Confettis           particules
+             ================= Musique             démarrage au premier geste, pause quand l'onglet est caché, crédit
+             ================= Bouton son          coupe / remet (music.muted, la lecture continue)
+             ================= Aucune interaction  blocage du scroll, zoom, clic droit
+
+  MODIFICATIONS COURANTES
+    • Date d'ouverture     → js/rideau.js (OUVERTURE), lue ici par OPEN_AT (script, RÉGLAGES)
+    • Texte des scènes     → script, RÉGLAGES, tableau SCENES (html: `…`, d: durée en ms, a/b: couleurs de fond)
+    • Fichier musique      → body, <audio src="…"> (app/teaser-musique.mp3, à côté de la page)
+    • Crédit musique       → body, #credit (nom et lien de l'artiste) ; style dans « Crédit musique »
+    • Égaliseur du crédit  → style « Crédit musique » : nombre de barres = nombre de <i> dans #credit .eq,
+                             couleurs et rythmes dans les règles :nth-child
+    • Bouton son           → body, #mute (icône SVG : .body haut-parleur, .w1/.w2 ondes, .x barre « coupé ») ;
+                             style dans « Bouton son » ; libellés aria dans le script « Bouton son »
+    • Public visé / badge  → body, #overlays (.badge, .who)
+    • Compteur de visites  → dernière balise <script> avant </body> (Cloudflare Web Analytics, docs/analytics.md)
+
+  LICENCE MUSIQUE
+    Morceau de Dmitrii Spis, pris sur Pixabay (licence Pixabay Content License : usage libre, y compris
+    commercial, attribution NON exigée, « toujours appréciée »). Le crédit est donc une courtoisie envers
+    l'artiste, pas une obligation : on cite l'artiste, pas la plateforme.
+    https://pixabay.com/service/license-summary/
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@700&family=Rubik:wght@400;600;800&display=swap">
+<style>
+  /* ---------- Réglage principal : date d'ouverture de l'appli / du site ---------- */
+  /* (modifiable aussi dans le script en bas : OPEN_AT) */
+
+  @property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+  @property --glow  { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
+
+  :root {
+    --navy: #12204d;
+    --navy-deep: #080f2e;
+    --pink: #e0305f;
+    --sky: #2bb3e6;
+    --orange: #f59a2b;
+    --cream: #fff7ee;
+    --accent: var(--pink);
+    --accent-2: var(--sky);
+    --ease-spring: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001);
+    --ease-out: cubic-bezier(.16,1,.3,1);
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--navy-deep);
+    color: var(--cream);
+    font-family: 'Rubik', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  /* Rien n'est cliquable : c'est une bande-annonce */
+  #stage, #bg, #overlays, #countdown { pointer-events: none; }
+
+  /* ---------- Fond ---------- */
+  #bg { position: fixed; inset: 0; overflow: hidden; }
+  #bg::before {
+    content: ''; position: absolute; inset: -30%;
+    background:
+      radial-gradient(40% 40% at 20% 30%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
+      radial-gradient(45% 45% at 80% 70%, color-mix(in oklab, var(--accent-2) 55%, transparent), transparent 70%),
+      radial-gradient(60% 60% at 50% 100%, color-mix(in oklab, var(--orange) 25%, transparent), transparent 70%),
+      var(--navy);
+    filter: blur(40px) saturate(1.2);
+    animation: drift 18s ease-in-out infinite alternate;
+    transition: background 1.2s ease;
+  }
+  @keyframes drift {
+    from { transform: translate(-4%, -3%) rotate(-3deg) scale(1.05); }
+    to   { transform: translate(4%, 3%) rotate(3deg) scale(1.15); }
+  }
+  #bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #bg .ring {
+    position: absolute; left: 50%; top: 50%; width: 140vmax; height: 140vmax;
+    translate: -50% -50%;
+    background: conic-gradient(from var(--angle), transparent 0 70%, color-mix(in oklab, var(--cream) 18%, transparent) 78%, transparent 86%);
+    animation: spin 14s linear infinite;
+    mix-blend-mode: screen; opacity: .6;
+  }
+  @keyframes spin { to { --angle: 360deg; } }
+
+  /* ---------- Overlays cinéma ---------- */
+  #overlays { position: fixed; inset: 0; }
+  .bar { position: absolute; left: 0; right: 0; height: 7vh; background: #000; z-index: 5; }
+  .bar.top { top: 0; } .bar.bottom { bottom: 0; }
+  .grain {
+    position: absolute; inset: 0; opacity: .12; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grain .6s steps(4) infinite;
+  }
+  @keyframes grain {
+    0% { transform: translate(0,0); } 25% { transform: translate(-3%,2%); }
+    50% { transform: translate(2%,-3%); } 75% { transform: translate(-1%,-1%); } 100% { transform: translate(0,0); }
+  }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65)); }
+  .flash { position: absolute; inset: 0; background: var(--cream); opacity: 0; z-index: 6; }
+  .flash.go { animation: flash .35s ease-out; }
+  @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
+  .scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.08) 3px 4px); }
+
+  .badge {
+    position: absolute; top: calc(7vh + 14px); left: 18px; z-index: 6;
+    font: 800 .72rem/1 'Rubik', sans-serif; letter-spacing: .18em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px; color: var(--cream); opacity: .85;
+  }
+  .badge i { width: 9px; height: 9px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 12px var(--pink); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .15; } }
+  .who {
+    position: absolute; top: calc(7vh + 14px); right: 18px; z-index: 6;
+    font: 600 .68rem/1 'Rubik', sans-serif; letter-spacing: .12em; text-transform: uppercase; opacity: .8; text-align: right;
+  }
+
+  .progress { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: linear-gradient(90deg, var(--pink), var(--sky), var(--orange)); z-index: 7; }
+
+  /* ---------- Scène ---------- */
+  #stage {
+    position: fixed; inset: 7vh 0 22vh 0;
+    display: grid; place-items: center; text-align: center;
+    padding-inline: 20px;
+    perspective: 1200px;
+    animation: kenburns 9s ease-in-out infinite alternate;
+  }
+  @keyframes kenburns { from { transform: scale(1) translateY(0); } to { transform: scale(1.04) translateY(-1%); } }
+  .scene { display: grid; gap: 14px; place-items: center; max-width: 900px; width: 100%; }
+
+  .display {
+    font-family: 'Archivo Black', 'Arial Black', Impact, sans-serif;
+    text-transform: uppercase; line-height: .92; letter-spacing: -.01em;
+    font-size: clamp(2.4rem, 11vw, 7rem); text-wrap: balance; margin: 0;
+  }
+  .display.title { font-size: clamp(2rem, 8.8vw, 6.5rem); }
+  .display.sm { font-size: clamp(1.8rem, 7.4vw, 5rem); }
+  .display .word { display: inline-block; white-space: nowrap; margin: 0 .12em; }
+  .display .ch { display: inline-block; }
+  .kicker { font: 800 clamp(.8rem, 2.6vw, 1.1rem)/1 'Rubik', sans-serif; letter-spacing: .28em; text-transform: uppercase; color: color-mix(in oklab, var(--cream) 85%, transparent); }
+  .script { font: 700 clamp(2rem, 9vw, 5.2rem)/1.05 'Caveat', 'Segoe Script', cursive; }
+  .sub { font: 600 clamp(1rem, 3.6vw, 1.6rem)/1.35 'Rubik', sans-serif; max-width: 30ch; text-wrap: balance; color: color-mix(in oklab, var(--cream) 90%, transparent); }
+  .big { font-family: 'Archivo Black', sans-serif; font-size: clamp(6rem, 34vw, 17rem); line-height: .85; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+
+  .pink { color: var(--pink); } .sky { color: var(--sky); } .orange { color: var(--orange); }
+  .grad {
+    background: linear-gradient(90deg, var(--pink), var(--orange), var(--sky), var(--pink));
+    background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+  @keyframes shimmer { to { background-position: 300% 0; } }
+  .outline { -webkit-text-stroke: 2px var(--cream); color: transparent; }
+
+  .chip {
+    display: inline-block; padding: .55em 1em; border-radius: 999px; font: 800 clamp(.95rem, 3.4vw, 1.5rem)/1 'Rubik', sans-serif;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--navy-deep); background: var(--cream);
+    transform: rotate(var(--r, 0deg));
+  }
+  .chip.pink { background: var(--pink); color: var(--cream); }
+  .chip.sky { background: var(--sky); color: var(--navy-deep); }
+  .chip.orange { background: var(--orange); color: var(--navy-deep); }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+  .stamp {
+    font-family: 'Archivo Black', sans-serif; font-size: clamp(2.6rem, 13vw, 8rem); line-height: .9; text-transform: uppercase;
+    color: var(--pink); border: .12em solid var(--pink); padding: .12em .3em; border-radius: .18em; rotate: -8deg;
+    box-shadow: inset 0 0 0 .05em var(--navy-deep), 0 0 0 .05em var(--navy-deep);
+    mix-blend-mode: normal;
+  }
+  .list { display: grid; gap: 8px; font: 800 clamp(1.15rem, 5vw, 2.4rem)/1.1 'Rubik', sans-serif; text-transform: uppercase; }
+  .list span { display: block; }
+
+  /* ---------- Animations d'entrée ---------- */
+  .pop  { animation: pop .9s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 90ms); }
+  @keyframes pop { from { opacity: 0; transform: scale(.2) rotate(-8deg); filter: blur(12px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+  .drop { animation: drop .8s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 45ms); transform-origin: 50% 100%; }
+  @keyframes drop { from { opacity: 0; transform: translateY(-1.2em) rotateX(-90deg); } to { opacity: 1; transform: none; } }
+
+  .slam { animation: slam .55s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 350ms); }
+  @keyframes slam { 0% { opacity: 0; transform: scale(3); filter: blur(10px); } 60% { opacity: 1; transform: scale(.96); filter: blur(0); } 100% { transform: scale(1); } }
+
+  .wipe { animation: wipe 1.6s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 200ms); }
+  @keyframes wipe { from { clip-path: inset(0 100% 0 0); opacity: .4; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+
+  .rise { animation: rise .8s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 120ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+
+  .split-l { animation: splitL .9s var(--ease-spring) both; }
+  .split-r { animation: splitR .9s var(--ease-spring) both; }
+  @keyframes splitL { from { opacity: 0; transform: translateX(-60vw) skewX(-20deg); } to { opacity: 1; transform: none; } }
+  @keyframes splitR { from { opacity: 0; transform: translateX(60vw) skewX(20deg); } to { opacity: 1; transform: none; } }
+
+  .glitch { position: relative; animation: glitchIn .8s steps(6) both; }
+  .glitch::before, .glitch::after { content: attr(data-t); position: absolute; inset: 0; opacity: .8; }
+  .glitch::before { color: var(--sky); animation: glitchA 1.2s steps(8) infinite; clip-path: inset(0 0 55% 0); }
+  .glitch::after { color: var(--pink); animation: glitchB 1.2s steps(8) infinite; clip-path: inset(50% 0 0 0); }
+  @keyframes glitchIn { from { opacity: 0; transform: skewX(40deg); } to { opacity: 1; transform: none; } }
+  @keyframes glitchA { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-6px,2px); } 40% { transform: translate(4px,-1px); } 60% { transform: translate(-2px,3px); } 80% { transform: translate(5px,0); } }
+  @keyframes glitchB { 0%,100% { transform: translate(0,0); } 20% { transform: translate(5px,-2px); } 40% { transform: translate(-4px,2px); } 60% { transform: translate(3px,-3px); } 80% { transform: translate(-5px,1px); } }
+
+  .stampIn { animation: stampIn .5s var(--ease-out) both; animation-delay: .5s; }
+  @keyframes stampIn { 0% { opacity: 0; transform: scale(4) rotate(10deg); } 70% { opacity: 1; transform: scale(.95) rotate(-8deg); } 100% { transform: scale(1) rotate(-8deg); } }
+
+  .type { overflow: hidden; white-space: nowrap; border-right: .08em solid var(--sky); animation: typing 1.6s steps(30) both, caret .6s step-end infinite; display: inline-block; max-width: 100%; }
+  @keyframes typing { from { width: 0; } to { width: 100%; } }
+  @keyframes caret { 50% { border-color: transparent; } }
+
+  .float { animation: floaty 3s ease-in-out infinite alternate; }
+  @keyframes floaty { from { transform: translateY(0) rotate(var(--r, 0deg)); } to { transform: translateY(-10px) rotate(calc(var(--r, 0deg) * -1)); } }
+
+  .shake { animation: shake .5s ease-in-out both; animation-delay: .7s; }
+  @keyframes shake { 0%,100% { transform: none; } 20% { transform: translate(-8px, 4px) rotate(-2deg); } 40% { transform: translate(7px, -3px) rotate(2deg); } 60% { transform: translate(-5px, 2px); } 80% { transform: translate(4px, -2px); } }
+
+  .flip { animation: flipIn .7s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 500ms); transform-origin: 50% 0; }
+  @keyframes flipIn { from { opacity: 0; transform: rotateX(90deg) translateY(-20px); } to { opacity: 1; transform: none; } }
+
+  .leaving { animation: leave .45s ease-in both !important; }
+  @keyframes leave { to { opacity: 0; transform: scale(1.15); filter: blur(10px); } }
+
+  /* ---------- Compte à rebours ---------- */
+  #countdown {
+    position: fixed; left: 0; right: 0; bottom: 7vh; height: 15vh; z-index: 6;
+    display: grid; place-items: center; gap: 4px;
+    background: linear-gradient(180deg, transparent, rgba(8,15,46,.85));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #countdown .label { font: 800 clamp(.7rem, 2.6vw, .95rem)/1 'Rubik', sans-serif; letter-spacing: .3em; text-transform: uppercase; color: var(--sky); }
+  .digits { display: flex; gap: clamp(8px, 2.5vw, 20px); align-items: flex-start; }   /* tout part du haut : cases et « : » sur la même ligne */
+  .unit { display: grid; place-items: center; gap: 4px; }
+  .unit b {
+    font: 400 clamp(1.7rem, 8vw, 3.4rem)/1 'Archivo Black', sans-serif; font-variant-numeric: tabular-nums;
+    background: rgba(255,247,238,.08); border: 1px solid rgba(255,247,238,.18); border-radius: .16em;
+    padding: .12em .18em; min-width: 1.8ch; text-align: center; backdrop-filter: blur(6px);
+    box-shadow: 0 0 calc(var(--glow) * .3px) var(--pink);
+  }
+  .unit b.tick { animation: tick .35s var(--ease-out); }
+  @keyframes tick { from { transform: translateY(-.25em); opacity: .3; color: var(--orange); } }
+  .unit small { font: 700 clamp(.55rem, 2vw, .7rem)/1 'Rubik', sans-serif; letter-spacing: .2em; text-transform: uppercase; opacity: .75; }
+  /* Séparateur « : » : une boîte exactement de la hauteur d'une case (1em de chiffre + 2 × .12em de
+     padding + 2 × 1px de bordure, même police et même taille que .unit b), le glyphe centré dedans.
+     Si on change la taille ou le padding des cases, reporter ici. */
+  .digits .sep {
+    font: 400 clamp(1.7rem, 8vw, 3.4rem)/1 'Archivo Black', sans-serif; color: var(--pink);
+    height: calc(1em + .24em + 2px); display: grid; place-items: center;
+    animation: blink 1s steps(2) infinite;
+  }
+  #countdown.open .digits { display: none; }
+  #countdown.open .label { display: none; }
+  #countdown .opened { display: none; font: 400 clamp(1.6rem, 8vw, 3rem)/1 'Archivo Black', sans-serif; text-transform: uppercase; }
+  #countdown.open .opened { display: block; animation: pop 1s var(--ease-spring) both; }
+
+  /* ---------- Indice son (pas cliquable : disparaît dès que la musique part) ---------- */
+  .hint {
+    position: fixed; left: 50%; bottom: calc(7vh + 15vh + 6px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; z-index: 8;
+    pointer-events: none; white-space: nowrap;
+    font: 800 .66rem/1 'Rubik', sans-serif; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--cream); background: rgba(8,15,46,.55); border: 1px solid rgba(255,247,238,.25); backdrop-filter: blur(6px);
+    padding: 9px 14px; border-radius: 999px; animation: hintPulse 1.8s ease-in-out infinite; transition: opacity .6s ease, transform .6s ease;
+  }
+  .hint.gone { opacity: 0; transform: translateY(12px); }
+  @keyframes hintPulse { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--sky) 55%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
+
+  /* ---------- Crédit musique : un « à l'écoute » dans la bande noire du bas, façon générique ----------
+     Invisible tant que rien ne joue (opacité 0). Quand la musique part, le script ajoute la classe
+     .on : le crédit apparaît en fondu lent et l'égaliseur bat. La classe .paused (musique en pause)
+     fige l'égaliseur. Très discret au repos (opacité .28), lisible au survol / focus (.9).
+     Réglages rapides :
+       - taille / espacement du texte     → la ligne `font:` et `letter-spacing` de .credit
+       - discrétion                       → .credit.on { opacity: … }
+       - hauteur des barres               → .credit .eq { height } et @keyframes eq (scaleY maxi)
+       - largeur / écart des barres       → .credit .eq i { width } et .credit .eq { gap }
+       - couleurs des barres              → les trois règles :nth-child(-n+3) / (n+4) / (n+7)
+       - rythme                           → les :nth-child(k) plus bas (durée + décalage négatif = départ désynchronisé)
+       - nombre de barres                 → ajouter / retirer des <i> dans #credit .eq (9 par défaut ; au-delà,
+                                            compléter les règles de rythme, sinon les barres en plus battent à l'unisson) */
+  .credit {
+    position: fixed; left: 18px; bottom: 0; height: 7vh; z-index: 9;
+    display: flex; align-items: center; gap: 9px; padding-bottom: env(safe-area-inset-bottom, 0px);
+    font: 600 .56rem/1 'Rubik', sans-serif; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+    color: var(--cream); opacity: 0; transition: opacity 1.6s ease .6s; pointer-events: none;
+  }
+  .credit.on { opacity: .28; pointer-events: auto; }
+  .credit.on:hover, .credit.on:focus-within { opacity: .9; transition-delay: 0s; transition-duration: .3s; }
+  .credit .by { opacity: .7; }                                  /* « Music by » un cran plus effacé que le nom */
+  .credit a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; }
+  .credit a:hover, .credit a:focus-visible { border-bottom-color: var(--sky); outline: none; }
+  /* L'égaliseur : 9 barres, dégradé rose → bleu → orange (la charte), chacune à son rythme */
+  .credit .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+  .credit .eq i { width: 2px; height: 3px; border-radius: 1px; transform-origin: bottom; background: var(--sky); }
+  .credit .eq i:nth-child(-n+3) { background: var(--pink); }
+  .credit .eq i:nth-child(n+4)  { background: var(--sky); }
+  .credit .eq i:nth-child(n+7)  { background: var(--orange); }
+  .credit.on .eq i { animation: eq .9s ease-in-out infinite alternate; }
+  .credit.on .eq i:nth-child(2) { animation-duration: .7s;  animation-delay: -.3s; }
+  .credit.on .eq i:nth-child(3) { animation-duration: 1.1s; animation-delay: -.6s; }
+  .credit.on .eq i:nth-child(4) { animation-duration: .8s;  animation-delay: -.1s; }
+  .credit.on .eq i:nth-child(5) { animation-duration: 1.2s; animation-delay: -.8s; }
+  .credit.on .eq i:nth-child(6) { animation-duration: .75s; animation-delay: -.45s; }
+  .credit.on .eq i:nth-child(7) { animation-duration: 1s;   animation-delay: -.2s; }
+  .credit.on .eq i:nth-child(8) { animation-duration: .85s; animation-delay: -.7s; }
+  .credit.on .eq i:nth-child(9) { animation-duration: 1.05s; animation-delay: -.5s; }
+  .credit.paused .eq i { animation-play-state: paused; }
+  @keyframes eq { from { transform: scaleY(1); } to { transform: scaleY(3.6); } }
+
+  /* ---------- Bouton son : haut-parleur stylisé à droite de la bande noire du bas, en miroir du crédit ----------
+     Même discrétion que le crédit : invisible tant que la musique n'a pas démarré (classe .on posée
+     par le script), opacité faible au repos, pleine au survol. Coupe le son sans arrêter la lecture
+     (music.muted), donc les scènes restent calées sur le morceau. Classe .muted : ondes effacées,
+     barre rose en travers, égaliseur du crédit figé.
+     Réglages rapides :
+       - taille de l'icône      → .mute svg { width }
+       - discrétion             → .mute.on { opacity: … }
+       - zone tactile           → .mute { width } (la bande fait 7vh de haut)
+       - couleur des ondes      → .mute .w1 / .w2 ; de la barre « coupé » → .mute .x */
+  .mute {
+    position: fixed; right: 12px; bottom: 0; height: 7vh; width: 44px; z-index: 9;
+    display: grid; place-items: center; padding: 0 0 env(safe-area-inset-bottom, 0px); margin: 0;
+    background: none; border: 0; color: var(--cream); cursor: pointer; -webkit-tap-highlight-color: transparent;
+    opacity: 0; pointer-events: none; transition: opacity 1.6s ease .6s;
+  }
+  .mute.on { opacity: .32; pointer-events: auto; }
+  .mute.on:hover, .mute.on:focus-visible { opacity: .9; transition-delay: 0s; transition-duration: .3s; outline: none; }
+  .mute svg { width: 20px; height: 20px; display: block; overflow: visible; }
+  .mute .body { fill: currentColor; }
+  .mute .w1, .mute .w2, .mute .x { fill: none; stroke-width: 1.8; stroke-linecap: round; }
+  .mute .w1 { stroke: var(--sky); }
+  .mute .w2 { stroke: var(--sky); animation: wave 1.8s ease-in-out infinite; }   /* la grande onde respire quand ça joue */
+  .mute .x  { stroke: var(--pink); stroke-width: 2.2; opacity: 0; transition: opacity .25s ease; }
+  .mute.muted .w1, .mute.muted .w2 { opacity: 0; animation: none; }
+  .mute.muted .x { opacity: 1; }
+  @keyframes wave { 50% { opacity: .25; } }
+
+  /* ---------- Lien des testeurs (ticket teaser 02) : au centre de la bande noire du bas ----------
+     Jusqu'à l'ouverture, ce teaser est la page de garde de l'appli ; les testeurs entrent par ce lien
+     (il pose la marque « testeur », voir js/rideau.js). Indispensable pour l'appli déjà installée sur
+     iPhone, dont le stockage est séparé de Safari et où l'on ne tape pas d'adresse. Discret mais
+     toujours visible : un curieux n'y trouve qu'une « Version en préparation ». */
+  .testeurs {
+    position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); height: 7vh; z-index: 9;
+    display: flex; align-items: center; padding-bottom: env(safe-area-inset-bottom, 0px);
+    font: 600 .56rem/1 'Rubik', sans-serif; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+    color: var(--cream); opacity: .22; text-decoration: none; -webkit-tap-highlight-color: transparent;
+  }
+  .testeurs:hover, .testeurs:focus-visible { opacity: .9; outline: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }
+    #bg .ring, .grain { display: none; }
+  }
+
+</style>
+<style>
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+</style>
+</head>
+<body>
+<!-- LA MUSIQUE : le mp3 doit être déposé dans le même dossier que cette page, sous le nom écrit ici.
+     Elle boucle ; le démarrage se fait au premier geste (section « Musique » du script). -->
+<audio id="music" src="./teaser-musique.mp3" loop preload="auto" playsinline></audio>
+<!-- Indice son : pastille au-dessus du compte à rebours, effacée dès que la musique part -->
+<div class="hint" id="hint">♪ Touche l'écran pour le son</div>
+<!-- Crédit musique : n'apparaît que quand la musique joue (classe .on posée par le script).
+     Le lien mène à la page de l'artiste (Pixabay, qui héberge le morceau) ; l'attribution n'est pas
+     exigée par la licence, voir l'en-tête du fichier. Chaque <i> est une barre de l'égaliseur. -->
+<div class="credit" id="credit" aria-label="Musique">
+  <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  <span><span class="by">Music by</span> <a href="https://pixabay.com/users/nastelbom-48128234/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=463071" target="_blank" rel="noopener">Dmitrii Spis</a></span>
+</div>
+<!-- Bouton son (coupe / remet la musique) : haut-parleur stylisé, visible seulement une fois la musique
+     partie. Le script pose .on, bascule .muted et l'attribut aria-label. -->
+<button class="mute" id="mute" type="button" aria-label="Couper le son" aria-pressed="false">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path class="body" d="M4 9v6h3.5l5 4V5l-5 4z"/>
+    <path class="w1" d="M15.5 9.5a3.6 3.6 0 0 1 0 5"/>
+    <path class="w2" d="M18.3 7a7.2 7.2 0 0 1 0 10"/>
+    <path class="x" d="M4.5 4.5l15 15"/>
+  </svg>
+</button>
+<!-- Lien des testeurs (ticket teaser 02) : « ?testeurs » marque le téléphone, l'appli s'ouvre -->
+<a class="testeurs" id="testeurs" href="./?testeurs#/">Testeurs : entrer dans l'appli</a>
+<div id="bg"><div class="ring"></div><canvas id="confetti"></canvas></div>
+
+<!-- La scène : vidée et remplie par le script à chaque changement (tableau SCENES) -->
+<div id="stage"><div class="scene" id="scene"></div></div>
+
+<!-- Compte à rebours vers OPEN_AT (script, RÉGLAGES) ; passé la date, seul « C'est ouvert ! » reste -->
+<div id="countdown">
+  <div class="label">L'appli ouvre dans</div>
+  <div class="digits">
+    <div class="unit"><b id="d">00</b><small>jours</small></div><div class="sep">:</div>
+    <div class="unit"><b id="h">00</b><small>heures</small></div><div class="sep">:</div>
+    <div class="unit"><b id="m">00</b><small>min</small></div><div class="sep">:</div>
+    <div class="unit"><b id="s">00</b><small>sec</small></div>
+  </div>
+  <div class="opened grad">C'est ouvert !</div>
+</div>
+
+<!-- Habillage cinéma : bandes noires, badge en haut à gauche, public visé en haut à droite,
+     balayage, vignettage, grain, flash entre deux scènes, barre de progression de la scène -->
+<div id="overlays">
+  <div class="bar top"></div><div class="bar bottom"></div>
+  <div class="badge"><i></i> Teaser officiel</div>
+  <div class="who">Collégiens · Lycéens · Parents</div>
+  <div class="scan"></div><div class="vignette"></div><div class="grain"></div>
+  <div class="flash" id="flash"></div>
+  <div class="progress" id="progress"></div>
+</div>
+
+<script>
+  /* ================= RÉGLAGES ================= */
+  // Date d'ouverture de l'appli : celle de js/rideau.js (une seule date pour le rideau et ce compte
+  // à rebours ; samedi 7 novembre 2026 à 9 h, heure de Paris). Le compte à rebours affiché = cette
+  // date moins l'heure du téléphone du visiteur, recalculé chaque seconde. Passé la date : « C'est
+  // ouvert ! » — et rideau.js renvoie à l'appli dès le chargement.
+  const OPEN_AT = new Date(window.FESTIVAL_OUVERTURE || '2026-11-07T09:00:00+01:00');
+
+  const T = (n) => `<span class="ch" style="--i:${n}">`;
+  const letters = (txt, cls, start = 0) => txt.split(' ').map((w, wi) =>
+    `<span class="word">${[...w].map((c, ci) => `<span class="ch ${cls}" style="--i:${start + wi * 4 + ci}">${c}</span>`).join('')}</span>`
+  ).join(' ');
+
+  /* Chaque scène : accent de fond, durée (ms), contenu HTML.
+     Les animations sont pilotées par les classes (.pop, .drop, .slam, .wipe, .rise, .glitch, .type, .flip, .stampIn ...). */
+  const SCENES = [
+    { a: '#e0305f', b: '#2bb3e6', d: 3600, html: `
+        <div class="display"><span class="word slam" style="--i:0">Viens</span><br>
+        <span class="word slam pink" style="--i:1">explorer.</span><br>
+        <span class="word slam sky" style="--i:2">t'informer.</span><br>
+        <span class="word slam orange" style="--i:3">échanger.</span></div>` },
+
+    { a: '#2bb3e6', b: '#f59a2b', d: 4200, html: `
+        <div class="kicker rise" style="--i:0">L'ensemble scolaire Maurice Rondeau · Institution Saint-Colomban · l'APEL</div>
+        <div class="display title">${letters('FESTIVAL DE', 'drop')}<br>${letters("L'ORIENTATION", 'drop grad', 10)}</div>` },
+
+    { a: '#f59a2b', b: '#e0305f', d: 3800, html: `
+        <div class="script grad wipe" style="--i:0">Trouve ta voie,</div>
+        <div class="script wipe" style="--i:3">construis ton avenir.</div>` },
+
+    { a: '#e0305f', b: '#f59a2b', d: 4200, html: `
+        <div class="kicker pop" style="--i:0">Samedi</div>
+        <div class="big pop pink" style="--i:1">14</div>
+        <div class="display pop" style="--i:3">Nov. 2026</div>
+        <div class="sub rise" style="--i:6">de 9h30 à 13h30 · Bussy Saint-Georges</div>` },
+
+    { a: '#2bb3e6', b: '#e0305f', d: 4000, html: `
+        <div class="big grad" id="counter">0</div>
+        <div class="display shake">écoles.<br><span class="outline">une matinée.</span><br><span class="sky">ton futur.</span></div>` },
+
+    { a: '#e0305f', b: '#2bb3e6', d: 3800, html: `
+        <div class="kicker rise" style="--i:0">Ateliers immersifs</div>
+        <div class="display glitch" data-t="Teste ton futur métier en VR">Teste ton futur métier en VR</div>` },
+
+    { a: '#f59a2b', b: '#2bb3e6', d: 4000, html: `
+        <div class="kicker rise" style="--i:0">Rencontres avec des professionnels</div>
+        <div class="display sm"><span class="type">Des pros. En vrai.</span></div>
+        <div class="sub rise" style="--i:8">Ils répondent à TES questions, sans filtre.</div>` },
+
+    { a: '#2bb3e6', b: '#f59a2b', d: 4000, html: `
+        <div class="display split-l">Les anciens</div>
+        <div class="display split-r orange">te racontent</div>
+        <div class="sub rise" style="--i:6">la vraie vie après le bac. Spoiler : ça se passe bien.</div>` },
+
+    { a: '#e0305f', b: '#f59a2b', d: 3800, html: `
+        <div class="kicker rise" style="--i:0">Conférences &amp; tables rondes</div>
+        <div class="display pop" style="--i:1">Pose la question<br><span class="grad">que tu n'oses pas</span><br>poser.</div>` },
+
+    { a: '#f59a2b', b: '#e0305f', d: 3600, html: `
+        <div class="chips">
+          <span class="chip pink pop float" style="--i:0;--r:-6deg">Collégiens</span>
+          <span class="chip sky pop float" style="--i:2;--r:4deg">Lycéens</span>
+          <span class="chip orange pop float" style="--i:4;--r:-3deg">Parents</span>
+        </div>
+        <div class="display rise" style="--i:7">Tout le monde<br>est invité.</div>` },
+
+    { a: '#2bb3e6', b: '#e0305f', d: 3400, html: `
+        <div class="display rise" style="--i:0">Food-trucks<br>sur place.</div>
+        <div class="script pop orange" style="--i:5">Oui, on a pensé à ça.</div>` },
+
+    { a: '#e0305f', b: '#2bb3e6', d: 4600, html: `
+        <div class="kicker pop" style="--i:0">Bientôt dans l'appli</div>
+        <div class="list">
+          <span class="flip pink" style="--i:1">Le programme heure par heure</span>
+          <span class="flip sky" style="--i:2">La carte des 40+ écoles</span>
+          <span class="flip orange" style="--i:3">Les horaires des conférences</span>
+          <span class="flip" style="--i:4">Ta sélection d'écoles à ne pas rater</span>
+        </div>` },
+
+    { a: '#f59a2b', b: '#2bb3e6', d: 3600, html: `
+        <div class="kicker rise" style="--i:0">Entrée</div>
+        <div class="stamp stampIn">Libre</div>
+        <div class="sub rise" style="--i:8">1 place du Clos Saint-Georges · 77600 Bussy Saint-Georges</div>` },
+
+    { a: '#e0305f', b: '#f59a2b', d: 4200, html: `
+        <div class="script wipe" style="--i:0">Rendez-vous le</div>
+        <div class="display grad pop" style="--i:2">14 novembre</div>
+        <div class="sub rise" style="--i:6">Prépare tes questions. On s'occupe du reste.</div>` },
+  ];
+
+  /* ================= Moteur de scènes ================= */
+  const stage = document.getElementById('scene');
+  const flash = document.getElementById('flash');
+  const progress = document.getElementById('progress');
+  const root = document.documentElement;
+  const total = SCENES.reduce((s, x) => s + x.d, 0);
+  let idx = 0, elapsedBefore = 0, sceneStart = performance.now(), tLeave, tNext;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function play(i) {
+    const sc = SCENES[i];
+    clearTimeout(tLeave); clearTimeout(tNext);
+    stage.classList.remove('leaving');
+    root.style.setProperty('--accent', sc.a);
+    root.style.setProperty('--accent-2', sc.b);
+    flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+    stage.innerHTML = sc.html;
+    if (i === 4) countUp(document.getElementById('counter'), 40, 1400, '+');
+    sceneStart = performance.now();
+    tLeave = setTimeout(() => { stage.classList.add('leaving'); }, sc.d - 450);
+    tNext = setTimeout(() => {
+      stage.classList.remove('leaving');
+      elapsedBefore += sc.d;
+      idx = (i + 1) % SCENES.length;
+      if (idx === 0) { elapsedBefore = 0; if (playing) music.currentTime = 0; }   // musique et images repartent ensemble
+      play(idx);
+    }, sc.d);
+  }
+  function countUp(el, target, dur, suffix) {
+    if (!el) return;
+    const t0 = performance.now();
+    (function f(t) {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(e * target) + (p === 1 ? suffix : '');
+      if (p < 1) requestAnimationFrame(f);
+    })(t0);
+  }
+  (function prog() {
+    const p = ((elapsedBefore + (performance.now() - sceneStart)) % total) / total;
+    progress.style.width = (p * 100).toFixed(2) + '%';
+    requestAnimationFrame(prog);
+  })();
+  play(0);
+
+  /* ================= Compte à rebours ================= */
+  const cd = document.getElementById('countdown');
+  const units = { d: document.getElementById('d'), h: document.getElementById('h'), m: document.getElementById('m'), s: document.getElementById('s') };
+  const pad = (n) => String(n).padStart(2, '0');
+  function setUnit(el, v) {
+    if (el.textContent === v) return;
+    el.textContent = v; el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick');
+  }
+  function tickCd() {
+    const diff = OPEN_AT - Date.now();
+    if (diff <= 0) { cd.classList.add('open'); return; }
+    const s = Math.floor(diff / 1000);
+    setUnit(units.d, pad(Math.floor(s / 86400)));
+    setUnit(units.h, pad(Math.floor(s / 3600) % 24));
+    setUnit(units.m, pad(Math.floor(s / 60) % 60));
+    setUnit(units.s, pad(s % 60));
+    root.style.setProperty('--glow', ((s % 2) * 60) + '%');
+  }
+  tickCd(); setInterval(tickCd, 1000);
+
+  /* ================= Confettis / particules ================= */
+  const cv = document.getElementById('confetti'), ctx = cv.getContext('2d');
+  const COLORS = ['#e0305f', '#2bb3e6', '#f59a2b', '#fff7ee'];
+  let W, H, parts = [];
+  function resize() {
+    W = cv.width = innerWidth * devicePixelRatio; H = cv.height = innerHeight * devicePixelRatio;
+    parts = Array.from({ length: reduced ? 0 : Math.min(120, Math.floor(innerWidth / 6)) }, spawn);
+  }
+  function spawn() {
+    return { x: Math.random() * W, y: Math.random() * H, r: (2 + Math.random() * 5) * devicePixelRatio,
+      vx: (Math.random() - .5) * .4 * devicePixelRatio, vy: (.2 + Math.random() * .6) * devicePixelRatio,
+      rot: Math.random() * Math.PI, vr: (Math.random() - .5) * .04, c: COLORS[Math.random() * COLORS.length | 0],
+      shape: Math.random() * 3 | 0, a: .35 + Math.random() * .5 };
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of parts) {
+      p.x += p.vx; p.y -= p.vy; p.rot += p.vr;
+      if (p.y < -20) { p.y = H + 20; p.x = Math.random() * W; }
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = p.a; ctx.fillStyle = p.c;
+      if (p.shape === 0) { ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); }
+      else if (p.shape === 1) { ctx.beginPath(); ctx.arc(0, 0, p.r * .7, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r, p.r); ctx.lineTo(-p.r, p.r); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+    }
+    requestAnimationFrame(draw);
+  }
+  addEventListener('resize', resize); resize(); draw();
+
+  /* ================= Musique (fichier teaser-musique.mp3 à côté de la page) =================
+     Un <audio> HTML ignore le bouton silence de l'iPhone ; il ne reste que la règle universelle :
+     un premier geste sur la page (tap, clic ou touche ; un défilement ne compte pas). */
+  const music = document.getElementById('music');
+  let playing = false;
+  music.volume = .9;
+  function startMusic(fromGesture) {
+    if (playing) return;
+    music.play().then(() => {
+      playing = true;
+      document.getElementById('hint').classList.add('gone');
+      document.getElementById('credit').classList.add('on');   // le crédit prend la place de l'indice
+      document.getElementById('mute').classList.add('on');     // et le bouton son apparaît avec lui
+      if (fromGesture) { idx = 0; elapsedBefore = 0; music.currentTime = 0; play(0); }   // repart sur la scène 1, calé sur la musique
+    }).catch(() => {});   // pas encore autorisé : on réessaiera au prochain geste
+  }
+  startMusic(false);   // essai discret au chargement (Chrome desktop / Android peuvent l'autoriser)
+  ['pointerup', 'touchend', 'mouseup', 'keydown', 'click'].forEach(ev => addEventListener(ev, () => startMusic(true), { passive: true }));
+  document.addEventListener('visibilitychange', () => { if (!playing) return; document.hidden ? music.pause() : music.play().catch(() => {}); });
+  /* L'égaliseur du crédit bat seulement quand on entend quelque chose : ni en pause, ni coupé */
+  const syncEq = () => document.getElementById('credit').classList.toggle('paused', music.paused || music.muted);
+  music.addEventListener('pause', syncEq);
+  music.addEventListener('play', syncEq);
+
+  /* ================= Bouton son (coupe / remet) =================
+     Coupe le son sans arrêter la lecture : les scènes restent calées sur le morceau et le son
+     revient exactement là où il en est. Le clic remonte aussi jusqu'à startMusic, sans effet
+     puisque la musique joue déjà. */
+  const mute = document.getElementById('mute');
+  mute.addEventListener('click', (e) => {
+    e.stopPropagation();
+    music.muted = !music.muted;
+    mute.classList.toggle('muted', music.muted);
+    mute.setAttribute('aria-pressed', String(music.muted));
+    mute.setAttribute('aria-label', music.muted ? 'Remettre le son' : 'Couper le son');
+    syncEq();
+  });
+
+  /* ================= Aucune interaction : ni scroll, ni clic, ni zoom ================= */
+  ['wheel', 'touchmove', 'contextmenu', 'gesturestart', 'keydown', 'dblclick'].forEach(ev =>
+    addEventListener(ev, e => e.preventDefault(), { passive: false }));
+</script>
+<!-- Compteur de visites Cloudflare Web Analytics (ticket analytics 01, docs/analytics.md), le même
+     que celui de l'appli : le jeton de cibles.prod.analytics est écrit par bin/deploy.sh --cible=prod
+     dans la copie servie (vide ici, comme dans js/config.js : ni la machine, ni le dev, ni la fumée
+     ne comptent). Sans cookie ; le refus « Ne pas envoyer de statistiques » de l'appli vaut ici. -->
+<script>
+  const ANALYTICS = '';
+  try {
+    if (ANALYTICS && localStorage.getItem('festival.stats.refus') !== '1') {
+      const b = document.createElement('script'); b.defer = true;
+      b.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      b.dataset.cfBeacon = JSON.stringify({ token: ANALYTICS, spa: false });
+      document.body.appendChild(b);
+    }
+  } catch (e) {}
+</script>
+</body>
+</html>
