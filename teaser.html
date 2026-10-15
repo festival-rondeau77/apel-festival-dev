@@ -366,19 +366,6 @@
   .mute.muted .x { opacity: 1; }
   @keyframes wave { 50% { opacity: .25; } }
 
-  /* ---------- Lien des testeurs (ticket teaser 02) : au centre de la bande noire du bas ----------
-     Jusqu'à l'ouverture, ce teaser est la page de garde de l'appli ; les testeurs entrent par ce lien
-     (il pose la marque « testeur », voir js/rideau.js). Indispensable pour l'appli déjà installée sur
-     iPhone, dont le stockage est séparé de Safari et où l'on ne tape pas d'adresse. Discret mais
-     toujours visible : un curieux n'y trouve qu'une « Version en préparation ». */
-  .testeurs {
-    position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); height: 7vh; z-index: 9;
-    display: flex; align-items: center; padding-bottom: env(safe-area-inset-bottom, 0px);
-    font: 600 .56rem/1 'Rubik', sans-serif; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
-    color: var(--cream); opacity: .22; text-decoration: none; -webkit-tap-highlight-color: transparent;
-  }
-  .testeurs:hover, .testeurs:focus-visible { opacity: .9; outline: none; }
-
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }
     #bg .ring, .grain { display: none; }
@@ -412,8 +399,6 @@
     <path class="x" d="M4.5 4.5l15 15"/>
   </svg>
 </button>
-<!-- Lien des testeurs (ticket teaser 02) : « ?testeurs » marque le téléphone, l'appli s'ouvre -->
-<a class="testeurs" id="testeurs" href="./?testeurs#/">Testeurs : entrer dans l'appli</a>
 <div id="bg"><div class="ring"></div><canvas id="confetti"></canvas></div>
 
 <!-- La scène : vidée et remplie par le script à chaque changement (tableau SCENES) -->
