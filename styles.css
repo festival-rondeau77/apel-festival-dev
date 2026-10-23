@@ -472,6 +472,8 @@ main { min-height: 60vh; }
 
 .puce { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 650; background: var(--bleu-pale); color: var(--bleu); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .fiche .puces .puce { white-space: normal; }
+.formations { margin: 0 0 14px; padding-left: 20px; line-height: 1.45; }
+.formations li { margin: 3px 0; }
 .puce.orange { background: var(--orange-pale); color: #8A3200; }
 .puce.neutre { background: transparent; color: var(--encre-2); border: 1px solid var(--trait); }
 .puce.alerte { background: var(--alerte-pale); color: var(--alerte); }
@@ -590,6 +592,8 @@ main { min-height: 60vh; }
    règle vivait sous « .ligne » seulement, si bien que le prochain événement de
    l'accueil collait sa salle à son format et donnait à lire « AccueilOuverture ». */
 .meta { color: var(--encre-2); font-size: 0.86rem; margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px 12px; align-items: center; line-height: 1.35; }
+/* Le parcours d'un ancien élève : l'information qui fait choisir, au premier plan. */
+.meta .parcours { flex-basis: 100%; color: var(--encre); font-weight: 650; font-size: 0.92rem; }
 /* Le repère de salle est une pièce à lui : partout où salleHtml() le pose —
    une ligne de liste, une fiche, l'accueil — il doit garder son épingle collée
    à son nom. Scopé à .ligne, il retombait ailleurs en lien souligné, épingle

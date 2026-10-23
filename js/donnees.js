@@ -444,7 +444,8 @@ export function construireModele(tables) {
     const carte = carteDe(e.carte, { village: zone ? zone.nom : village, dejaPrises: cartesPrises, avertissements, ou });
     exposants.push({
       cle: cleDe(e.id, cleExposant(type, nom), ou, `${slugType(type)}:`), type, typeSlug: slugType(type), nom, carte,
-      organisation: texte(e.organisation), village: zone ? zone.nom : village, villageConnu,
+      // « Promo » sans année (un ancien élève dont l'APEL n'a pas la promo) ne dit rien : on le tait.
+      organisation: /^promo$/i.test(texte(e.organisation)) ? '' : texte(e.organisation), village: zone ? zone.nom : village, villageConnu,
       domaines, domainesConnus: connus,
       sousTitre: texte(e.sous_titre), description: texte(e.description), niveau: texte(e.niveau),
       site: texte(e.site), ville: texte(e.ville), salle, salleAVenir: salle === '',

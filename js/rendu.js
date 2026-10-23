@@ -123,14 +123,19 @@ function ligneExposant(etat, ex, { entree = null, chrono = false, de = '', sansS
   if (ex.stand) meta.push(`<span>${h(t('stand %s', ex.stand))}</span>`);
   if (ex.organisation && ex.organisation !== ex.type) meta.push(`<span class="puce">${h(t(ex.organisation))}</span>`);
   const sousTitre = tt(ex.sousTitre);
-  if (sousTitre) meta.push(`<span>${h(sousTitre.length > 64 ? `${sousTitre.slice(0, 62)}…` : sousTitre)}</span>`);
+  const court = sousTitre.length > 64 ? `${sousTitre.slice(0, 62)}…` : sousTitre;
+  // Un ancien élève se choisit sur son parcours, pas sur sa salle (ils sont tous à la
+  // cantine, demande APEL du 2026-10-23) : le parcours d'abord, en clair, la salle à la fin.
+  const ancien = ex.type === 'Ancien élève';
+  if (sousTitre && !ancien) meta.push(`<span>${h(court)}</span>`);
+  const salle = sansSalle ? '' : salleHtml(ex.salle, ex.salleAVenir);
   const alerte = entree && entree.alerte && !entree.alerte.vue
     ? `<span class="alerte-ico">${icone('alerte', 15)}${h(texteAlerte(entree.alerte))}</span>` : '';
   return `<li class="ligne${entree && entree.fait ? ' fait' : ''}">
     ${chrono ? `<div class="rail-heure"></div>${pointChrono(entree, { petit: true })}`
     : entree ? coche(entree) : `<div class="marque">${icone('exposants', 18)}</div>`}
     <div class="corps"><a href="${lienExposant(ex.cle, de)}">${h(ex.nom)}</a>
-      <div class="meta">${sansSalle ? '' : salleHtml(ex.salle, ex.salleAVenir)}${meta.join('')}${alerte}</div></div>
+      <div class="meta">${ancien ? `${sousTitre ? `<span class="parcours">${h(court)}</span>` : ''}${meta.join('')}${salle}` : `${salle}${meta.join('')}`}${alerte}</div></div>
     ${entree ? boutonRetirer(ex.cle, ex.nom) : etoile(etat, ex, ex.nom)}
   </li>`;
 }
@@ -791,7 +796,9 @@ export function ecranProgramme(etat) {
   // rondes, Ateliers. Ils remplacent la rangée de filtre « Format » (demande APEL, 2026-10-23).
   const formats = formatsPresents(modele);
   const format = ongletProgramme(modele, ui);
-  const liste = filtrerEvenements(modele, ui, format);
+  // L'ouverture en tête de chaque onglet, même à l'heure d'un atelier (demande APEL,
+  // 2026-10-23) ; le reste suit l'ordre des heures (tri stable).
+  const liste = filtrerEvenements(modele, ui, format).sort((a, b) => Number(Boolean(b.moment)) - Number(Boolean(a.moment)));
   const tous = filtrerEvenements(modele, ui);
   const domaines = ordonner(new Set(modele.evenements.flatMap((e) => e.domaines).filter(Boolean)), DOMAINES);
   const publics = [['3e', 'Collégiens'], ['Terminale', 'Lycéens'], ['étudiant', 'Étudiants'], ['parent', 'Parents']];
@@ -972,7 +979,11 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
       ${ex.presence ? `<dt>${h(t('Présent'))}</dt><dd>${h(tt(ex.presence))}</dd>` : ''}
     </dl>
     ${ex.description ? `<p class="description">${h(tt(ex.description))}</p>` : ''}
-    ${formations.length ? `<h2 class="titre-section">${h(t('Formations présentées'))}</h2><div class="puces">${formations.map((f) => `<span class="puce neutre">${h(f)}</span>`).join('')}</div>` : ''}
+    ${formations.length ? `<h2 class="titre-section">${h(t('Formations présentées'))}</h2>${formations.some((f) => f.length > 50)
+      // Les textes de l'APEL sont des phrases (« Programme ingénieur en 5 ans ; bachelors… ») :
+      // une liste se lit mieux qu'une pastille de trois lignes.
+      ? `<ul class="formations">${formations.map((f) => `<li>${h(f)}</li>`).join('')}</ul>`
+      : `<div class="puces">${formations.map((f) => `<span class="puce neutre">${h(f)}</span>`).join('')}</div>`}` : ''}
     <div class="boutons">
       <button class="bouton${dans ? ' orange' : ''}" type="button" data-action="etoile" data-cle="${attr(ex.cle)}" aria-pressed="${dans}">${icone('visite', 19)}${h(dans ? t('À visiter') : t('Ajouter à ma visite'))}</button>
       ${ex.salle && !ex.salleAVenir ? `<a class="bouton secondaire" href="${lienPlanSalle(ex.salle)}">${icone('plan', 19)}${h(t('Voir sur le plan'))}</a>` : ''}
