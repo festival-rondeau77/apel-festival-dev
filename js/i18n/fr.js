@@ -59,7 +59,6 @@ export default [
   '%s village', '%s villages', '%s salle', '%s salles', 'Salles à localiser',
   "Trois étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.",
   // les repères extérieurs du relevé (batiment.js), seuls textes de la géométrie
-  'Arrêt bus 26 · 44 · 46', 'Arrêt bus 26 (Bussy)', 'RER A',
   'Zoomer', 'Dézoomer', 'Recentrer le plan', 'Salles', 'et', 'Salles à venir.', 'Événements',
   "Rien n'est encore affecté à ce village.",
   "demandez à l'accueil", 'salle à localiser',

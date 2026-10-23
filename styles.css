@@ -845,6 +845,18 @@ details.equivalent summary { cursor: pointer; font-weight: 650; min-height: 46px
 .aide-bloc svg { width: 21px; height: 21px; color: var(--bleu); margin-top: 2px; }
 .aide-bloc h3 { font-size: 1rem; margin: 0 0 3px; letter-spacing: -0.01em; }
 .aide-bloc p { margin: 0; color: var(--encre-2); line-height: 1.5; }
+/* L'accès en pastilles (option A) : les numéros de ligne d'abord, lisibles comme sur un quai. */
+.acces { display: grid; border-bottom: 1px solid var(--trait); }
+.acces-ligne { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: start; padding: 14px 0; }
+.acces-ligne + .acces-ligne { border-top: 1px solid var(--trait); }
+.acces .pictos { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; }
+.acces .picto-mode { font: 800 0.7rem/1 var(--display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--encre-2); border: 1.5px solid currentColor; border-radius: 5px; padding: 3px 4px; }
+.acces .picto-rer { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #E3051C; color: #fff; font: 800 1rem/1 var(--display); }
+.acces .pastilles-bus { display: flex; flex-wrap: wrap; gap: 6px; }
+.acces .picto-bus { display: inline-flex; align-items: center; justify-content: center; min-width: 46px; height: 26px; padding: 0 8px; border-radius: 7px; background: var(--encre); color: var(--carte); font: 800 0.92rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.acces-texte { min-width: 0; display: grid; gap: 4px; }
+.acces-texte b { font-family: var(--display); font-weight: 800; }
+.acces-texte small { color: var(--encre-2); font-size: 0.86rem; }
 .aide-bloc a { font-weight: 650; }
 
 /* ------------------------------------------------------------ messages */

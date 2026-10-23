@@ -54,7 +54,6 @@ export default {
   "Vue d'ensemble": 'Übersicht', 'Fermer le plan': 'Plan schließen', 'Ouvrir le plan : %s': 'Plan öffnen: %s', 'La fiche': 'Details', 'Agrandir ou réduire la fiche': 'Details vergrößern oder verkleinern', 'Villages': 'Villages',
   '%s village': '%s Village', '%s villages': '%s Villages', '%s salle': '%s Raum', '%s salles': '%s Räume', 'Salles à localiser': 'Räume ohne Ortsangabe',
   "Trois étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.": 'Drei Stockwerke übereinander: Tippen Sie auf ein Stockwerk, um es zu öffnen, und auf einen Raum, um ihn zu sehen.',
-  'Arrêt bus 26 · 44 · 46': 'Bushaltestelle 26 · 44 · 46', 'Arrêt bus 26 (Bussy)': 'Bushaltestelle 26 (Bussy)', 'RER A': 'RER A',
   'Zoomer': 'Vergrößern', 'Dézoomer': 'Verkleinern', 'Recentrer le plan': 'Plan zentrieren', 'Salles': 'Räume', 'et': 'und', 'Salles à venir.': 'Räume folgen.', 'Événements': 'Veranstaltungen',
   "Rien n'est encore affecté à ce village.": 'Diesem Village ist noch nichts zugeordnet.',
   "demandez à l'accueil": 'fragen Sie am Empfang', 'salle à localiser': 'Raum ohne Ortsangabe',

@@ -1294,8 +1294,7 @@ export function ecranAide(etat) {
     ${horaires ? bloc('programme', t('Horaires'), `${h(horaires)}, ${h(t('entrée libre'))}`) : ''}
     ${adresse ? bloc('lieu', t('Adresse'), h(adresse)) : ''}
     ${i.entree ? bloc('porte', t('Entrée'), h(tt(i.entree))) : ''}
-    ${i.rer ? bloc('train', t('RER'), h(tt(i.rer))) : ''}
-    ${i.bus ? bloc('bus', t('Bus'), h(tt(i.bus))) : ''}
+    ${acces(i)}
     ${i.parking ? bloc('parking', t('Parking'), h(tt(i.parking))) : ''}
     ${i.restauration ? bloc('cafe', t('Restauration'), h(tt(i.restauration))) : ''}
     ${i.wifi ? bloc('wifi', t('Wifi'), h(i.wifi)) : ''}
@@ -1311,6 +1310,27 @@ export function ecranAide(etat) {
       <p>${h(etat.statsRefusees ? t('Désactivées sur ce téléphone : plus rien ne part.') : t("Elles comptent les écrans consultés pour préparer le festival de l'an prochain. Aucun nom, aucun contact, aucune position."))}</p>
       <button class="bouton secondaire" type="button" data-action="refus-stats" aria-pressed="${etat.statsRefusees ? 'true' : 'false'}">${h(etat.statsRefusees ? t('Réactiver les statistiques') : t('Ne pas envoyer de statistiques'))}</button></div></div>
   </section>`;
+}
+
+// L'accès en transports (option A, choisie le 2026-10-23) : les lignes en pastilles, comme
+// sur un quai, puis le texte traduit. `Infos.rer_ligne` (A) et `Infos.bus_lignes` (2226, 2244,
+// 2228) sont des numéros, jamais traduits ; `rer` et `bus` restent des phrases traduites
+// (« Bussy-Saint-Georges, sortie 1, 10 min à pied »). Sans numéro, le bloc d'avant.
+export function acces(i) {
+  const bloc = (ico, titre, texte) => `<div class="aide-bloc">${icone(ico, 21)}<div><h3>${h(titre)}</h3><p>${texte}</p></div></div>`;
+  const rerLigne = String(i.rer_ligne || '').trim();
+  const bus = String(i.bus_lignes || '').split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  const phrase = (texte) => {
+    const [tete, ...reste] = tt(texte).split(/[,，、]/);
+    return `<b>${h(tete.trim())}</b>${reste.length ? `<small>${h(reste.join(',').trim())}</small>` : ''}`;
+  };
+  const rer = !i.rer && !rerLigne ? ''
+    : rerLigne ? `<div class="acces-ligne"><span class="pictos"><span class="picto-mode">RER</span><span class="picto-rer" aria-label="${attr(`RER ${rerLigne}`)}">${h(rerLigne)}</span></span><span class="acces-texte">${i.rer ? phrase(i.rer) : ''}</span></div>`
+    : bloc('train', t('RER'), h(tt(i.rer)));
+  const lesBus = !i.bus && !bus.length ? ''
+    : bus.length ? `<div class="acces-ligne"><span class="pictos"><span class="picto-mode">${h(t('Bus'))}</span></span><span class="acces-texte"><span class="pastilles-bus">${bus.map((n) => `<span class="picto-bus">${h(n)}</span>`).join('')}</span>${i.bus ? `<small>${h(tt(i.bus))}</small>` : ''}</span></div>`
+    : bloc('bus', t('Bus'), h(tt(i.bus)));
+  return rerLigne || bus.length ? `<div class="acces">${rer}${lesBus}</div>` : `${rer}${lesBus}`;
 }
 
 // ---------------------------------------------------------------- navigation
