@@ -1,7 +1,15 @@
-// Service worker : l'appli entière en cache à l'installation (cache d'abord,
-// réseau pour mettre à jour) ; les données (snapshot) réseau d'abord, cache en
-// secours. La VERSION est réécrite par bin/deploy.sh à chaque publication.
-const VERSION = '2026.10.23-d3902da';
+// Service worker : l'appli entière en cache à l'installation, une version = un cache
+// figé (cache d'abord) ; les données (snapshot) réseau d'abord, cache en secours. La
+// VERSION est réécrite par bin/deploy.sh à chaque publication ; une nouvelle VERSION
+// installe un nouveau cache complet, que « Recharger » met en service d'un coup.
+//
+// Une version n'est jamais un mélange (2026-10-23 : les onglets du programme
+// s'affichaient sans répondre au clic, rendu.js neuf et app.js ancien) :
+// - l'installation contourne le cache HTTP du navigateur (`cache: 'reload'`) : GitHub
+//   Pages le garde dix minutes, et `addAll` y aurait repris un ancien app.js ;
+// - le cache d'une version n'est plus réécrit par le réseau en cours de route : seul un
+//   fichier absent de la liste y entre.
+const VERSION = '2026.10.23-e6b62b3';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
@@ -23,7 +31,7 @@ const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname)
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE_APPLI);
-    await cache.addAll(FICHIERS);
+    await cache.addAll(FICHIERS.map((u) => new Request(u, { cache: 'reload' })));
     const donnees = await caches.open(CACHE_DONNEES);
     await Promise.all(DONNEES.map((u) => donnees.add(u).catch(() => {})));
     if (DEV) await self.skipWaiting();
@@ -69,11 +77,10 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE_APPLI);
     const enCache = await cache.match(e.request, { ignoreSearch: true });
-    const reseau = fetch(e.request).then((rep) => { if (rep.ok) cache.put(e.request, rep.clone()); return rep; }).catch(() => null);
-    if (enCache && DEV) { const frais = await reseau; if (frais) return frais; return enCache; }
-    if (enCache) { reseau.catch(() => {}); return enCache; }
-    const rep = await reseau;
+    if (enCache && !DEV) return enCache;
+    const rep = await fetch(e.request).then((r) => { if (r.ok && !enCache) cache.put(e.request, r.clone()); return r; }).catch(() => null);
     if (rep) return rep;
+    if (enCache) return enCache;
     if (e.request.mode === 'navigate') return (await cache.match('./index.html')) || Response.error();
     return Response.error();
   })());
