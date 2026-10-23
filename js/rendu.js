@@ -753,10 +753,18 @@ export function prochainEvenement(modele, maintenant) {
 // « nursing » à l'écran doit pouvoir le taper et retrouver la ligne.
 const contientTraduit = (texte, q) => Boolean(texte) && (contient(texte, q) || contient(tt(texte), q));
 
-export function filtrerEvenements(modele, ui) {
+// Les Formats présents au programme, dans l'ordre de FORMATS : les onglets du programme.
+// Un « moment » (l'ouverture) n'est pas un format qu'on choisit : il ne fait pas d'onglet.
+export function formatsPresents(modele) {
+  return FORMATS.filter((f) => modele.evenements.some((e) => e.format === f && !e.moment));
+}
+
+// `format` : l'onglet affiché (null = tous). Le moment (l'ouverture) est dans chaque onglet :
+// c'est le repère de l'heure, pas un rendez-vous d'un format.
+export function filtrerEvenements(modele, ui, format = null) {
   return modele.evenements.filter((e) => {
     if (ui.filtreDomaineProgramme && !e.domaines.includes(ui.filtreDomaineProgramme) && !e.moment) return false;
-    if (ui.filtreFormat && e.format !== ui.filtreFormat) return false;
+    if (format && e.format !== format && !e.moment) return false;
     if (ui.filtrePublic && !publicInclut(e.public, ui.filtrePublic)) return false;
     if (ui.rechercheProgramme) {
       const q = ui.rechercheProgramme;
@@ -766,32 +774,52 @@ export function filtrerEvenements(modele, ui) {
   });
 }
 
+// L'onglet du programme réellement ouvert : celui demandé, sauf si les filtres posés le
+// vident alors qu'un autre onglet a des résultats (même règle que les exposants).
+export function ongletProgramme(modele, ui) {
+  const formats = formatsPresents(modele);
+  if (formats.length < 2) return null;
+  const demande = formats.includes(ui.ongletProgramme) ? ui.ongletProgramme : formats[0];
+  const rdv = (f) => filtrerEvenements(modele, ui, f).filter((e) => !e.moment).length;
+  const filtre = ui.filtreDomaineProgramme || ui.filtrePublic || ui.rechercheProgramme;
+  return filtre && rdv(demande) === 0 ? (formats.find((f) => rdv(f) > 0) || demande) : demande;
+}
+
 export function ecranProgramme(etat) {
   const { modele, ui } = etat;
-  const liste = filtrerEvenements(modele, ui);
+  // Trois onglets, comme les exposants (École, Pros, Anciens élèves) : Conférences, Tables
+  // rondes, Ateliers. Ils remplacent la rangée de filtre « Format » (demande APEL, 2026-10-23).
+  const formats = formatsPresents(modele);
+  const format = ongletProgramme(modele, ui);
+  const liste = filtrerEvenements(modele, ui, format);
+  const tous = filtrerEvenements(modele, ui);
   const domaines = ordonner(new Set(modele.evenements.flatMap((e) => e.domaines).filter(Boolean)), DOMAINES);
-  const formats = FORMATS.filter((f) => modele.evenements.some((e) => e.format === f));
   const publics = [['3e', 'Collégiens'], ['Terminale', 'Lycéens'], ['étudiant', 'Étudiants'], ['parent', 'Parents']];
   const rangees = [
     { cle: 'filtreDomaineProgramme', titre: t('Domaine'), tous: t('Tous'), aria: t('Filtrer par domaine'),
       valeurs: domaines, actif: ui.filtreDomaineProgramme, libelle: (v) => nomCourt(v) },
-    { cle: 'filtreFormat', titre: t('Format'), tous: t('Tous'), aria: t('Filtrer par format'),
-      valeurs: formats, actif: ui.filtreFormat, libelle: (v) => t(PLURIEL_FORMAT[v] || v) },
     { cle: 'filtrePublic', titre: t('Public'), tous: t('Tout public'), aria: t('Filtrer par public'),
       valeurs: publics.map(([v]) => v), actif: ui.filtrePublic,
       libelle: (v) => t((publics.find(([x]) => x === v) || [v, v])[1]) },
   ];
-  // Le compte annoncé doit égaler le nombre de lignes sous les yeux. L'ouverture
-  // est une ligne, mais pas un rendez-vous : on la nomme au lieu de la taire.
-  const rendezVous = liste.filter((e) => !e.moment).length;
-  const ouverture = liste.length - rendezVous;
+  // Le compte annoncé est celui de tout le programme (les onglets réunis), comme pour les
+  // exposants ; l'ouverture est une ligne de chaque onglet, mais pas un rendez-vous : on la
+  // nomme au lieu de la taire.
+  const rendezVous = tous.filter((e) => !e.moment).length;
+  const ouverture = tous.length - rendezVous;
   const phraseTotale = `${t('%s rendez-vous', rendezVous)}${ouverture ? ` ${t('et l’ouverture')}` : ''}`;
-  const filtre = Boolean(ui.filtreDomaineProgramme || ui.filtreFormat || ui.filtrePublic || ui.rechercheProgramme);
+  const filtre = Boolean(ui.filtreDomaineProgramme || ui.filtrePublic || ui.rechercheProgramme);
+  const compte = (f) => filtrerEvenements(modele, ui, f).filter((e) => !e.moment).length;
   return `${entete(t('Le programme'), sousTitreListe({ affiches: liste.length, total: modele.evenements.length, phraseTotale, filtre }))}
+  ${format ? `<div class="onglets" role="tablist" aria-label="${attr(t('Format'))}">
+    ${formats.map((f) => { const n = filtre ? compte(f) : null; return `<button class="onglet" type="button" role="tab" id="onglet-${attr(normaliser(f))}" aria-selected="${f === format}" data-action="onglet-programme" data-valeur="${attr(f)}">${h(t(PLURIEL_FORMAT[f] || f))}${n === null ? '' : ` <span class="compte">${n}</span>`}</button>`; }).join('')}
+  </div>` : ''}
   ${champRecherche('rechercheProgramme', ui.rechercheProgramme, t('Un domaine, une école, un intervenant'))}
   ${panneauFiltres(rangees, ui.filtresOuverts)}
+  <div role="tabpanel" ${format ? `aria-labelledby="onglet-${attr(normaliser(format))}"` : ''}>
   ${liste.length ? `<ul class="liste">${liste.map((e) => ligneEvenement(etat, e, { de: 'programme' })).join('')}</ul>`
     : `<p class="vide">${h(modele.evenements.length ? t('Aucun événement ne correspond. Élargissez la recherche ou les filtres.') : t("Le programme arrive bientôt : les événements confirmés s'afficheront ici."))}</p>`}
+  </div>
   ${modele.infos.restauration ? `<p class="info">${icone('cafe', 19)}${h(tt(modele.infos.restauration))}</p>` : ''}`;
 }
 
@@ -807,7 +835,7 @@ export function ecranEvenement(etat, cle) {
   const dans = visiteContient(etat.visite, ev.cle);
   const entree = etat.visite.entrees.find((e) => e.cle === ev.cle);
   return `<article class="fiche">
-    ${entete(tt(ev.titre), '', retourDepuis(etat.route.params.de, { href: '#/programme', libelle: t('Le programme') }))}
+    ${entete(tt(ev.titre), '', retourDepuis(etat.route.params.de, { href: ev.moment ? '#/programme' : `#/programme?onglet=${encodeURIComponent(ev.format)}`, libelle: t('Le programme') }))}
     <div class="puces"><span class="puce">${h(t(ev.format))}</span>${ev.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}${ev.public.length ? `<span class="puce neutre">${h(ev.public.map((p) => t(p)).join(', '))}</span>` : ''}</div>
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>

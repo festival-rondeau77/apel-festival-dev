@@ -9,7 +9,7 @@ import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR, suiteApresErreurCam
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { nouveauJeton, empreinteDe, afficherCode, JETON } from './gains.js';
 import { analyserRoute, ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
-import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, filtrerExposants, typesPresents, bandeauAnnonces, h as echapper } from './rendu.js';
+import { ecran, navigation, piedDePage, titreDocument, filtrerEvenements, ongletProgramme, filtrerExposants, typesPresents, bandeauAnnonces, h as echapper } from './rendu.js';
 import { rechercherSurPlan, construireScene, cameraPour, cadrerSur, zoomer, altitudes, projeter, facesVisibles, ordreDeDessin, tranches, etiquette, H_DALLE, INCLINAISON, ORIENTATION_DEFAUT } from './plan.js';
 import { t, tt, langue, definirLangue, definirTraductions, langueInitiale, CLE_STOCKAGE_LANGUE, definirLanguesProposees, languesProposees } from './i18n.js';
 import { dictionnaireDepuis } from './donnees.js';
@@ -34,7 +34,7 @@ const etat = {
   // pas de Worker, ou jamais joint. Le Passeport, lui, vit dans etat.visite.jeu.
   grandDefi: null,
   ui: {
-    rechercheProgramme: '', filtreDomaineProgramme: '', filtreFormat: '', filtrePublic: '',
+    rechercheProgramme: '', filtreDomaineProgramme: '', ongletProgramme: 'Conférence', filtrePublic: '',
     rechercheExposants: '', ongletExposants: 'École', filtreDomaineExposants: '',
     recherchePlan: '', zoneOuverte: null, salleAllumee: null, etagePlan: null, feuillePlan: null, suggestionsOuvertes: false,
     filtresOuverts: false, etapePreparer: 0, bandeauFerme: '',
@@ -229,6 +229,7 @@ function appliquerRoute() {
     // à l'accueil sinon (arrivée directe par l'URL ou un QR code).
     if (precedente !== 'plan') plan.retour = demarre ? 'back' : 'accueil';
   }
+  if (etat.route.nom === 'programme' && p.onglet) etat.ui.ongletProgramme = p.onglet;
   if (etat.route.nom === 'exposants') {
     if (p.onglet) etat.ui.ongletExposants = p.onglet;
     if (p.domaine !== undefined) etat.ui.filtreDomaineExposants = p.domaine;
@@ -601,7 +602,7 @@ function noterRecherche(champ) {
   if (normaliser(etat.ui[champ]).length < 2) return;
   const terme = termeDeRecherche(etat.ui[champ], vocabulaire(etat.modele));
   let n = 0;
-  if (champ === 'rechercheProgramme') n = filtrerEvenements(etat.modele, etat.ui).length;
+  if (champ === 'rechercheProgramme') n = filtrerEvenements(etat.modele, etat.ui, ongletProgramme(etat.modele, etat.ui)).length;
   else if (champ === 'rechercheExposants') n = filtrerExposants(etat.modele, etat.ui, typesPresents(etat.modele).includes(etat.ui.ongletExposants) ? etat.ui.ongletExposants : typesPresents(etat.modele)[0]).length;
   else n = rechercherSurPlan(etat.modele, etat.ui[champ]) ? 1 : 0;
   clearTimeout(noterRecherche.minuteur);
@@ -621,6 +622,7 @@ document.addEventListener('click', (e) => {
     // Changer d'onglet garde le Domaine : il traverse les onglets (voir ecranExposants),
     // et le compte affiché sur chaque onglet dit déjà combien on y trouvera.
     case 'onglet': etat.ui.ongletExposants = valeur; rendre({ conserver: true }); break;
+    case 'onglet-programme': etat.ui.ongletProgramme = valeur; rendre({ conserver: true }); break;
     case 'zone': etat.ui.zoneOuverte = etat.ui.zoneOuverte === valeur ? null : valeur; etat.ui.salleAllumee = null; etat.ui.recherchePlan = ''; etat.ui.feuillePlan = null; rendre({ conserver: true }); break;
     case 'salle': etat.ui.salleAllumee = valeur; etat.ui.recherchePlan = ''; etat.ui.zoneOuverte = null; etat.ui.feuillePlan = null; rendre({ conserver: true }); break;
     // Toucher un étage l'ouvre à plat ; le retoucher quand il est ouvert ferme
