@@ -847,7 +847,7 @@ export function ecranEvenement(etat, cle) {
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
       <dt>${h(t('Quand'))}</dt><dd>${h(heure(ev.debut) || t('heure à venir'))}${ev.fin !== null ? ` ${h(t('%s à %s', '', heure(ev.fin)).trim())}` : ''}</dd>
-      <dt>${h(t('Où'))}</dt><dd>${salleHtml(ev.salle, ev.salleAVenir)}${ev.zone ? `, ${h(t('village'))} ${h(ev.zone.numero ?? '')} ${h(t(ev.zone.nom))}` : ''}</dd>
+      <dt>${h(t('Où'))}</dt><dd>${salleHtml(ev.salle, ev.salleAVenir)}${ev.zone && !ev.zone.fonction ? `, ${h(t('village'))} ${h(ev.zone.numero ?? '')} ${h(t(ev.zone.nom))}` : ''}</dd>
       ${ev.intervenantsTexte ? `<dt>${h(t('Avec'))}</dt><dd>${h(ev.intervenantsTexte)}</dd>` : ''}
     </dl>
     ${ev.description ? `<p class="description">${h(tt(ev.description))}</p>` : ''}
