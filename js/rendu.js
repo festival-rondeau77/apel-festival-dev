@@ -923,7 +923,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   const entree = etat.visite.entrees.find((e) => e.cle === ex.cle);
   const evenements = ex.evenements.map((c) => modele.evenements.find((e) => e.cle === c)).filter(Boolean);
   const salleObj = salleParNom(modele, ex.salle);
-  const libSousTitre = t({ 'École': 'Formations', 'Pro': 'Métier', 'Entreprise': 'Métiers', 'Ancien élève': 'Parcours' }[ex.type] || 'Formations');
+  const libSousTitre = t({ 'École': 'Formations', 'Pro': 'Études / formation', 'Entreprise': 'Métiers', 'Ancien élève': 'Parcours' }[ex.type] || 'Formations');
   const formations = ex.type === 'École' && ex.sousTitre ? tt(ex.sousTitre).split(/;/).map((s) => s.trim()).filter(Boolean) : [];
   const questionsType = questionsPour(etat.visite, modele, ex.type);
   return `<article class="fiche">
@@ -935,7 +935,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
     ${carnetDeLaFiche(etat, ex, secret)}
     ${entree && entree.alerte && !entree.alerte.vue ? `<p class="avert">${icone('alerte', 19)}<span>${h(t('Changement'))} : ${h(texteAlerte(entree.alerte))}</span></p>` : ''}
     <dl>
-      ${ex.type === 'Pro' && ex.organisation ? `<dt>${h(t('Entreprise'))}</dt><dd>${h(ex.organisation)}</dd>` : ''}
+      ${ex.type === 'Pro' && ex.organisation ? `<dt>${h(t('Contact'))}</dt><dd>${h(ex.organisation)}</dd>` : ''}
       ${ex.type !== 'École' && ex.sousTitre ? `<dt>${h(libSousTitre)}</dt><dd>${h(tt(ex.sousTitre))}</dd>` : ''}
       ${ex.niveau ? `<dt>${h(t('Niveau'))}</dt><dd>${h(tt(ex.niveau))}</dd>` : ''}
       ${ex.ville ? `<dt>${h(t('Ville'))}</dt><dd>${h(ex.ville)}</dd>` : ''}
@@ -957,9 +957,9 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
 
 // ---------------------------------------------------------------- plan
 
-// La couleur d'un Village, par une classe (`zone-1` … `zone-11`, styles.css) et non par un
+// La couleur d'un Village, par une classe (`zone-1` … `zone-13`, styles.css) et non par un
 // attribut style : la CSP (sécurité 06) refuse tout style en ligne.
-const CLASSE_ZONE = (numero) => `zone-${((numero ?? 1) - 1) % 11 + 1}`;
+const CLASSE_ZONE = (numero) => `zone-${((numero ?? 1) - 1) % 13 + 1}`;
 
 // Le nom d'une Zone sur au plus deux lignes qui tiennent dans une largeur donnée.
 export function couperNomZone(nom, maxCaracteres) {
@@ -1067,7 +1067,7 @@ export function ecranPlan(etat) {
   </details>`;
 
   const resume = vue === 'axo'
-    ? `<h2 class="feuille-titre">${h(t('Plan du festival'))}</h2><p class="feuille-sous">${h(t("Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir."))}</p>`
+    ? `<h2 class="feuille-titre">${h(t('Plan du festival'))}</h2><p class="feuille-sous">${h(t("Trois étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir."))}</p>`
     : `<h2 class="feuille-titre">${h(t(vue))}</h2><p class="feuille-sous">${h(planDeLEtage(scene, modele, vue).zones.map((z) => `${z.numero ?? ''} ${t(z.nom)}`.trim()).join(' · ') || t("Rien à cet étage pour l'instant."))}</p>`;
   const fiche = guidage || panneauSalle || panneauVillage;
   const hauteur = hauteurFeuille(ui, Boolean(fiche));

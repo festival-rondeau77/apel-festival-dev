@@ -35,11 +35,12 @@
   --alerte: #C90151;
   --alerte-pale: #FCE4EC;
 
-  /* Les onze villages du plan : la palette de l'affiche, déclinée en aplats
-     clairs pour que le texte reste noir dessus. 1 et 11 sont des fonctions
+  /* Les treize villages du plan : la palette de l'affiche, déclinée en aplats
+     clairs pour que le texte reste noir dessus. 1 et 13 sont des fonctions
      (accueil, conférences) et prennent le gris-bleu neutre. */
-  --z1: #D6E0EE; --z2: #FBDDE8; --z3: #FDE7C0; --z4: #D9E7F7; --z5: #CFEAEB;
-  --z6: #A9DCDF; --z7: #F6C9D9; --z8: #F5D093; --z9: #FDE7C0; --z10: #CFEAEB; --z11: #E7ECF3;
+  --z1: #D6E0EE; --z2: #CFEAEB; --z3: #A9DCDF; --z4: #FFD3C2; --z5: #E9D5F2;
+  --z6: #F5D093; --z7: #D5DEC4; --z8: #FDE7C0; --z9: #D9E7F7; --z10: #FBDDE8;
+  --z11: #DCEFD6; --z12: #E3E0F7; --z13: #E7ECF3;
 
   --display: 'Bricolage', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --texte: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -75,8 +76,9 @@
   --trait: #1E3A5C;
   --alerte: #FF6E9F;
   --alerte-pale: #4A1026;
-  --z1: #17304F; --z2: #4E1F35; --z3: #4B3717; --z4: #1F3557; --z5: #10424A;
-  --z6: #175A63; --z7: #5E2440; --z8: #5C441C; --z9: #4B3717; --z10: #10424A; --z11: #1E3A5C;
+  --z1: #17304F; --z2: #10424A; --z3: #175A63; --z4: #5C2F1F; --z5: #45264F;
+  --z6: #5C441C; --z7: #36432A; --z8: #4B3717; --z9: #1F3557; --z10: #4E1F35;
+  --z11: #24452A; --z12: #2E2A57; --z13: #1E3A5C;
   --scene: #081E36; --scene-2: #0B2843; --dalle: #102A49; --dalle-cote: #071729; --vide: #040F1D;
   --neutre: #152E4E; --circul: #11263F; --sol: #0C2038; --parvis: #182A40; --pelouse: #14352A; --route: #0A1A2E;
   --arbre: #2E6B45; --fantome: #132B47; --contour: #2A4667; --mur: #5C7A9C; --ombre: #000814;
@@ -499,6 +501,9 @@ main { min-height: 60vh; }
   background: transparent; color: var(--encre); cursor: pointer; font-weight: 650; font-size: 0.88rem; white-space: nowrap;
 }
 .filtre[aria-pressed="true"] { background: var(--encre); border-color: var(--encre); color: var(--fond); }
+/* Dans une liste (le plan en liste), le nom d'un village de l'APEL peut être long
+   (« Voies professionnelles et technologiques ») : il passe à la ligne au lieu de déborder. */
+.ligne .corps .filtre { white-space: normal; max-width: 100%; text-align: left; }
 
 /* Une commande compacte plutôt que trois rangées empilées : la liste redevient la
    vedette de l'écran, et rien d'essentiel n'est plus coupé hors du cadre à 390 px.
@@ -744,6 +749,8 @@ body.plan-ouvert .nav, body.plan-ouvert #pied, body.plan-ouvert .bandeau, body.p
 .zone-9 { --c: var(--z9); }
 .zone-10 { --c: var(--z10); }
 .zone-11 { --c: var(--z11); }
+.zone-12 { --c: var(--z12); }
+.zone-13 { --c: var(--z13); }
 .piece.salle { --m: var(--c, var(--carte)); cursor: pointer; }
 .piece.salle .face-t { stroke: var(--encre); stroke-opacity: 0.6; }
 .piece.salle.poi .face-t { stroke: var(--orange); stroke-opacity: 1; stroke-width: 1.2; }

@@ -16,13 +16,13 @@ export default [
   'Tous', 'Collégiens', 'Lycéens', 'Étudiants', 'Parents', 'Tout public',
   '3e', '2nde', '1re', 'Terminale', 'étudiant', 'parent',
   'Université', 'Prépa', 'Lycée', 'CFA', 'UFA', 'Association',
-  'Rez-de-chaussée', '1er étage', 'Étage',
+  'Rez-de-chaussée', '1er étage', 'Étage', '2e étage', 'Contact', 'Études / formation',
   'Salle', 'Auditorium', 'Toilettes', 'Foodtruck', 'WC', 'Café', 'Confs', 'Entrée', 'Entrée libre', 'Passer en thème sombre', 'Passer en thème clair',
   // villages et domaines (noms longs et courts)
-  'Santé & Soin', 'Commerce, Marketing & Management', 'Banque, Finance & Droit', 'Ingénierie, Industrie & Sciences',
-  'Numérique & Cybersécurité', 'Communication, Médias & Création', 'Formations professionnelles',
-  'Services, Éducation & Sécurité', 'Orientation générale',
-  'Santé', 'Commerce', 'Finance & Droit', 'Ingénierie', 'Numérique', 'Médias & Création', 'Formations pro', 'Services', 'Orientation',
+  'Sciences, Industries et Aéronautique', 'Informatique, Numérique et Cybersécurité', 'Communication & Média', 'Art, Design et Architecture',
+  'Voies professionnelles et technologiques', 'Armées', 'Commerce, Marketing, Management & RH', 'Banque, Assurance et Droit',
+  'Santé, Soins & Biotechnologies', 'Éducation & Social', 'Universités et Classes Préparatoires',
+  'Sciences & Industrie', 'Numérique', 'Communication', 'Art & Design', 'Voies pro', 'Commerce', 'Banque & Droit', 'Santé', 'Éducation', 'Universités & prépas',
   'Village', 'village', 'Village à venir', 'Village %s', 'Zone %s',
   // lignes, gestes, filtres
   'Ajouter à ma visite', 'Retirer de ma visite', 'Dans ma visite', 'À visiter', 'Marquer comme fait',
@@ -57,7 +57,7 @@ export default [
   "Plan de l'Ensemble Scolaire Maurice Rondeau : %s", 'La liste équivalente est dans la fiche, sous le plan.',
   "Vue d'ensemble", 'Fermer le plan', 'Ouvrir le plan : %s', 'La fiche', 'Agrandir ou réduire la fiche', 'Villages',
   '%s village', '%s villages', '%s salle', '%s salles', 'Salles à localiser',
-  "Deux étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.",
+  "Trois étages empilés : touchez un étage pour l'ouvrir, une salle pour la voir.",
   // les repères extérieurs du relevé (batiment.js), seuls textes de la géométrie
   'Arrêt bus 26 · 44 · 46', 'Arrêt bus 26 (Bussy)', 'RER A',
   'Zoomer', 'Dézoomer', 'Recentrer le plan', 'Salles', 'et', 'Salles à venir.', 'Événements',

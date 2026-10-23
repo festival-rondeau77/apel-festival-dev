@@ -10,18 +10,22 @@ import { empreinte } from './empreinte.js';
 // courir de « Écoles d'ingénieurs » à « Métiers ». Deux villages sont des
 // fonctions et non des domaines : l'Accueil et les Conférences.
 // Le numéro sert au repérage physique (« village 5 ») et à l'ordre du plan.
+// Depuis le 2026-10-22, la liste est celle de l'APEL (onglet « Liste » de son fichier
+// de suivi) : elle décide les villages, et donc les domaines (même liste).
 export const VILLAGES = [
   { numero: 1, nom: 'Accueil', court: 'Accueil', fonction: true },
-  { numero: 2, nom: 'Santé & Soin', court: 'Santé' },
-  { numero: 3, nom: 'Commerce, Marketing & Management', court: 'Commerce' },
-  { numero: 4, nom: 'Banque, Finance & Droit', court: 'Finance & Droit' },
-  { numero: 5, nom: 'Ingénierie, Industrie & Sciences', court: 'Ingénierie' },
-  { numero: 6, nom: 'Numérique & Cybersécurité', court: 'Numérique' },
-  { numero: 7, nom: 'Communication, Médias & Création', court: 'Médias & Création' },
-  { numero: 8, nom: 'Formations professionnelles', court: 'Formations pro' },
-  { numero: 9, nom: 'Services, Éducation & Sécurité', court: 'Services' },
-  { numero: 10, nom: 'Orientation générale', court: 'Orientation' },
-  { numero: 11, nom: 'Conférences', court: 'Conférences', fonction: true },
+  { numero: 2, nom: 'Sciences, Industries et Aéronautique', court: 'Sciences & Industrie' },
+  { numero: 3, nom: 'Informatique, Numérique et Cybersécurité', court: 'Numérique' },
+  { numero: 4, nom: 'Communication & Média', court: 'Communication' },
+  { numero: 5, nom: 'Art, Design et Architecture', court: 'Art & Design' },
+  { numero: 6, nom: 'Voies professionnelles et technologiques', court: 'Voies pro' },
+  { numero: 7, nom: 'Armées', court: 'Armées' },
+  { numero: 8, nom: 'Commerce, Marketing, Management & RH', court: 'Commerce' },
+  { numero: 9, nom: 'Banque, Assurance et Droit', court: 'Banque & Droit' },
+  { numero: 10, nom: 'Santé, Soins & Biotechnologies', court: 'Santé' },
+  { numero: 11, nom: 'Éducation & Social', court: 'Éducation' },
+  { numero: 12, nom: 'Universités et Classes Préparatoires', court: 'Universités & prépas' },
+  { numero: 13, nom: 'Conférences', court: 'Conférences', fonction: true },
 ];
 
 // Le vocabulaire des Domaines est celui des Villages, moins les deux fonctions :
@@ -29,28 +33,39 @@ export const VILLAGES = [
 // chose sur le plan, dans un filtre et dans « ce qui m'intéresse ».
 export const DOMAINES = VILLAGES.filter((v) => !v.fonction).map((v) => v.nom);
 
-// Les huit Secteurs de septembre mélangeaient domaine et type de formation
-// (« Ingénieurs » à côté de « Universités & prépas »), ce que la relecture APEL
-// du 2026-09-08 a renvoyé. On garde leur traduction pour qu'un tableur pas encore
-// migré continue de s'afficher : la valeur ancienne entre, la nouvelle sort.
+// Les anciennes listes : les huit Secteurs de septembre (domaine et type de formation
+// mélangés, relecture APEL du 2026-09-08), puis les neuf villages du 2026-09-08 au
+// 2026-10-22. On garde leur traduction pour qu'une valeur ancienne (un tableur pas
+// encore migré, « ce qui m'intéresse » gardé sur un téléphone) continue de
+// s'afficher : la valeur ancienne entre, la nouvelle sort.
 export const DOMAINES_ANCIENS = {
-  'commerce-management': 'Commerce, Marketing & Management',
-  'ingenieurs-sciences-numerique': 'Ingénierie, Industrie & Sciences',
-  'sante': 'Santé & Soin',
-  'communication-medias': 'Communication, Médias & Création',
-  'art-design-architecture': 'Communication, Médias & Création',
-  'universites-prepas': 'Orientation générale',
-  'metiers-alternance': 'Formations professionnelles',
-  'international': 'Orientation générale',
+  'commerce-management': 'Commerce, Marketing, Management & RH',
+  'ingenieurs-sciences-numerique': 'Sciences, Industries et Aéronautique',
+  'sante': 'Santé, Soins & Biotechnologies',
+  'communication-medias': 'Communication & Média',
+  'art-design-architecture': 'Art, Design et Architecture',
+  'universites-prepas': 'Universités et Classes Préparatoires',
+  'metiers-alternance': 'Voies professionnelles et technologiques',
+  'international': 'Universités et Classes Préparatoires',
+  'sante-soin': 'Santé, Soins & Biotechnologies',
+  'commerce-marketing-management': 'Commerce, Marketing, Management & RH',
+  'banque-finance-droit': 'Banque, Assurance et Droit',
+  'ingenierie-industrie-sciences': 'Sciences, Industries et Aéronautique',
+  'numerique-cybersecurite': 'Informatique, Numérique et Cybersécurité',
+  'communication-medias-creation': 'Communication & Média',
+  'formations-professionnelles': 'Voies professionnelles et technologiques',
+  'services-education-securite': 'Éducation & Social',
+  'orientation-generale': 'Universités et Classes Préparatoires',
 };
 
 export const TYPES_EXPOSANT = ['École', 'Pro', 'Entreprise', 'Ancien élève'];
 export const FORMATS = ['Conférence', 'Table ronde', 'Atelier'];
 export const PUBLICS = ['Tous', 'Collégiens', 'Lycéens', 'Étudiants', 'Parents'];
 export const NIVEAUX = ['3e', '2nde', '1re', 'Terminale', 'étudiant', 'parent'];
-// Le lycée tient sur deux niveaux ; une Salle sans niveau est au rez-de-chaussée,
-// pour qu'une saisie incomplète ne fasse disparaître personne du plan.
-export const ETAGES = ['Rez-de-chaussée', '1er étage'];
+// Le lycée tient sur trois niveaux (le 2e depuis le 2026-10-22) ; une Salle sans
+// niveau est au rez-de-chaussée, pour qu'une saisie incomplète ne fasse disparaître
+// personne du plan.
+export const ETAGES = ['Rez-de-chaussée', '1er étage', '2e étage'];
 export const ETAGE_PAR_DEFAUT = ETAGES[0];
 export const ZONES_PAR_DEFAUT = VILLAGES.map((v) => ({ numero: v.numero, nom: v.nom }));
 
@@ -201,6 +216,7 @@ export function etageCanonique(valeur) {
   const n = normaliser(valeur);
   if (!n) return ETAGE_PAR_DEFAUT;
   if (/^(rdc|rez|0)/.test(n) || n.includes('rez-de-chaussee')) return ETAGES[0];
+  if (/2/.test(n)) return ETAGES[2];
   if (/1/.test(n)) return ETAGES[1];
   for (const e of ETAGES) if (normaliser(e) === n) return e;
   return ETAGE_PAR_DEFAUT;
@@ -246,7 +262,7 @@ export function rejouerDemande(valeur) {
   return normaliser(valeur) === 'oui';
 }
 
-// Les libellés de zone du plan (Params K) : `N · Nom` de chacun des onze villages.
+// Les libellés de zone du plan (Params K) : `N · Nom` de chacun des treize villages.
 export const LIBELLES_ZONES = VILLAGES.map((v) => `${v.numero} · ${v.nom}`);
 
 // Une zone du plan telle que le Push l'accepte : vide, ou `N · Nom` d'un village

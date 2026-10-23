@@ -1,5 +1,5 @@
 // Le bâtiment : géométrie relevée sur les plans d'évacuation du lycée Maurice
-// Rondeau (rez-de-chaussée et 1er étage, salle par salle, quatre escaliers, patio,
+// Rondeau (rez-de-chaussée, 1er et 2e étage, salle par salle, quatre escaliers, patio,
 // arc du restaurant), extérieur stylisé d'après les deux vues aériennes de la
 // plaquette d'accès. Extrait par script de la maquette « Rondeau relevé sur plan »
 // du 2026-09-22 (ADR-0013). Données pures : aucun texte destiné au Visiteur, aucune
@@ -7,7 +7,11 @@
 // Village. Réserves à lever sur place : ticket 13.
 //
 // Unités : 1 = 10 px du scan du plan RDC redressé (≈ 1,3 m). Le 1er étage a été
-// recalé sur le RDC par les centres des quatre escaliers. Le parvis est en haut.
+// recalé sur le RDC par les centres des quatre escaliers, le 2e aussi (2026-10-22,
+// plans/plans.pdf page 4, à 1 unité près : trois ailes de salles, le reste est toit).
+// Les salles du RDC portent leur numéro de porte quand l'APEL s'en sert (10 = salle
+// de permanence, 12 = arts plastiques, 13 = foyer, légende du plan d'évacuation).
+// Le parvis est en haut.
 //
 // Une Pièce : { nom, court?, k?, h?, poly }
 //   nom    ce qui est écrit sur la porte (« 110 », « CDI », « Auditorium ») — la
@@ -84,15 +88,15 @@ export const BATIMENT = [
       { nom: "Couloir", k: 'c', poly: [[117, 67], [176, 68], [176, 70], [117, 69]] },
       { nom: "Auditorium", poly: [[110, 68.5], [132, 69.5], [132, 79], [110, 79]] },
       { nom: "Atelier A05", court: "A05", k: 'n', poly: [[132, 69.5], [168, 70], [168, 79], [132, 79]] },
-      { nom: "Foyer", k: 'c', poly: [[108.5, 79], [117, 79], [117, 84], [108.5, 84]] },
-      { nom: "Oratoire", k: 'n', poly: [[76, 64], [93.5, 64], [93.5, 74], [76, 74]] },
+      { nom: "13", poly: [[108.5, 79], [117, 79], [117, 84], [108.5, 84]] },
+      { nom: "Oratoire", poly: [[76, 64], [93.5, 64], [93.5, 74], [76, 74]] },
       { nom: "Salle multimédia", k: 'n', poly: [[62, 72], [71, 72], [71, 83], [62, 83]] },
-      { nom: "Salle de permanence", poly: [[97.5, 72.5], [106, 72.5], [106, 83.5], [97.5, 83.5]] },
-      { nom: "Arts plastiques", k: 'n', poly: [[97.5, 87], [106, 87], [106, 98], [97.5, 98]] },
+      { nom: "10", poly: [[97.5, 72.5], [106, 72.5], [106, 83.5], [97.5, 83.5]] },
+      { nom: "12", k: 'n', poly: [[97.5, 87], [106, 87], [106, 98], [97.5, 98]] },
       { nom: "Salle EPS", poly: [[108.5, 86], [117, 86], [117, 104], [108.5, 104]] },
       { nom: "Vestiaires", k: 'n', poly: [[108.5, 105], [117, 105], [117, 125], [108.5, 125]] },
       { nom: "Bureaux", k: 'n', poly: [[62, 85], [71, 85], [71, 98], [62, 98]] },
-      { nom: "Restaurant scolaire", k: 'n', poly: [[41, 84], [60, 84], [60, 99], [97, 99], [97, 112], [106, 112], [106, 125], [100, 133], [88, 131], [77, 126], [67, 119], [58, 111], [50, 102], [44, 93]] },
+      { nom: "Restaurant scolaire", court: "Cantine", poly: [[41, 84], [60, 84], [60, 99], [97, 99], [97, 112], [106, 112], [106, 125], [100, 133], [88, 131], [77, 126], [67, 119], [58, 111], [50, 102], [44, 93]] },
     ],
   },
   {
@@ -135,6 +139,25 @@ export const BATIMENT = [
       { nom: "134", court: "134", poly: [[52, 83], [59, 83], [59, 93], [52, 93]] },
       { nom: "135", court: "135", poly: [[52, 93], [59, 93], [59, 100], [52, 100]] },
       { nom: "Atelier A137", court: "A137", k: 'n', poly: [[50.5, 101], [68.5, 101], [68.5, 115], [50.5, 115]] },
+    ],
+  },
+  {
+    etage: '2e étage',
+    contour: [[71.5, 48], [112.5, 56.5], [176, 57], [176.5, 68.5], [168, 68], [168, 80.5], [117, 80.5], [117, 126], [97.5, 126], [97, 106], [102.5, 106], [101.5, 70], [97, 64.5], [71.5, 64]],
+    trous: [],
+    pieces: [
+      ...ESCALIERS,
+      { nom: "222", poly: [[72, 51], [80.5, 53], [80, 64], [72, 63.5]] },
+      { nom: "221", poly: [[80.5, 53], [88.5, 55], [88.5, 64.5], [80, 64]] },
+      { nom: "220", poly: [[88.5, 55], [97.5, 56.5], [97, 64.5], [88.5, 64.5]] },
+      { nom: "210", poly: [[102, 78.5], [113, 78.5], [113.5, 90.5], [102, 90.5]] },
+      { nom: "211", poly: [[102, 90.5], [113.5, 90.5], [114, 99.5], [102.5, 99]] },
+      { nom: "212", k: 'n', poly: [[98, 106], [114, 106.5], [114.5, 121], [98.5, 120.5]] },
+      { nom: "200", poly: [[124, 63.5], [132.5, 64], [133, 76], [124, 76]] },
+      { nom: "201", poly: [[132.5, 64], [142, 64], [142, 76], [133, 76]] },
+      { nom: "202", poly: [[142, 64], [150, 64], [150.5, 76], [142, 76]] },
+      { nom: "203", poly: [[150, 64], [158.5, 64], [159, 76], [150.5, 76]] },
+      { nom: "204", poly: [[158.5, 64], [166, 64], [166.5, 76.5], [159, 76]] },
     ],
   },
 ];
