@@ -118,9 +118,14 @@ function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche 
   </li>`;
 }
 
+// Le type d'établissement d'une École (Lycée, CFA…) avait été deviné sur le nom à la reprise,
+// incomplet et sans source : l'APEL l'a fait retirer le 2026-10-24. Restent la promo d'un
+// ancien élève et le contact d'un pro.
+const montreOrganisation = (ex) => ex.type !== 'École' && ex.organisation && ex.organisation !== ex.type;
+
 function ligneExposant(etat, ex, { entree = null, chrono = false, de = '', sansSalle = false } = {}) {
   const meta = [];
-  if (ex.organisation && ex.organisation !== ex.type) meta.push(`<span class="puce">${h(t(ex.organisation))}</span>`);
+  if (montreOrganisation(ex)) meta.push(`<span class="puce">${h(t(ex.organisation))}</span>`);
   const sousTitre = tt(ex.sousTitre);
   const court = sousTitre.length > 64 ? `${sousTitre.slice(0, 62)}…` : sousTitre;
   // Un ancien élève se choisit sur son parcours, pas sur sa salle (ils sont tous à la
@@ -963,7 +968,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   return `<article class="fiche">
     ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Tu viens de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
-    <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
+    <div class="puces"><span class="puce">${h(t(ex.type))}</span>${montreOrganisation(ex) ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
     ${defisDeLaFiche(etat, ex, secret)}
     ${rescanner(etat, secret)}
     ${carnetDeLaFiche(etat, ex, secret)}

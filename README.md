@@ -1,4 +1,4 @@
 # Festival de l'Orientation — appli visiteur
 
 Fichiers servis par GitHub Pages — plateforme **dev**. Ne pas modifier ici : le code source vit dans le dépôt de projet et `bin/deploy.sh` recopie.
-Version 2026.10.24-f9ea8b3.
+Version 2026.10.24-05ed728.
