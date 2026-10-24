@@ -26,7 +26,7 @@ export default [
   'Village', 'village', 'Village à venir', 'Village %s', 'Zone %s',
   // lignes, gestes, filtres
   'Ajouter à ma visite', 'Retirer de ma visite', 'Dans ma visite', 'À visiter', 'Marquer comme fait',
-  'salle à venir', 'stand %s', '%s min', 'Effacer la recherche', 'Filtres', 'Retirer le filtre %s',
+  'salle à venir', '%s min', 'Effacer la recherche', 'Filtres', 'Retirer le filtre %s',
   '%s résultat', '%s résultats', '%s au total', 'Domaine', 'Format', 'Public',
   'Filtrer par domaine', 'Filtrer par format', 'Filtrer par public',
   // accueil

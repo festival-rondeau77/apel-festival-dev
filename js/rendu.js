@@ -120,7 +120,6 @@ function ligneEvenement(etat, ev, { avecHeure = true, chrono = false, chevauche 
 
 function ligneExposant(etat, ex, { entree = null, chrono = false, de = '', sansSalle = false } = {}) {
   const meta = [];
-  if (ex.stand) meta.push(`<span>${h(t('stand %s', ex.stand))}</span>`);
   if (ex.organisation && ex.organisation !== ex.type) meta.push(`<span class="puce">${h(t(ex.organisation))}</span>`);
   const sousTitre = tt(ex.sousTitre);
   const court = sousTitre.length > 64 ? `${sousTitre.slice(0, 62)}…` : sousTitre;
@@ -962,7 +961,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   const formations = ex.type === 'École' && ex.sousTitre ? tt(ex.sousTitre).split(/;/).map((s) => s.trim()).filter(Boolean) : [];
   const questionsType = questionsPour(etat.visite, modele, ex.type);
   return `<article class="fiche">
-    ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Tu viens de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}` : ''}</span></p>` : ''}
+    ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Tu viens de scanner le QR code du stand'))}${ex.salle ? `, ${h(ex.salle)}` : ''}</span></p>` : ''}
     ${entete(ex.nom, '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(ex.type)}`, libelle: PLURIEL_TYPE[ex.type] ? plurielType(ex.type) : t('Les exposants') }))}
     <div class="puces"><span class="puce">${h(t(ex.type))}</span>${ex.organisation && ex.organisation !== ex.type ? `<span class="puce">${h(t(ex.organisation))}</span>` : ''}${ex.domaines.map((d) => `<span class="puce neutre">${h(t(d))}</span>`).join('')}</div>
     ${defisDeLaFiche(etat, ex, secret)}
@@ -975,7 +974,7 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
       ${ex.niveau ? `<dt>${h(t('Niveau'))}</dt><dd>${h(tt(ex.niveau))}</dd>` : ''}
       ${ex.ville ? `<dt>${h(t('Ville'))}</dt><dd>${h(ex.ville)}</dd>` : ''}
       ${ex.village ? `<dt>${h(t('Village'))}</dt><dd>${h(t(ex.village))}${salleObj && salleObj.zone && salleObj.zone.numero !== null ? ` (${h(t('village'))} ${h(salleObj.zone.numero)})` : ''}</dd>` : ''}
-      <dt>${h(t('Salle'))}</dt><dd>${salleHtml(ex.salle, ex.salleAVenir)}${salleObj ? `, ${h(t(salleObj.etage).toLowerCase())}` : ''}${ex.stand ? `, ${h(t('stand %s', ex.stand))}` : ''}</dd>
+      <dt>${h(t('Salle'))}</dt><dd>${salleHtml(ex.salle, ex.salleAVenir)}${salleObj ? `, ${h(t(salleObj.etage).toLowerCase())}` : ''}</dd>
       ${ex.presence ? `<dt>${h(t('Présent'))}</dt><dd>${h(tt(ex.presence))}</dd>` : ''}
     </dl>
     ${ex.description ? `<p class="description">${h(tt(ex.description))}</p>` : ''}

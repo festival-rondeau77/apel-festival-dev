@@ -20,7 +20,7 @@ export default {
   'Village': '专区', 'village': '专区', 'Village à venir': '专区待定', 'Village %s': '专区 %s', 'Zone %s': '区域 %s',
 
   'Ajouter à ma visite': '加入我的行程', 'Retirer de ma visite': '从我的行程移除', 'Dans ma visite': '已在我的行程中', 'À visiter': '待参观', 'Marquer comme fait': '标记为已完成',
-  'salle à venir': '教室待定', 'stand %s': '%s 号展位', '%s min': '%s 分钟', 'Effacer la recherche': '清除搜索', 'Filtres': '筛选', 'Retirer le filtre %s': '移除筛选 %s',
+  'salle à venir': '教室待定', '%s min': '%s 分钟', 'Effacer la recherche': '清除搜索', 'Filtres': '筛选', 'Retirer le filtre %s': '移除筛选 %s',
   '%s résultat': '%s 个结果', '%s résultats': '%s 个结果', '%s au total': '共 %s 个', 'Domaine': '领域', 'Format': '形式', 'Public': '对象',
   'Filtrer par domaine': '按领域筛选', 'Filtrer par format': '按形式筛选', 'Filtrer par public': '按对象筛选',
 

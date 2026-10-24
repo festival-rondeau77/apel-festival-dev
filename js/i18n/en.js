@@ -20,7 +20,7 @@ export default {
   'Village': 'Village', 'village': 'village', 'Village à venir': 'Village to be announced', 'Village %s': 'Village %s', 'Zone %s': 'Zone %s',
 
   'Ajouter à ma visite': 'Add to my visit', 'Retirer de ma visite': 'Remove from my visit', 'Dans ma visite': 'In my visit', 'À visiter': 'To visit', 'Marquer comme fait': 'Mark as done',
-  'salle à venir': 'room to be announced', 'stand %s': 'stand %s', '%s min': '%s min', 'Effacer la recherche': 'Clear search', 'Filtres': 'Filters', 'Retirer le filtre %s': 'Remove filter %s',
+  'salle à venir': 'room to be announced', '%s min': '%s min', 'Effacer la recherche': 'Clear search', 'Filtres': 'Filters', 'Retirer le filtre %s': 'Remove filter %s',
   '%s résultat': '%s result', '%s résultats': '%s results', '%s au total': '%s in total', 'Domaine': 'Field', 'Format': 'Format', 'Public': 'Audience',
   'Filtrer par domaine': 'Filter by field', 'Filtrer par format': 'Filter by format', 'Filtrer par public': 'Filter by audience',
 

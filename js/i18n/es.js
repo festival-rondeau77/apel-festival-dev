@@ -20,7 +20,7 @@ export default {
   'Village': 'Aldea', 'village': 'aldea', 'Village à venir': 'Aldea por asignar', 'Village %s': 'Aldea %s', 'Zone %s': 'Zona %s',
 
   'Ajouter à ma visite': 'Añadir a mi visita', 'Retirer de ma visite': 'Quitar de mi visita', 'Dans ma visite': 'En mi visita', 'À visiter': 'Por visitar', 'Marquer comme fait': 'Marcar como hecho',
-  'salle à venir': 'sala por asignar', 'stand %s': 'estand %s', '%s min': '%s min', 'Effacer la recherche': 'Borrar la búsqueda', 'Filtres': 'Filtros', 'Retirer le filtre %s': 'Quitar el filtro %s',
+  'salle à venir': 'sala por asignar', '%s min': '%s min', 'Effacer la recherche': 'Borrar la búsqueda', 'Filtres': 'Filtros', 'Retirer le filtre %s': 'Quitar el filtro %s',
   '%s résultat': '%s resultado', '%s résultats': '%s resultados', '%s au total': '%s en total', 'Domaine': 'Ámbito', 'Format': 'Formato', 'Public': 'Público',
   'Filtrer par domaine': 'Filtrar por ámbito', 'Filtrer par format': 'Filtrar por formato', 'Filtrer par public': 'Filtrar por público',
 

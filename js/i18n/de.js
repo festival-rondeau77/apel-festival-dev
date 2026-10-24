@@ -22,7 +22,7 @@ export default {
   'Village': 'Village', 'village': 'Village', 'Village à venir': 'Village folgt', 'Village %s': 'Village %s', 'Zone %s': 'Zone %s',
 
   'Ajouter à ma visite': 'Zu meinem Besuch hinzufügen', 'Retirer de ma visite': 'Aus meinem Besuch entfernen', 'Dans ma visite': 'In meinem Besuch', 'À visiter': 'Zu besuchen', 'Marquer comme fait': 'Als erledigt markieren',
-  'salle à venir': 'Raum folgt', 'stand %s': 'Stand %s', '%s min': '%s Min.', 'Effacer la recherche': 'Suche löschen', 'Filtres': 'Filter', 'Retirer le filtre %s': 'Filter %s entfernen',
+  'salle à venir': 'Raum folgt', '%s min': '%s Min.', 'Effacer la recherche': 'Suche löschen', 'Filtres': 'Filter', 'Retirer le filtre %s': 'Filter %s entfernen',
   '%s résultat': '%s Ergebnis', '%s résultats': '%s Ergebnisse', '%s au total': '%s insgesamt', 'Domaine': 'Fachbereich', 'Format': 'Format', 'Public': 'Zielgruppe',
   'Filtrer par domaine': 'Nach Fachbereich filtern', 'Filtrer par format': 'Nach Format filtern', 'Filtrer par public': 'Nach Zielgruppe filtern',
 
