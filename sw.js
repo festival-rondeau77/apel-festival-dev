@@ -9,7 +9,7 @@
 //   Pages le garde dix minutes, et `addAll` y aurait repris un ancien app.js ;
 // - le cache d'une version n'est plus réécrit par le réseau en cours de route : seul un
 //   fichier absent de la liste y entre.
-const VERSION = '2026.10.25-884b970';
+const VERSION = '2026.10.25-284bfde';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
@@ -63,6 +63,8 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.endsWith('/teaser.html') || url.pathname.endsWith('/teaser-musique.mp3')) return;
   // La page des résultats de l'APEL (questionnaire, ADR-0026) : toujours le réseau, jamais en cache.
   if (/\/(resultats\.html|resultats\.css|js\/resultats\.js)$/.test(url.pathname)) return;
+  // Le lien court des questions flash (ADR-0027) : une redirection, toujours le réseau.
+  if (/\/(animation|animation\.html|js\/animation-lien\.js)$/.test(url.pathname)) return;
   if (url.pathname.endsWith('/data/snapshot.json')) {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE_DONNEES);

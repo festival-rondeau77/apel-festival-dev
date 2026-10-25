@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <!-- Le lien court des questions flash (ADR-0027) : festival.apelrondeau77.fr/animation mène à la
+       page animation du Worker de la même plateforme (CONFIG.jeuUrl, réécrit par bin/deploy.sh).
+       Ni le rideau ni le service worker : toujours le réseau. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Questions flash · Festival de l'Orientation</title>
+  <style>body { font: 17px/1.45 system-ui, sans-serif; margin: 0; padding: 1.5rem 1rem; max-width: 32rem; margin-inline: auto; }</style>
+  <script type="module" src="./js/animation-lien.js"></script>
+</head>
+<body>
+  <p id="message">Ouverture de la page des questions flash…</p>
+</body>
+</html>
