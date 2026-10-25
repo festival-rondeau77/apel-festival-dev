@@ -676,7 +676,7 @@ function ecranQuestion(etat) {
 // Un instant gagnant (grand-defi 08), ouvert par le bandeau d'annonce
 // (`#/instant/<défi>`) : la question et ses choix pendant la fenêtre ; une réponse
 // touchée est enregistrée tout de suite et part dans la minute. Le téléphone ne sait
-// pas si elle est juste : le Worker tire un gagnant parmi les bonnes réponses deux
+// pas si elle est juste : le Worker tire un gagnant (ou plusieurs) parmi les bonnes réponses deux
 // minutes après la fermeture, et seul le gagnant l'apprend (« Vous avez gagné ! »).
 function ecranInstant(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
@@ -690,7 +690,10 @@ function ecranInstant(etat) {
   if (statut === 'a-venir') return pasOuvert(t('Cet instant gagnant n’a pas encore commencé.'));
   let corps;
   if (statut === 'ouvert') {
-    corps = `<p class="essai">${h(t('Réponds avant %s : un gagnant est tiré parmi les bonnes réponses.', heure(fermeture)))}</p>
+    // Une question flash peut avoir plusieurs gagnants (ADR-0027).
+    const n = defi.params.gagnants || 1;
+    const consigne = n > 1 ? t('Réponds avant %s : %s gagnants sont tirés parmi les bonnes réponses.', heure(fermeture), n) : t('Réponds avant %s : un gagnant est tiré parmi les bonnes réponses.', heure(fermeture));
+    corps = `<p class="essai">${h(consigne)}</p>
     <div class="choix" role="group" aria-label="${attr(tt(defi.question))}">${defi.choix.map((c, i) => `<button class="bouton secondaire" type="button" data-action="repondre-instant" data-defi="${attr(defi.id)}" data-choix="${i}">${h(tt(c))}</button>`).join('')}</div>`;
   } else if (statut === 'repondu') {
     corps = `<p class="verdict attente">${h(t('Réponse enregistrée : %s', tt(defi.choix[choix] || '')))}</p>
