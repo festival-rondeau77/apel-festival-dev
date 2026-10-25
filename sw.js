@@ -9,12 +9,12 @@
 //   Pages le garde dix minutes, et `addAll` y aurait repris un ancien app.js ;
 // - le cache d'une version n'est plus réécrit par le réseau en cours de route : seul un
 //   fichier absent de la liste y entre.
-const VERSION = '2026.10.24-05ed728';
+const VERSION = '2026.10.25-c697eb0';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
   './', './index.html', './reglement-jeu.html', './styles.css', './manifest.webmanifest',
-  './js/rideau.js', './js/app.js', './js/erreurs.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js', './js/scan.js', './js/gains.js', './js/qr.js', './js/vendor/jsqr.js',
+  './js/rideau.js', './js/app.js', './js/erreurs.js', './js/config.js', './js/donnees.js', './js/empreinte.js', './js/visite.js', './js/stats.js', './js/sources.js', './js/routes.js', './js/rendu.js', './js/plan.js', './js/batiment.js', './js/icones.js', './js/defis.js', './js/passeport.js', './js/scan.js', './js/gains.js', './js/qr.js', './js/questionnaire.js', './js/vendor/jsqr.js',
   './js/i18n.js', './js/i18n/fr.js', './js/i18n/en.js', './js/i18n/es.js', './js/i18n/zh.js', './js/i18n/de.js',
   './icones/icone.svg', './icones/icone-192.png', './icones/icone-512.png', './icones/icone-maskable-512.png', './icones/icone-180.png',
   './logos/apel-fleur.webp', './logos/rondeau.webp', './logos/saint-colomban.webp',
@@ -61,6 +61,8 @@ self.addEventListener('fetch', (e) => {
   // Le teaser et sa musique (ticket teaser 02) : jamais interceptés ni en cache. Safari demande
   // l'audio par requêtes partielles (206), que cache.put refuse ; et le teaser n'a pas besoin du hors-ligne.
   if (url.pathname.endsWith('/teaser.html') || url.pathname.endsWith('/teaser-musique.mp3')) return;
+  // La page des résultats de l'APEL (questionnaire, ADR-0026) : toujours le réseau, jamais en cache.
+  if (/\/(resultats\.html|resultats\.css|js\/resultats\.js)$/.test(url.pathname)) return;
   if (url.pathname.endsWith('/data/snapshot.json')) {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE_DONNEES);

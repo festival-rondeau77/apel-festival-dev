@@ -195,6 +195,15 @@ export const TYPES_PREUVE = {
       return normaliser(defi.choix[preuve.choix]) === normaliser(reponse.bonne) ? '' : MAUVAISE_REPONSE;
     },
   },
+  // Répondre au questionnaire de satisfaction (ADR-0026) : les points s'écrivent quand la
+  // réponse arrive au Worker par ?action=questionnaire, jamais par la salve du jeu, qui
+  // n'a pas de quoi le prouver.
+  questionnaire: {
+    lireParams: () => ({ params: {} }),
+    concerne: () => false,
+    motif: () => '',
+    verifier: () => PAR_LE_QUESTIONNAIRE,
+  },
   // Deux votes autour d'un Événement du Programme (défi 8, la table ronde « Faut-il
   // avoir peur de l'IA ? »), sans scan : un « avant », jusqu'à `tolerance_avant`
   // minutes après le début prévu (15), un « après », dès `tolerance_apres` minutes
@@ -235,6 +244,9 @@ export const TYPES_PREUVE = {
     },
   },
 };
+
+// Le refus d'un défi `questionnaire` envoyé par la salve du jeu.
+export const PAR_LE_QUESTIONNAIRE = 'par le questionnaire seulement';
 
 // Les deux moments d'un vote : le Worker les écrit dans `validations.motif` d'un vote
 // compté et les renvoie au téléphone. Ne pas les renommer pendant le jeu.

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <!-- Les résultats du questionnaire de satisfaction, pour l'APEL (ADR-0026, .scratch/questionnaire).
+       Ouverte par le lien …/resultats.html#c=<code> ; le code est le secret CODE_RESULTATS du Worker
+       (bin/jeu.sh resultats). Ni le rideau ni le service worker : toujours le réseau. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://festival-jeu.festival-e23.workers.dev https://festival-jeu-dev.festival-e23.workers.dev; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Résultats du questionnaire · Festival de l'Orientation</title>
+  <link rel="icon" href="./icones/icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./polices/polices.css">
+  <link rel="stylesheet" href="./resultats.css">
+</head>
+<body>
+  <main id="page">
+    <header class="tete">
+      <p class="etiquette">Festival de l'Orientation · questionnaire de satisfaction</p>
+      <h1>Les résultats</h1>
+      <p id="maj" class="maj">Chargement…</p>
+    </header>
+    <form id="acces" class="acces" hidden>
+      <label for="code">Le code des résultats</label>
+      <div class="ligne"><input id="code" type="password" autocomplete="off" spellcheck="false"><button type="submit">Ouvrir</button></div>
+      <p id="acces-erreur" class="erreur" role="alert"></p>
+    </form>
+    <div id="resultats" hidden></div>
+  </main>
+  <noscript>Cette page a besoin de JavaScript.</noscript>
+  <script type="module" src="./js/resultats.js"></script>
+</body>
+</html>

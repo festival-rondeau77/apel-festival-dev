@@ -5,6 +5,7 @@ import { construireModele, diff, normaliser } from './donnees.js';
 import * as Visite from './visite.js';
 import { creerStats, plateforme, identifiantAleatoire, termeDeRecherche, CLE_APPAREIL } from './stats.js';
 import * as Passeport from './passeport.js';
+import * as Questionnaire from './questionnaire.js';
 import { routeDepuisScan, zoneVisee, codeVise, lireAvecJsQR, suiteApresErreurCamera } from './scan.js';
 import { creerSources, creerRafraichisseur, urlAction } from './sources.js';
 import { nouveauJeton, empreinteDe, afficherCode, JETON } from './gains.js';
@@ -49,6 +50,15 @@ const etat = {
 
 const stockageVisite = Visite.creerStockageVisite(stockage);
 etat.visite = stockageVisite.charger();
+
+// Le questionnaire de satisfaction (ADR-0026) : le brouillon, l'écran, la réponse qui attend
+// le Worker. Un testeur (la marque du rideau, `?testeurs`) ou la machine de développement le
+// voit à toute heure.
+etat.testeur = (() => {
+  if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return true;
+  try { return stockage.getItem('festival.testeur') === '1'; } catch { return false; }
+})();
+try { etat.questionnaire = Questionnaire.etatTelephone(JSON.parse(stockage.getItem(Questionnaire.CLE_STOCKAGE) || 'null')); } catch { etat.questionnaire = Questionnaire.etatTelephone(null); }
 
 // ---------------------------------------------------------------- langue
 
@@ -309,6 +319,7 @@ try { etat.grandDefi = JEU_URL ? Passeport.lireJeuPublic(JSON.parse(stockage.get
 
 async function chargerJeu() {
   if (!JEU_URL) return;
+  envoyerQuestionnaire(); // une réponse au questionnaire restée en attente repart au même rythme
   const rep = await fetch(urlAction(JEU_URL, 'jeu'), { cache: 'no-store' });
   if (!rep.ok) throw new Error(`jeu : HTTP ${rep.status}`);
   const jeu = Passeport.lireJeuPublic(await rep.json());
@@ -445,13 +456,76 @@ function repondreInstant(defi, choix) {
 // fixé au démarrage). Ma visite reste. Au Worker, l'ancien Passeport garde ses lignes.
 function rejouer() {
   if (!Passeport.rejouerOuvert(etat.modele.infos)) return;
-  try { stockage.removeItem(CLE_APPAREIL); stockage.removeItem(CLE_JETON); } catch { /* navigation privée : rien à oublier */ }
+  try { stockage.removeItem(CLE_APPAREIL); stockage.removeItem(CLE_JETON); stockage.removeItem(Questionnaire.CLE_STOCKAGE); } catch { /* navigation privée : rien à oublier */ }
   stockageVisite.sauver({ ...etat.visite, jeu: Passeport.etatJeuInitial() });
   history.replaceState(null, '', '#/');
   location.reload();
 }
 
-window.addEventListener('online', () => envoiJeu.envoyer());
+window.addEventListener('online', () => { envoiJeu.envoyer(); envoyerQuestionnaire(); });
+
+// ---------------------------------------------------------------- questionnaire de satisfaction (ADR-0026)
+
+// `conserver` : un choix coché garde la page où elle est ; un changement d'écran remonte en haut.
+function sauverQuestionnaire(tel, { rendu = true, conserver = false } = {}) {
+  etat.questionnaire = tel;
+  try { stockage.setItem(Questionnaire.CLE_STOCKAGE, JSON.stringify(tel)); } catch { /* quota ou navigation privée : la réponse reste en mémoire */ }
+  if (rendu) rendre({ conserver });
+}
+
+// Un geste de l'écran #/avis. Un choix unique ou une note passe à la question suivante
+// après un court instant (le choix se voit coché) ; les autres attendent « Suivant ».
+function gesteAvis(action, valeur, ligne) {
+  const tel = etat.questionnaire;
+  if (tel.fait || etat.route.nom !== 'avis') return;
+  const q = Questionnaire.QUESTIONS[tel.etape];
+  if (action === 'avis-commencer') return sauverQuestionnaire({ ...tel, etape: Questionnaire.premiereARemplir(tel.brouillon) });
+  if (action === 'avis-retour') return sauverQuestionnaire({ ...tel, etape: tel.etape - 1 });
+  if (!q) return;
+  if (action === 'avis-choix') {
+    const n = Number(valeur);
+    if (!Number.isInteger(n)) return;
+    const tel2 = { ...tel, brouillon: Questionnaire.choisir(tel.brouillon, q, n) };
+    sauverQuestionnaire(tel2, { conserver: true });
+    if (q.type === 'un' || q.type === 'note') {
+      clearTimeout(gesteAvis.suite);
+      gesteAvis.suite = setTimeout(() => { if (etat.questionnaire.etape === tel2.etape && etat.route.nom === 'avis') sauverQuestionnaire({ ...etat.questionnaire, etape: tel2.etape + 1 }); }, 280);
+    }
+    return;
+  }
+  if (action === 'avis-ligne') return sauverQuestionnaire({ ...tel, brouillon: Questionnaire.noterLigne(tel.brouillon, q, Number(ligne), Number(valeur)) }, { conserver: true });
+  if (!Questionnaire.peutContinuer(tel.brouillon, q)) return;
+  if (action === 'avis-suivant' && tel.etape < Questionnaire.QUESTIONS.length - 1) return sauverQuestionnaire({ ...tel, etape: tel.etape + 1 });
+  if (action === 'avis-envoyer') {
+    if (Questionnaire.verifierReponses(Questionnaire.reponsesPropres(tel.brouillon))) return;
+    sauverQuestionnaire(Questionnaire.terminer(tel));
+    envoyerQuestionnaire();
+  }
+}
+
+// La réponse part au Worker et reste gardée jusqu'à sa réponse : un échec réseau la garde
+// pour le retour du réseau, du premier plan ou du prochain rafraîchissement ; un refus
+// définitif (400 mal formée, 410 coupé ou fermé) l'abandonne. Le Passeport rendu porte
+// les points du défi `questionnaire`.
+let envoiQuestionnaire = null;
+function envoyerQuestionnaire() {
+  const tel = etat.questionnaire;
+  if (!JEU_URL || !tel.envoi || envoiQuestionnaire) return;
+  envoiQuestionnaire = (async () => {
+    try {
+      const rep = await fetch(urlAction(JEU_URL, 'questionnaire'), {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ appareil: ID_PASSEPORT, origine: location.hostname.slice(0, 80), reponses: tel.envoi }),
+      });
+      if (rep.status === 400 || rep.status === 410) { sauverQuestionnaire({ ...etat.questionnaire, envoi: null }, { rendu: etat.route.nom === 'avis' }); return; }
+      if (!rep.ok) throw new Error(`questionnaire : HTTP ${rep.status}`);
+      const corps = await rep.json();
+      if (corps && corps.passeport) modifierVisite({ ...etat.visite, jeu: Passeport.appliquerReponse(etat.visite.jeu, corps.passeport) });
+      sauverQuestionnaire({ ...etat.questionnaire, envoi: null });
+    } catch (e) { journal('questionnaire : envoi remis à plus tard', e); }
+    finally { envoiQuestionnaire = null; }
+  })();
+}
 
 // ---------------------------------------------------------------- scanner (grand-defi 10, ADR-0017)
 
@@ -589,6 +663,11 @@ document.addEventListener('input', (e) => {
     stockageVisite.sauver(etat.visite);
     return;
   }
+  // Un texte du questionnaire : gardé à chaque frappe, sans nouveau rendu, comme le carnet.
+  if (champ.startsWith('avis:')) {
+    sauverQuestionnaire({ ...etat.questionnaire, brouillon: Questionnaire.ecrire(etat.questionnaire.brouillon, champ.slice(5), e.target.value) }, { rendu: false });
+    return;
+  }
   etat.ui[champ] = e.target.value;
   clearTimeout(minuteurRecherche);
   minuteurRecherche = setTimeout(() => {
@@ -659,6 +738,7 @@ document.addEventListener('click', (e) => {
     case 'repondre-instant': repondreInstant(cible.dataset.defi, cible.dataset.choix); break;
     case 'rejouer': rejouer(); break;
     case 'copier-message': copierMessage(cible.dataset.code); break;
+    case 'avis-commencer': case 'avis-retour': case 'avis-choix': case 'avis-ligne': case 'avis-suivant': case 'avis-envoyer': gesteAvis(action, valeur, cible.dataset.ligne); break;
     default: break;
   }
 });
@@ -1036,7 +1116,7 @@ const rafraichisseurJeu = creerRafraichisseur({
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); envoyerStatsSiDu(); rendre({ conserver: true }); }
+  if (document.visibilityState === 'visible') { rafraichisseur.surVisibilite(); rafraichisseurJeu.surVisibilite(); envoiJeu.envoyer(); envoyerQuestionnaire(); envoyerStatsSiDu(); rendre({ conserver: true }); }
   else { envoyerStatsEnArrierePlan(); arreterScanner(); } // la caméra ne tourne pas dans une poche ; le retour la rouvre
 });
 
@@ -1164,6 +1244,7 @@ async function demarrer() {
   rafraichisseur.demarrer();
   if (JEU_URL) rafraichisseurJeu.demarrer();
   envoiJeu.envoyer();
+  envoyerQuestionnaire();
   envoyerStatsSiDu();
   verifierRappels();
   setInterval(verifierRappels, 30000);

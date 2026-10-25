@@ -14,6 +14,7 @@ import { afficherCode, urlRemise } from './gains.js';
 import { encoderQR, qrEnSvg } from './qr.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
+import { QUESTIONS, NOTES, SANS_AVIS, champsTexte, peutContinuer, etatQuestionnaire, etatTelephone, reglages as reglagesQuestionnaire } from './questionnaire.js';
 
 // ---------------------------------------------------------------- utilitaires
 
@@ -265,6 +266,7 @@ export function ecranAccueil(etat) {
     ${infos.entree ? `<p class="entree-libre">${icone('entrer', 15)}<span>${h(t('Entrée libre'))}</span></p>` : ''}
     ${sceauxEcoles()}
   </section>
+  ${tuileAvis(etat)}
   <nav class="grille-boutons" aria-label="${attr(t("Aller à l'essentiel"))}">
     ${bouton('#/plan', 'plan', t('Plan du festival'), { classe: 'principal', ton: 'explorer' })}
     ${carteGrandDefi(etat)}
@@ -553,7 +555,7 @@ function commentProuver(etat, d) {
   else if (d.type_preuve === 'scan-attribue') {
     const s = standAttribue(d, etat.appareil);
     texte = s ? t('QR de ton stand : %s, jusqu’à %s', nomDuStand(etat, s), heure(d.params.actif_a)) : t('Révélé en cours de matinée');
-  }
+  } else if (d.type_preuve === 'questionnaire') texte = t('Répondre au questionnaire de satisfaction');
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
 
@@ -605,6 +607,14 @@ function carnetDeLaFiche(etat, ex, secret) {
   </section>`;
 }
 
+// Le défi `questionnaire` dans Mes défis : « Répondre » quand il est ouvert, son heure avant.
+function lienAvisDuDefi(etat) {
+  const e = etatAvis(etat);
+  if (e === 'ouvert' && !telAvis(etat).fait) return ` <a href="#/avis">${h(t('Répondre'))}</a>`;
+  if (e === 'avant') return ` · ${h(t('à partir de %s', heure(reglagesQuestionnaire(etat.modele.infos).heure)))}`;
+  return '';
+}
+
 // « Mes défis » : chaque défi actif, comment il se prouve, son état.
 function ecranMesDefis(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
@@ -620,7 +630,7 @@ function ecranMesDefis(etat) {
       <span class="nom">${h(nomDefi(defi))}</span><span class="points">+${h(defi.points)}</span>${defi.consigne ? `<span class="consigne">${h(tt(defi.consigne))}</span>` : ''}
       <span class="comment">${h(commentProuver(etat, defi))}${defi.type_preuve === 'reponse' && !defi.params.qr && statut === 'a-faire'
         ? ` <a href="#/question/${attr(encodeURIComponent(defi.id))}">${h(t('Répondre'))}</a>` : ''}${defi.type_preuve === 'votes-evenement' && statut === 'a-faire'
-        ? ` <a href="#/vote/${attr(encodeURIComponent(defi.id))}">${h(t('Voter'))}</a>` : ''}${statut === 'manque' ? ` · ${h(heureManquee(defi))}` : ''}</span>
+        ? ` <a href="#/vote/${attr(encodeURIComponent(defi.id))}">${h(t('Voter'))}</a>` : ''}${defi.type_preuve === 'questionnaire' && statut === 'a-faire' ? lienAvisDuDefi(etat) : ''}${statut === 'manque' ? ` · ${h(heureManquee(defi))}` : ''}</span>
       <span class="etat ${attr(statut)}">${h(t(ETAT_DEFI[statut]))}</span>
     </li>`).join('')}</ul>
     <div class="boutons"><a class="bouton" href="#/scanner">${icone('qr', 19)}${h(t('Scan QR'))}</a></div>`;
@@ -696,6 +706,111 @@ function ecranInstant(etat) {
 
 // L'heure de l'écran (ms) : celle posée par app.js au rendu, sinon l'horloge.
 const maintenantMs = (etat) => (etat.maintenant && Number.isFinite(etat.maintenant.ms) ? etat.maintenant.ms : Date.now());
+
+// ---------------------------------------------------------------- questionnaire de satisfaction (ADR-0026)
+
+// Le questionnaire de l'APEL, au « vous » (le jeu, lui, tutoie). `etat.questionnaire` :
+// ce que garde le téléphone (questionnaire.etatTelephone) ; `etat.testeur` : il le voit
+// à toute heure. Une question par écran ; un choix unique ou une note passe tout seul à
+// la suivante (app.js), les autres ont « Suivant ».
+const telAvis = (etat) => etat.questionnaire || etatTelephone(null);
+export const etatAvis = (etat) => etatQuestionnaire(etat.modele.infos, maintenantMs(etat), { testeur: Boolean(etat.testeur) });
+// Le défi `questionnaire` du jeu servi, pour ses points ; null sans jeu ou sans ce défi.
+const defiAvis = (etat) => (etat.grandDefi && etat.grandDefi.actif ? etat.grandDefi.defis.find((d) => d.type_preuve === 'questionnaire') || null : null);
+
+// Un visage par note, du rouge (1) au vert (5) : des attributs SVG, aucun style en ligne (CSP).
+const TEINTES_NOTE = ['#E2476B', '#F08A4B', '#F2B739', '#7CC36B', '#1FA67A'];
+const BOUCHES = ['M8 17c1.2-2 2.6-2.6 4-2.6s2.8.6 4 2.6', 'M8.5 16.2c1-1 2.2-1.4 3.5-1.4s2.5.4 3.5 1.4', 'M8.5 15.5h7', 'M8.5 14.8c1 1 2.2 1.5 3.5 1.5s2.5-.5 3.5-1.5', 'M7.6 14c1.2 2 2.7 3 4.4 3s3.2-1 4.4-3'];
+export function visage(note) {
+  const i = note - 1;
+  return `<svg class="visage" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="${TEINTES_NOTE[i]}"/><circle cx="8.6" cy="10" r="1.3" fill="#1B1200"/><circle cx="15.4" cy="10" r="1.3" fill="#1B1200"/><path d="${BOUCHES[i]}" fill="none" stroke="#1B1200" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+}
+
+// La tuile de l'accueil, au-dessus de la grille, tant que le questionnaire est ouvert.
+function tuileAvis(etat) {
+  if (etatAvis(etat) !== 'ouvert') return '';
+  const tel = telAvis(etat);
+  if (tel.fait) return `<a class="avis-tuile faite" href="#/avis">${icone('avis', 24)}<span class="texte"><strong>${h(t('Merci pour votre avis'))}</strong><span>${h(t('Vous avez répondu au questionnaire.'))}</span></span></a>`;
+  const d = defiAvis(etat);
+  return `<a class="avis-tuile" href="#/avis">${icone('avis', 26)}<span class="texte"><strong>${h(t('Votre avis en 2 minutes'))}</strong><span>${h(t('Aidez-nous à préparer la prochaine édition. C’est anonyme.'))}</span>
+    <span class="pied"><span class="cta">${h(t(tel.etape >= 0 ? 'Reprendre' : 'Répondre'))}</span>${d ? `<span class="points">${h(t('+%s points au Grand Défi', d.points))}</span>` : ''}</span></span></a>`;
+}
+
+function ecranAvis(etat) {
+  const retour = { href: '#/', libelle: t('Accueil') };
+  const tel = telAvis(etat);
+  const ouvert = etatAvis(etat);
+  const d = defiAvis(etat);
+  const message = (texte) => `${entete(t('Votre avis'), '', retour)}
+    <p class="vide">${h(texte)}</p>
+    <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
+  if (tel.fait) {
+    return `${entete(t('Votre avis'), '', retour)}
+    <section class="avis avis-merci" aria-live="polite">
+      <div class="confettis" aria-hidden="true">${'<i></i>'.repeat(14)}</div>
+      <div class="coeur">${icone('avis', 40)}</div>
+      <h2>${h(t('Merci pour votre participation !'))}</h2>
+      ${d ? `<p class="gain">${h(t('+%s points au Grand Défi', d.points))}</p>` : ''}
+      <p>${h(t('Vos réponses permettront aux APEL Maurice Rondeau et Saint-Colomban et aux établissements de préparer une prochaine édition encore plus adaptée aux attentes des élèves et des familles.'))}</p>
+      ${tel.envoi ? `<p class="note">${h(t('Votre réponse partira dès que le réseau reviendra.'))}</p>` : ''}
+      <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>
+    </section>`;
+  }
+  if (ouvert === 'avant') return message(t('Le questionnaire ouvre le jour du festival, à %s.', heure(reglagesQuestionnaire(etat.modele.infos).heure)));
+  if (ouvert === 'ferme') return message(t('Le questionnaire est fermé. Merci à tous ceux qui ont répondu !'));
+  if (ouvert !== 'ouvert') return message(t('Le questionnaire n’est pas ouvert.'));
+  if (tel.etape < 0) {
+    return `${entete(t('Votre avis'), '', retour)}
+    <section class="avis avis-intro">
+      <h2>${h(t('Merci d’avoir participé au Festival de l’Orientation !'))}</h2>
+      <p>${h(t('Votre avis nous aidera à améliorer les prochaines éditions.'))}</p>
+      <p class="pastilles"><span>${h(tn('%s question', '%s questions', QUESTIONS.length))}</span><span>${h(t('2 minutes'))}</span><span>${h(t('Anonyme'))}</span>${d ? `<span class="points">${h(t('+%s points au Grand Défi', d.points))}</span>` : ''}</p>
+      <p class="note">${h(t('Aucun nom, aucun e-mail : personne ne sait qui a répondu quoi.'))}</p>
+      <div class="boutons"><button class="bouton" type="button" data-action="avis-commencer">${h(t(Object.keys(tel.brouillon).length ? 'Reprendre' : 'Commencer'))}</button></div>
+    </section>`;
+  }
+  const i = tel.etape;
+  const q = QUESTIONS[i];
+  const b = tel.brouillon;
+  const derniere = i === QUESTIONS.length - 1;
+  return `${entete(t('Votre avis'), '', retour)}
+    <section class="avis avis-question" aria-labelledby="avis-q">
+      <div class="avis-progres"><button class="lien" type="button" data-action="avis-retour">‹ ${h(t('Retour'))}</button>
+        <span class="piste" role="progressbar" aria-label="${attr(t('Question %s sur %s', i + 1, QUESTIONS.length))}" aria-valuemin="1" aria-valuemax="${QUESTIONS.length}" aria-valuenow="${i + 1}"><span data-part="${Math.round(((i + 1) / QUESTIONS.length) * 100)}"></span></span>
+        <span class="compte">${i + 1} / ${QUESTIONS.length}</span></div>
+      <h2 id="avis-q">${i + 1}. ${h(t(q.titre))}</h2>
+      <p class="aide">${h(t(q.aide))}</p>
+      ${zoneAvis(q, b)}
+      <div class="boutons"><button class="bouton" type="button" data-action="${derniere ? 'avis-envoyer' : 'avis-suivant'}"${peutContinuer(b, q) ? '' : ' disabled'}>${h(t(derniere ? 'Envoyer' : 'Suivant'))}</button></div>
+      <p class="note anonyme">${h(t('Anonyme : personne ne sait qui a répondu quoi.'))}</p>
+    </section>`;
+}
+
+// Les réponses d'une question, selon sa forme. Les textes s'écrivent dans le brouillon à
+// chaque frappe (data-champ « avis:<champ> », sans nouveau rendu).
+function zoneAvis(q, b) {
+  const presse = (oui) => `aria-pressed="${oui ? 'true' : 'false'}"`;
+  if (q.type === 'note') {
+    return `<div class="avis-visages" role="group" aria-labelledby="avis-q">${NOTES.map((n) => `<button type="button" data-action="avis-choix" data-valeur="${n}" ${presse(b[q.cle] === n)} aria-label="${attr(t('Note %s', n))}">${visage(n)}<b>${n}</b><small>${h(n === 1 ? t('Pas du tout') : n === 5 ? t('Très satisfait(e)') : '')}</small></button>`).join('')}</div>`;
+  }
+  if (q.type === 'grille') {
+    const notes = Array.isArray(b[q.cle]) ? b[q.cle] : [];
+    return `<div class="avis-grille">${q.lignes.map((l, li) => `<div class="ligne-note"><p id="avis-l${li}">${h(t(l))}</p>
+      <div class="notes" role="group" aria-labelledby="avis-l${li}">${NOTES.map((n) => `<button type="button" data-action="avis-ligne" data-ligne="${li}" data-valeur="${n}" ${presse(notes[li] === n)} aria-label="${attr(t('Note %s', n))}">${visage(n)}</button>`).join('')}<button type="button" class="sans-avis" data-action="avis-ligne" data-ligne="${li}" data-valeur="${SANS_AVIS}" ${presse(notes[li] === SANS_AVIS)}>${h(t('Sans avis'))}</button></div></div>`).join('')}</div>`;
+  }
+  if (q.type === 'texte') {
+    return `<textarea class="avis-texte" data-champ="avis:${attr(q.cle)}" rows="5" maxlength="${champsTexte(q)[0].longueur}" aria-labelledby="avis-q" placeholder="${attr(t('Votre suggestion'))}">${h(b[q.cle] || '')}</textarea>`;
+  }
+  const liste = q.type === 'plusieurs' ? (Array.isArray(b[q.cle]) ? b[q.cle] : []) : [b[q.cle]];
+  const plein = q.max && liste.length >= q.max;
+  const court = q.choix.every((c) => c.length <= 22);
+  const choix = q.choix.map((c, k) => {
+    const coche = liste.includes(k);
+    return `<button type="button" class="avis-option${k === q.seul ? ' seul' : ''}" data-action="avis-choix" data-valeur="${k}" ${presse(coche)}${plein && !coche ? ' disabled' : ''}>${h(t(c))}</button>`;
+  }).join('');
+  const champs = champsTexte(q).filter((c) => c.quand(liste)).map((c) => `<label class="avis-champ"><span>${h(t(c.libelle))}</span><input type="text" data-champ="avis:${attr(c.cle)}" maxlength="${c.longueur}" value="${attr(b[c.cle] || '')}" placeholder="${attr(t('Votre réponse'))}"></label>`).join('');
+  return `<div class="avis-choix${court ? ' deux' : ''}" role="group" aria-labelledby="avis-q">${choix}</div>${champs}`;
+}
 
 // Les deux votes autour d'un Événement (grand-defi 05, le défi 8, la table ronde) :
 // la question, puis une ligne par fenêtre (« avant », jusqu'à début + 15 min ;
@@ -1307,7 +1422,8 @@ export function ecranAide(etat) {
   <h2 class="titre-section">${h(t('Et aussi'))}</h2>
   <section class="carte">
     ${i.reglement_url ? blocLien('document', t('Règlement du festival'), t('Lire le règlement'), url(i.reglement_url)) : ''}
-    ${i.avis_url ? `<a class="aide-bloc" href="${url(i.avis_url)}" target="_blank" rel="noopener" data-action="avis">${icone('avis', 21)}<div><h3>${h(t('Donner mon avis'))}</h3><p>${h(t("Deux minutes, pour nous aider à faire mieux l'an prochain."))}</p></div>${icone('chevron', 18)}</a>`
+    ${etatAvis(etat) === 'ouvert' ? `<a class="aide-bloc" href="#/avis">${icone('avis', 21)}<div><h3>${h(t('Donner mon avis'))}</h3><p>${h(t("Deux minutes, pour nous aider à faire mieux l'an prochain."))}</p></div>${icone('chevron', 18)}</a>`
+      : i.avis_url ? `<a class="aide-bloc" href="${url(i.avis_url)}" target="_blank" rel="noopener" data-action="avis">${icone('avis', 21)}<div><h3>${h(t('Donner mon avis'))}</h3><p>${h(t("Deux minutes, pour nous aider à faire mieux l'an prochain."))}</p></div>${icone('chevron', 18)}</a>`
       : bloc('avis', t('Donner mon avis'), h(t('Le questionnaire de satisfaction sera disponible le jour du festival.')))}
     ${bloc('prive', t('Vie privée'), h(tt(i.vie_privee) || t("L'appli compte de façon anonyme les écrans consultés, pour préparer le festival de l'an prochain : aucun nom, aucun contact, aucune position. Ce que vous ajoutez à « Ma visite » reste sur votre téléphone.")))}
     <div class="aide-bloc">${icone('prive', 21)}<div><h3>${h(t('Statistiques anonymes'))}</h3>
@@ -1425,6 +1541,7 @@ export function ecran(etat) {
     case 'vote': return ecranVote(etat);
     case 'gagne': return ecranGagne(etat);
     case 'instant': return ecranInstant(etat);
+    case 'avis': return ecranAvis(etat);
     default: return `${entete(t('Page introuvable'))}<p class="vide">${h(t("Cette page n'existe pas."))}</p><div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;
   }
 }
@@ -1432,7 +1549,7 @@ export function ecran(etat) {
 export function titreDocument(etat) {
   poserLangue(etat);
   const nomFestival = tt(etat.modele.infos.nom || "Festival de l'Orientation");
-  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Comment ça marche'), gagne: t('Tu as gagné !'), instant: t('Instant gagnant') }[etat.route.nom];
+  const t2 = { accueil: '', programme: t('Le programme'), exposants: t('Les exposants'), plan: t('Plan'), visite: t('Ma visite'), preparer: t('Préparer ma visite'), questions: t('Mes questions'), aide: t("Besoin d'aide ?"), scanner: t('Scanner un QR'), rejouer: t('Rejouer depuis le début'), defis: t('Mes défis'), regle: t('Comment ça marche'), gagne: t('Tu as gagné !'), instant: t('Instant gagnant'), avis: t('Votre avis') }[etat.route.nom];
   if (etat.route.nom === 'question' || etat.route.nom === 'vote') {
     const d = etat.grandDefi && etat.grandDefi.defis.find((x) => x.id === etat.route.params.defi);
     return `${d ? nomDefi(d) : t('Grand Défi')} · ${nomFestival}`;

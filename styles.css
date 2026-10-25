@@ -16,6 +16,7 @@
   color-scheme: light;
 
   --framboise: #C90151;
+  --sur-framboise: #FFFFFF;   /* le texte posé sur un aplat framboise (la tuile du questionnaire) */
   --turquoise: #01A1A7;
   --ambre: #ED9800;
   --marine: #003473;
@@ -59,6 +60,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --framboise: #FF6E9F;
+  --sur-framboise: #2A0012;
   --turquoise: #35C6CC;
   --ambre: #FFB13D;
   --marine: #7FA6D4;
@@ -945,3 +947,88 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appe
 .reglement ul { padding-left: 1.2em; display: grid; gap: 6px; }
 .reglement .brouillon { padding: 10px 14px; border-left: 4px solid var(--ambre); background: var(--orange-pale); border-radius: 4px 4px 14px 4px; }
 .reglement .retour-appli { margin: 0; font-weight: 650; }
+
+/* ---------------------------------------------------------------- questionnaire de satisfaction (ADR-0026) */
+
+/* La tuile de l'accueil, au-dessus de la grille : framboise, la couleur de l'APEL sur l'affiche. */
+.avis-tuile {
+  /* 44 px au-dessus : les sceaux des deux écoles débordent de l'affiche de 35 px, ils ne couvrent pas la tuile. */
+  display: flex; align-items: center; gap: 12px; margin: 44px 0 0; padding: 14px 16px; min-height: 68px;
+  border-radius: 4px 4px 16px 4px; background: var(--framboise); color: var(--sur-framboise); text-decoration: none;
+}
+.avis-tuile svg { width: 26px; height: 26px; flex: none; }
+.avis-tuile .texte { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.avis-tuile strong { font-family: var(--display); font-weight: 800; font-size: 1.12rem; letter-spacing: -0.02em; }
+.avis-tuile .texte > span { font-size: 0.86rem; font-weight: 600; }
+.avis-tuile .pied { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.avis-tuile .cta { font-weight: 800; font-size: 0.82rem; padding: 6px 12px; border-radius: 999px; background: var(--sur-framboise); color: var(--framboise); }
+.avis-tuile .points, .avis .points, .avis-merci .gain { font-weight: 800; font-size: 0.8rem; padding: 5px 10px; border-radius: 999px; background: var(--ambre); color: var(--sur-ambre); }
+.avis-tuile.faite { background: var(--bleu-pale); color: var(--encre); min-height: 0; }
+.avis-tuile.faite svg { color: var(--bleu); }
+
+.avis { margin: 6px 0 24px; }
+.avis h2 { font-family: var(--display); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; font-size: 1.32rem; margin: 6px 0 8px; text-wrap: balance; }
+.avis .aide { margin: 0 0 14px; color: var(--encre-2); font-size: 0.88rem; }
+.avis .note { color: var(--encre-2); font-size: 0.82rem; }
+.avis .note.anonyme { text-align: center; margin: 10px 0 0; }
+.avis .boutons .bouton { flex: 1; }
+.avis .bouton:disabled { opacity: 0.4; cursor: default; }
+.avis-intro .pastilles { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.avis-intro .pastilles span:not(.points) { font-size: 0.8rem; font-weight: 700; padding: 5px 11px; border-radius: 999px; background: var(--carte); border: 1px solid var(--trait); }
+
+.avis-progres { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--encre-2); }
+.avis-progres .lien { background: none; border: 0; padding: 6px 0; color: var(--encre-2); font: inherit; font-weight: 650; cursor: pointer; }
+.avis-progres .piste { flex: 1; height: 6px; border-radius: 6px; background: var(--trait); overflow: hidden; }
+.avis-progres .piste span { display: block; height: 100%; background: var(--framboise); border-radius: 6px; transition: width 0.3s ease; }
+.avis-progres .compte { font-variant-numeric: tabular-nums; }
+
+.avis-choix { display: grid; gap: 8px; }
+.avis-choix.deux { grid-template-columns: 1fr 1fr; }
+.avis-option {
+  text-align: left; min-height: 48px; padding: 11px 13px; border-radius: 4px 4px 13px 4px; cursor: pointer;
+  border: 2px solid var(--trait); background: var(--carte); color: var(--encre); font: inherit; font-weight: 650; font-size: 0.95rem; line-height: 1.25;
+}
+.avis-option[aria-pressed="true"] { border-color: var(--framboise); background: var(--alerte-pale); }
+.avis-option.seul { border-style: dashed; }
+.avis-option:disabled { opacity: 0.4; cursor: default; }
+.avis-champ { display: grid; gap: 6px; margin-top: 10px; padding: 12px; border-radius: 4px 4px 13px 4px; background: var(--bleu-pale); }
+.avis-champ span { font-size: 0.86rem; font-weight: 700; }
+.avis-champ input, .avis-texte {
+  width: 100%; border-radius: 10px; border: 2px solid var(--trait); background: var(--carte); color: var(--encre); font: inherit; font-size: 1rem; padding: 10px 12px;
+}
+.avis-champ input { border-color: var(--framboise); }
+.avis-texte { min-height: 130px; resize: vertical; }
+
+.visage { width: 100%; height: 100%; display: block; }
+.avis-visages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.avis-visages button { display: grid; justify-items: center; gap: 2px; padding: 8px 0 6px; border: 2px solid transparent; border-radius: 14px; background: none; color: var(--encre); font: inherit; cursor: pointer; }
+.avis-visages button .visage { width: 48px; height: 48px; }
+.avis-visages button b { font-size: 0.9rem; }
+.avis-visages button small { min-height: 2.4em; font-size: 0.66rem; color: var(--encre-2); text-align: center; line-height: 1.15; }
+.avis-visages button[aria-pressed="true"], .avis-grille .notes button[aria-pressed="true"] { border-color: var(--framboise); background: var(--alerte-pale); }
+
+.avis-grille { display: grid; gap: 10px; }
+.avis-grille .ligne-note { padding: 10px; border-radius: 4px 4px 13px 4px; background: var(--carte); border: 1px solid var(--trait); }
+.avis-grille .ligne-note p { margin: 0 0 8px; font-weight: 700; font-size: 0.9rem; line-height: 1.25; }
+.avis-grille .notes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.avis-grille .notes button { width: 42px; height: 42px; padding: 3px; border-radius: 50%; border: 2px solid transparent; background: none; cursor: pointer; }
+.avis-grille .notes .sans-avis { width: auto; height: 34px; margin-left: auto; padding: 0 11px; border-radius: 999px; border: 1px solid var(--trait); color: var(--encre-2); font: inherit; font-size: 0.76rem; font-weight: 650; }
+.avis-grille .notes .sans-avis[aria-pressed="true"] { color: var(--encre); }
+
+.avis-merci { position: relative; overflow: hidden; text-align: center; padding: 18px 4px 4px; }
+.avis-merci .coeur { width: 84px; height: 84px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; background: var(--alerte-pale); color: var(--framboise); }
+.avis-merci .coeur svg { width: 40px; height: 40px; }
+.avis-merci h2 { font-size: 1.6rem; }
+.avis-merci .gain { display: inline-block; margin: 4px 0 12px; }
+.avis-merci > p:not(.gain) { max-width: 30rem; margin: 0 auto 10px; color: var(--encre-2); }
+.confettis { position: absolute; inset: 0; pointer-events: none; }
+.confettis i { position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px; background: var(--framboise); animation: confetti 1.9s ease-in forwards; }
+.confettis i:nth-child(4n+2) { background: var(--turquoise); }
+.confettis i:nth-child(4n+3) { background: var(--ambre); }
+.confettis i:nth-child(4n) { background: var(--marine); }
+.confettis i:nth-child(1) { left: 4%; } .confettis i:nth-child(2) { left: 11%; animation-delay: 0.2s; } .confettis i:nth-child(3) { left: 18%; animation-delay: 0.45s; }
+.confettis i:nth-child(4) { left: 25%; animation-delay: 0.1s; } .confettis i:nth-child(5) { left: 32%; animation-delay: 0.35s; } .confettis i:nth-child(6) { left: 39%; animation-delay: 0.55s; }
+.confettis i:nth-child(7) { left: 46%; animation-delay: 0.15s; } .confettis i:nth-child(8) { left: 53%; animation-delay: 0.4s; } .confettis i:nth-child(9) { left: 60%; animation-delay: 0.05s; }
+.confettis i:nth-child(10) { left: 67%; animation-delay: 0.3s; } .confettis i:nth-child(11) { left: 74%; animation-delay: 0.5s; } .confettis i:nth-child(12) { left: 81%; animation-delay: 0.25s; }
+.confettis i:nth-child(13) { left: 88%; animation-delay: 0.6s; } .confettis i:nth-child(14) { left: 95%; animation-delay: 0.12s; }
+@keyframes confetti { to { transform: translateY(520px) rotate(540deg); opacity: 0; } }
