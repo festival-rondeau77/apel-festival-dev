@@ -92,14 +92,19 @@ export function ecrire(brouillon, champ, texte) {
 
 // La question peut-elle être quittée par « Suivant » ? Les questions 1 à 8 exigent une
 // réponse ; la 9 et les champs de texte sont facultatifs.
+// La réponse `v` à une question à choix, à note ou en grille est-elle complète ? Une
+// seule règle pour le téléphone (Suivant) et le Worker (verifierReponses).
+function complete(q, v) {
+  if (q.type === 'un') return Number.isInteger(v) && v >= 0 && v < q.choix.length;
+  if (q.type === 'note') return NOTES.includes(v);
+  if (q.type === 'grille') return Array.isArray(v) && v.length === q.lignes.length && v.every((x) => x === SANS_AVIS || NOTES.includes(x));
+  return true;
+}
 export function peutContinuer(brouillon, q) {
   const v = brouillon[q.cle];
   if (q.facultatif) return true;
-  if (q.type === 'un') return Number.isInteger(v) && v >= 0 && v < q.choix.length;
-  if (q.type === 'note') return NOTES.includes(v);
   if (q.type === 'plusieurs') return liste(v).length > 0;
-  if (q.type === 'grille') return Array.isArray(v) && v.length === q.lignes.length && v.every((x) => x === SANS_AVIS || NOTES.includes(x));
-  return true;
+  return complete(q, v);
 }
 
 // Le numéro de la première question sans réponse (reprendre un brouillon), ou la dernière.
@@ -109,20 +114,31 @@ export function premiereARemplir(brouillon) {
 }
 
 // Ce que garde le téléphone (localStorage `festival.questionnaire`) : le brouillon,
-// l'écran où il en est (-1 : l'accueil du questionnaire), `fait` (il a répondu) et
-// `envoi`, la réponse qui attend la confirmation du Worker (null une fois confirmée).
+// l'écran où il en est (-1 : l'accueil du questionnaire), `fait` (il a répondu), `jour`
+// (la date de Paris de la réponse) et `envoi`, la réponse qui attend la confirmation du
+// Worker (null une fois confirmée).
 export const CLE_STOCKAGE = 'festival.questionnaire';
 export function etatTelephone(brut) {
   const b = brut && typeof brut === 'object' ? brut : {};
   const brouillon = b.brouillon && typeof b.brouillon === 'object' && !Array.isArray(b.brouillon) ? b.brouillon : {};
   const etape = Number.isInteger(b.etape) && b.etape >= -1 && b.etape < QUESTIONS.length ? b.etape : -1;
   const envoi = b.envoi && verifierReponses(b.envoi) === null ? b.envoi : null;
-  return { brouillon, etape, fait: b.fait === true, envoi };
+  const jour = typeof b.jour === 'string' && DATE.test(b.jour) ? b.jour : null;
+  return { brouillon, etape, fait: b.fait === true, jour, envoi };
 }
 
 // « Envoyer » : le brouillon devient la réponse qui part ; il n'est plus gardé.
-export function terminer(tel) {
-  return { brouillon: {}, etape: -1, fait: true, envoi: reponsesPropres(tel.brouillon) };
+export function terminer(tel, ms = Date.now()) {
+  return { brouillon: {}, etape: -1, fait: true, jour: jourAParis(ms), envoi: reponsesPropres(tel.brouillon) };
+}
+
+// Un testeur qui a répondu avant le festival répond de nouveau le jour venu : sa réponse
+// était d'essai, et la remise à zéro (jeu.sh reinitialiser) a effacé ses points et son
+// téléphone de la liste du Worker. Sinon `tel` tel quel.
+export function recommencerApresEssai(tel, infos, ms) {
+  const { date } = reglages(infos);
+  if (!tel.fait || !date || jourAParis(ms) < date || (tel.jour && tel.jour >= date)) return tel;
+  return etatTelephone(null);
 }
 
 // ---------------------------------------------------------------- ce qui part (téléphone → Worker)
@@ -147,9 +163,7 @@ export function verifierReponses(r) {
   if (inconnu) return `champ inconnu : ${inconnu}`;
   for (const q of QUESTIONS) {
     const v = r[q.cle];
-    if (q.type === 'un' && !numero(v, q.choix.length)) return `${q.cle} : un choix attendu`;
-    if (q.type === 'note' && !NOTES.includes(v)) return `${q.cle} : une note de 1 à 5 attendue`;
-    if (q.type === 'grille' && !(Array.isArray(v) && v.length === q.lignes.length && v.every((x) => x === SANS_AVIS || NOTES.includes(x)))) return `${q.cle} : une note par ligne attendue`;
+    if (!complete(q, v)) return { un: `${q.cle} : un choix attendu`, note: `${q.cle} : une note de 1 à 5 attendue`, grille: `${q.cle} : une note par ligne attendue` }[q.type];
     if (q.type === 'plusieurs') {
       if (!Array.isArray(v) || !v.length || !v.every((x) => numero(x, q.choix.length))) return `${q.cle} : des choix attendus`;
       if (new Set(v).size !== v.length) return `${q.cle} : choix en double`;
@@ -245,7 +259,14 @@ export function accueilAuWorker(infos, ms) {
   const r = reglages(infos);
   if (r.coupe) return { motif: 'questionnaire coupé' };
   if (r.fermeture !== null && ms >= r.fermeture + GRACE_APRES_FERMETURE) return { motif: 'questionnaire fermé' };
-  return { essai: r.ouverture === null || ms < r.ouverture, points: r.essaiDuJeu || (r.date !== null && jourAParis(ms) === r.date) };
+  return { essai: r.ouverture === null || ms < r.ouverture, points: pointsPossibles(infos, ms) };
+}
+
+// Les 10 points s'écrivent-ils à l'instant `ms` ? Le jour du festival, ou pendant l'essai
+// du jeu (`rejouer`). Le téléphone ne les promet qu'alors.
+export function pointsPossibles(infos, ms) {
+  const r = reglages(infos);
+  return r.essaiDuJeu || (r.date !== null && jourAParis(ms) === r.date);
 }
 
 // ---------------------------------------------------------------- les résultats (la page de l'APEL)

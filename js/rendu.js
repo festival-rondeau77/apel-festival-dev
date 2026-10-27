@@ -14,7 +14,7 @@ import { afficherCode, urlRemise } from './gains.js';
 import { encoderQR, qrEnSvg } from './qr.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
 import { ficheOuverte, ROUTES_EXPOSANT } from './routes.js';
-import { QUESTIONS, NOTES, SANS_AVIS, champsTexte, peutContinuer, etatQuestionnaire, etatTelephone, reglages as reglagesQuestionnaire } from './questionnaire.js';
+import { QUESTIONS, NOTES, SANS_AVIS, champsTexte, peutContinuer, etatQuestionnaire, etatTelephone, pointsPossibles, reglages as reglagesQuestionnaire } from './questionnaire.js';
 
 // ---------------------------------------------------------------- utilitaires
 
@@ -610,7 +610,7 @@ function carnetDeLaFiche(etat, ex, secret) {
 // Le défi `questionnaire` dans Mes défis : « Répondre » quand il est ouvert, son heure avant.
 function lienAvisDuDefi(etat) {
   const e = etatAvis(etat);
-  if (e === 'ouvert' && !telAvis(etat).fait) return ` <a href="#/avis">${h(t('Répondre'))}</a>`;
+  if (e === 'ouvert' && !telAvis(etat).fait && defiAvis(etat)) return ` <a href="#/avis">${h(t('Répondre'))}</a>`;
   if (e === 'avant') return ` · ${h(t('à partir de %s', heure(reglagesQuestionnaire(etat.modele.infos).heure)))}`;
   return '';
 }
@@ -718,8 +718,17 @@ const maintenantMs = (etat) => (etat.maintenant && Number.isFinite(etat.maintena
 // la suivante (app.js), les autres ont « Suivant ».
 const telAvis = (etat) => etat.questionnaire || etatTelephone(null);
 export const etatAvis = (etat) => etatQuestionnaire(etat.modele.infos, maintenantMs(etat), { testeur: Boolean(etat.testeur) });
-// Le défi `questionnaire` du jeu servi, pour ses points ; null sans jeu ou sans ce défi.
-const defiAvis = (etat) => (etat.grandDefi && etat.grandDefi.actif ? etat.grandDefi.defis.find((d) => d.type_preuve === 'questionnaire') || null : null);
+// Le défi `questionnaire` du jeu servi, pour ses points ; null sans jeu, sans ce défi, ou
+// quand le Worker ne les donnerait pas (hors du jour du festival, sauf essai du jeu).
+const defiDuJeu = (etat) => (etat.grandDefi && etat.grandDefi.actif ? etat.grandDefi.defis.find((d) => d.type_preuve === 'questionnaire') || null : null);
+const defiAvis = (etat) => (pointsPossibles(etat.modele.infos, maintenantMs(etat)) ? defiDuJeu(etat) : null);
+// Le merci : les points déjà reçus, ou à recevoir avec la réponse qui attend le réseau.
+function gainAvis(etat, tel) {
+  const d = defiDuJeu(etat);
+  const passeport = etat.visite && etat.visite.jeu && etat.visite.jeu.passeport;
+  if (d && passeport && (passeport.defis || []).includes(d.id)) return d;
+  return tel.envoi ? defiAvis(etat) : null;
+}
 
 // Un visage par note, du rouge (1) au vert (5) : des attributs SVG, aucun style en ligne (CSP).
 const TEINTES_NOTE = ['#E2476B', '#F08A4B', '#F2B739', '#7CC36B', '#1FA67A'];
@@ -743,7 +752,7 @@ function ecranAvis(etat) {
   const retour = { href: '#/', libelle: t('Accueil') };
   const tel = telAvis(etat);
   const ouvert = etatAvis(etat);
-  const d = defiAvis(etat);
+  const d = tel.fait ? gainAvis(etat, tel) : defiAvis(etat);
   const message = (texte) => `${entete(t('Votre avis'), '', retour)}
     <p class="vide">${h(texte)}</p>
     <div class="boutons"><a class="bouton" href="#/">${h(t("Retour à l'accueil"))}</a></div>`;

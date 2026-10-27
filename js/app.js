@@ -505,19 +505,22 @@ function gesteAvis(action, valeur, ligne) {
 
 // La réponse part au Worker et reste gardée jusqu'à sa réponse : un échec réseau la garde
 // pour le retour du réseau, du premier plan ou du prochain rafraîchissement ; un refus
-// définitif (400 mal formée, 410 coupé ou fermé) l'abandonne. Le Passeport rendu porte
+// définitif (400 mal formée, 410 coupé, fermé ou autre version, 413 trop lourde) l'abandonne. Le Passeport rendu porte
 // les points du défi `questionnaire`.
 let envoiQuestionnaire = null;
 function envoyerQuestionnaire() {
   const tel = etat.questionnaire;
+  // Une réponse d'essai d'avant le festival : le jour venu, le téléphone peut répondre de nouveau.
+  const neuf = etat.modele ? Questionnaire.recommencerApresEssai(tel, etat.modele.infos, Date.now()) : tel;
+  if (neuf !== tel) { sauverQuestionnaire(neuf, { rendu: false }); return; }
   if (!JEU_URL || !tel.envoi || envoiQuestionnaire) return;
   envoiQuestionnaire = (async () => {
     try {
       const rep = await fetch(urlAction(JEU_URL, 'questionnaire'), {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ appareil: ID_PASSEPORT, origine: location.hostname.slice(0, 80), reponses: tel.envoi }),
+        body: JSON.stringify({ appareil: ID_PASSEPORT, origine: location.hostname.slice(0, 80), version: Questionnaire.VERSION, reponses: tel.envoi }),
       });
-      if (rep.status === 400 || rep.status === 410) { sauverQuestionnaire({ ...etat.questionnaire, envoi: null }, { rendu: etat.route.nom === 'avis' }); return; }
+      if (rep.status === 400 || rep.status === 410 || rep.status === 413) { sauverQuestionnaire({ ...etat.questionnaire, envoi: null }, { rendu: etat.route.nom === 'avis' }); return; }
       if (!rep.ok) throw new Error(`questionnaire : HTTP ${rep.status}`);
       const corps = await rep.json();
       if (corps && corps.passeport) modifierVisite({ ...etat.visite, jeu: Passeport.appliquerReponse(etat.visite.jeu, corps.passeport) });
