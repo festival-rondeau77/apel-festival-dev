@@ -565,7 +565,10 @@ function commentProuver(etat, d) {
 // touchant un choix : il part par son numéro, jamais comme un texte.
 function defisDeLaFiche(etat, ex, secret) {
   if (!secret) return '';
-  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele), appareil: etat.appareil, maintenant: maintenantMs(etat) });
+  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele), appareil: etat.appareil, maintenant: maintenantMs(etat) })
+    // Le Groupe des anciens élèves n'a pas de Domaine : « Sors de ta zone de confort » ne s'y
+    // gagne jamais, inutile de l'afficher « Pas pour ce stand » (ADR-0028).
+    .filter(({ defi }) => !(ex.groupe && defi.type_preuve === 'hors-domaines'));
   if (!ici.length) return '';
   const action = (defi, choix = null) => `data-action="valider-defi" data-defi="${attr(defi.id)}" data-cle="${attr(ex.cle)}"${choix === null ? '' : ` data-choix="${choix}"`}`;
   return `<section class="defis-ici" aria-labelledby="defis-ici-titre">
