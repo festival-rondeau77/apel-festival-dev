@@ -4,7 +4,7 @@
 // le français comme clé et comme secours. La langue courante est posée depuis
 // `etat.langue` à l'entrée de chaque fonction publique, pour que le rendu reste
 // une fonction de l'état et rien d'autre.
-import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone } from './donnees.js';
+import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone, ficheDe } from './donnees.js';
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
@@ -444,8 +444,8 @@ function heureManquee(defi) {
 // 2e école, « Validé » laissait croire qu'on venait de le valider là.
 function etatDuDefi(etat, ex, statut, chez) {
   if (statut !== 'valide' || !chez || chez === ex.cle) return t(ETAT_DEFI[statut]);
-  const autre = etat.modele.exposants.find((e) => e.cle === chez);
-  return autre ? t('Déjà gagné chez %s', autre.nom) : t('Déjà gagné');
+  const autre = ficheDe(etat.modele, chez);
+  return autre ? t('Déjà gagné chez %s', t(autre.nom)) : t('Déjà gagné');
 }
 
 // Pourquoi un défi à faire n'est pas pour ce stand (le motif de defis.js, estimé
@@ -1082,6 +1082,8 @@ const POUR_TYPE = { 'École': 'Pour une école', 'Pro': 'Pour un pro', 'Entrepri
 export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
   const { modele } = etat;
   const ex = modele.exposants.find((e) => e.cle === cle);
+  const groupe = ex ? null : ficheDe(modele, cle);
+  if (groupe) return ecranGroupe(etat, groupe, { qr, secret });
   if (!ex) return `${entete(t('Exposant introuvable'), '', retourDepuis(etat.route.params.de, { href: '#/exposants', libelle: t('Les exposants') }))}
     <p class="vide">${h(t("Cet exposant n'est pas (ou plus) dans la liste, ou le lien est incomplet."))}</p>
     <div class="boutons"><a class="bouton" href="#/exposants">${h(t('Voir les exposants'))}</a></div>`;
@@ -1122,6 +1124,24 @@ export function ecranExposant(etat, cle, { qr = false, secret = '' } = {}) {
       ${ex.site ? `<a class="bouton secondaire" href="${url(ex.site)}" target="_blank" rel="noopener" data-action="site" data-cle="${attr(ex.cle)}">${icone('externe', 19)}${h(ex.site.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, ''))}</a>` : ''}
     </div>
     ${evenements.length ? `<h2 class="titre-section">${h(t('Intervient aussi'))}</h2><ul class="liste carte">${evenements.map((e) => ligneEvenement(etat, e)).join('')}</ul>` : ''}
+  </article>`;
+}
+
+// La fiche qu'ouvre la Carte unique des anciens élèves (un Groupe, donnees.js) : les défis
+// qu'elle prouve (« Paroles d'ancien »), la salle, puis chacun d'eux, vers sa fiche. Ni
+// « Ajouter à ma visite » ni carnet : ce n'est pas un stand qu'on note, c'est une salle.
+function ecranGroupe(etat, g, { qr, secret }) {
+  const membres = g.membres.map((c) => etat.modele.exposants.find((e) => e.cle === c)).filter(Boolean);
+  const salleObj = salleParNom(etat.modele, g.salle);
+  return `<article class="fiche">
+    ${qr ? `<p class="qr-entete">${icone('qr', 22)}<span>${h(t('Tu viens de scanner le QR code des anciens élèves'))}${g.salle ? `, ${h(g.salle)}` : ''}</span></p>` : ''}
+    ${entete(t(g.nom), '', retourDepuis(etat.route.params.de, { href: `#/exposants?onglet=${encodeURIComponent(g.type)}`, libelle: plurielType(g.type) }))}
+    ${defisDeLaFiche(etat, g, secret)}
+    ${rescanner(etat, secret)}
+    <p class="description">${h(t('Ils sont tous ici : demande-leur comment ils ont choisi leur voie après le bac.'))}</p>
+    <dl><dt>${h(t('Salle'))}</dt><dd>${salleHtml(g.salle, g.salleAVenir)}${salleObj ? `, ${h(t(salleObj.etage).toLowerCase())}` : ''}</dd></dl>
+    ${g.salle && !g.salleAVenir ? `<div class="boutons"><a class="bouton secondaire" href="${lienPlanSalle(g.salle)}">${icone('plan', 19)}${h(t('Voir sur le plan'))}</a></div>` : ''}
+    ${membres.length ? `<h2 class="titre-section">${h(plurielType(g.type))}</h2><ul class="liste carte">${membres.map((e) => ligneExposant(etat, e, { sansSalle: true })).join('')}</ul>` : ''}
   </article>`;
 }
 
@@ -1569,6 +1589,6 @@ export function titreDocument(etat) {
   if (etat.route.nom === 'evenement') { const e = etat.modele.evenements.find((x) => x.cle === etat.route.params.cle); return `${e ? tt(e.titre) : t('Événement')} · ${nomFestival}`; }
   const fiche = ficheOuverte(etat.route, etat.modele);
   if (fiche && !fiche.cle && etat.route.nom !== 'exposant') return `${t('Carte pas encore attribuée')} · ${nomFestival}`;
-  if (fiche) { const e = etat.modele.exposants.find((x) => x.cle === fiche.cle); return `${e ? e.nom : t('Exposant')} · ${nomFestival}`; }
+  if (fiche) { const e = ficheDe(etat.modele, fiche.cle); return `${e ? t(e.nom) : t('Exposant')} · ${nomFestival}`; }
   return t2 ? `${t2} · ${nomFestival}` : nomFestival;
 }

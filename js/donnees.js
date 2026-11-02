@@ -321,6 +321,9 @@ export function etagesDeZone(zone) {
 
 // ---------------------------------------------------------------- Cartes du jeu (grand-defi 11, ADR-0018)
 
+// La clé du Groupe des anciens élèves, celle qu'enregistre un scan de sa Carte.
+export const GROUPE_ANCIENS = 'ancien-eleve:anciens-eleves';
+
 // L'étiquette d'une Carte : `5-07` = lot du village 5, carte 7 ; `0-xx` = neutre.
 // Tapée à la main dans le tableur (« 5-7 », « 5–07 ») : on la remet en forme,
 // '' si ce n'en est pas une.
@@ -347,13 +350,19 @@ function carteDe(brut, { village, dejaPrises, avertissements, ou }) {
 // L'Exposant auquel une Carte est attribuée, ou null (carte pas encore attribuée).
 export function exposantDeCarte(modele, etiquette) {
   const e = etiquetteCanonique(etiquette);
-  return (e && modele.exposants.find((x) => x.carte === e)) || null;
+  return (e && [...modele.exposants, ...(modele.groupes || [])].find((x) => x.carte === e)) || null;
+}
+
+// La fiche d'une clé : un Exposant, ou un Groupe (la Carte « anciens élèves »), ou null.
+export function ficheDe(modele, cle) {
+  return modele.exposants.find((e) => e.cle === cle) || (modele.groupes || []).find((g) => g.cle === cle) || null;
 }
 
 // Étiquette → clé de l'Exposant, depuis les tables du programme : ce que le
 // Worker lit pour savoir quel Stand une Carte prouve.
 export function attributionDesCartes(tables) {
-  return new Map(construireModele(tables).exposants.filter((e) => e.carte).map((e) => [e.carte, e.cle]));
+  const { exposants, groupes } = construireModele(tables);
+  return new Map([...exposants, ...groupes].filter((e) => e.carte).map((e) => [e.carte, e.cle]));
 }
 
 // L'identifiant d'une ligne de Gestion (colonne `id`, ADR-0023) : lettres, chiffres,
@@ -454,6 +463,25 @@ export function construireModele(tables) {
   }
   const exposantsParNom = new Map(exposants.map((e) => [normaliser(e.nom), e]));
 
+  // La Carte des anciens élèves (décision de l'utilisateur, 2026-11-02) : ils sont tous à
+  // la cantine, une seule Carte y est posée, `Infos.carte_anciens_eleves` (`0-01`). Elle
+  // désigne un Groupe, pas un Exposant : sa clé est du type ancien élève (le défi « Paroles
+  // d'ancien » la reconnaît), il n'a aucun Domaine (il ne compte pas pour « Sors de ta zone
+  // de confort »), et il n'entre ni dans les listes, ni dans la recherche, ni dans Ma visite.
+  // Sans anciens élèves au programme, ou sans la clé, pas de Groupe.
+  const groupes = [];
+  const anciens = exposants.filter((e) => e.type === 'Ancien élève');
+  const carteAnciens = carteDe(infos.carte_anciens_eleves, { village: '', dejaPrises: cartesPrises, avertissements, ou: 'Infos carte_anciens_eleves' });
+  if (carteAnciens && anciens.length) {
+    const parSalle = new Map();
+    for (const a of anciens) if (a.salle) parSalle.set(a.salle, (parSalle.get(a.salle) || 0) + 1);
+    const salle = [...parSalle].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    groupes.push({
+      cle: GROUPE_ANCIENS, type: 'Ancien élève', typeSlug: slugType('Ancien élève'), nom: 'Anciens élèves', carte: carteAnciens, groupe: true,
+      membres: anciens.map((a) => a.cle), domaines: [], salle, salleAVenir: salle === '', zone: zoneDeSalle(salle),
+    });
+  }
+
   const evenements = [];
   for (const ev of evenementsBruts) {
     const titre = texte(ev.titre);
@@ -495,7 +523,7 @@ export function construireModele(tables) {
     .sort((a, b) => TYPES_EXPOSANT.indexOf(a.typeExposant) - TYPES_EXPOSANT.indexOf(b.typeExposant) || a.ordre - b.ordre)
     .map((q) => ({ ...q, cle: `${slugType(q.typeExposant)}:${q.ordre}` }));
 
-  return { exposants, evenements, salles, zones, questions, infos, avertissements };
+  return { exposants, groupes, evenements, salles, zones, questions, infos, avertissements };
 }
 
 // ---------------------------------------------------------------- diff et version
