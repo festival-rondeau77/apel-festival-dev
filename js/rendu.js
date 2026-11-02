@@ -723,7 +723,7 @@ const maintenantMs = (etat) => (etat.maintenant && Number.isFinite(etat.maintena
 // à toute heure. Une question par écran ; un choix unique ou une note passe tout seul à
 // la suivante (app.js), les autres ont « Suivant ».
 const telAvis = (etat) => etat.questionnaire || etatTelephone(null);
-export const etatAvis = (etat) => etatQuestionnaire(etat.modele.infos, maintenantMs(etat), { testeur: Boolean(etat.testeur) });
+export const etatAvis = (etat) => etatQuestionnaire(etat.modele.infos, maintenantMs(etat), { testeur: Boolean(etat.testeur), local: Boolean(etat.local) });
 // Le défi `questionnaire` du jeu servi, pour ses points ; null sans jeu, sans ce défi, ou
 // quand le Worker ne les donnerait pas (hors du jour du festival, sauf essai du jeu).
 const defiDuJeu = (etat) => (etat.grandDefi && etat.grandDefi.actif ? etat.grandDefi.defis.find((d) => d.type_preuve === 'questionnaire') || null : null);

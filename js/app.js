@@ -52,10 +52,10 @@ const stockageVisite = Visite.creerStockageVisite(stockage);
 etat.visite = stockageVisite.charger();
 
 // Le questionnaire de satisfaction (ADR-0026) : le brouillon, l'écran, la réponse qui attend
-// le Worker. Un testeur (la marque du rideau, `?testeurs`) ou la machine de développement le
-// voit à toute heure.
+// le Worker. La machine de développement le voit à toute heure ; un testeur (la marque du
+// rideau, `?testeurs`), pendant l'essai du jeu seulement (questionnaire.etatQuestionnaire).
+etat.local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 etat.testeur = (() => {
-  if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return true;
   try { return stockage.getItem('festival.testeur') === '1'; } catch { return false; }
 })();
 try { etat.questionnaire = Questionnaire.etatTelephone(JSON.parse(stockage.getItem(Questionnaire.CLE_STOCKAGE) || 'null')); } catch { etat.questionnaire = Questionnaire.etatTelephone(null); }

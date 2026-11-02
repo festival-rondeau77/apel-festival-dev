@@ -241,12 +241,15 @@ export function reglages(infos) {
   return { coupe, heure, jours, date, ouverture: date ? msAParis(date, heure) : null, fermeture: date ? msAParis(plusJours(date, jours + 1), 0) : null, essaiDuJeu: rejouerDemande(i.rejouer) };
 }
 
-// L'état vu du téléphone : 'coupe' | 'avant' | 'ouvert' | 'ferme'. Un testeur le voit
-// ouvert à toute heure (sauf coupé).
-export function etatQuestionnaire(infos, ms, { testeur = false } = {}) {
+// L'état vu du téléphone : 'coupe' | 'avant' | 'ouvert' | 'ferme'. La machine de
+// développement (`local`) le voit ouvert à toute heure (sauf coupé) ; un téléphone testeur
+// aussi, mais seulement pendant l'essai du jeu (`Infos.rejouer`) : l'essai fini, il redevient
+// un visiteur (le 2026-11-02, un testeur voyait encore « Merci pour votre avis » après
+// l'ouverture au public).
+export function etatQuestionnaire(infos, ms, { testeur = false, local = false } = {}) {
   const r = reglages(infos);
   if (r.coupe) return 'coupe';
-  if (testeur) return 'ouvert';
+  if (local || (testeur && r.essaiDuJeu)) return 'ouvert';
   if (r.ouverture === null) return 'avant';
   if (ms < r.ouverture) return 'avant';
   return ms < r.fermeture ? 'ouvert' : 'ferme';
