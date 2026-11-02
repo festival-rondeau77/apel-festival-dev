@@ -545,7 +545,10 @@ const domainesDans = (modele) => (cle) => { const e = modele.exposants.find((x) 
 const QR_DU_TYPE = { ecole: 'QR d’une école', pro: 'QR d’un pro', entreprise: 'QR d’une entreprise', 'ancien-eleve': 'QR d’un ancien élève' };
 function commentProuver(etat, d) {
   let texte = '';
-  if (d.type_preuve === 'scan-exposant') texte = t(QR_DU_TYPE[d.params.type_exposant] || 'Scanner un QR');
+  // La Carte unique des anciens élèves (ADR-0028) : un seul QR, dans leur salle commune.
+  const groupe = (etat.modele.groupes || []).find((g) => g.typeSlug === d.params.type_exposant);
+  if (d.type_preuve === 'scan-exposant' && groupe) texte = t('QR des anciens élèves, %s', groupe.salle || t('Anciens élèves'));
+  else if (d.type_preuve === 'scan-exposant') texte = t(QR_DU_TYPE[d.params.type_exposant] || 'Scanner un QR');
   else if (d.type_preuve === 'scan-stand') {
     const e = etat.modele.exposants.find((x) => standCorrespond(d.params.stand, x.cle));
     texte = t('QR du stand %s', e ? e.nom : d.params.nom_stand);
