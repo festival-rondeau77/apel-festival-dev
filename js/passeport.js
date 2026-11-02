@@ -366,6 +366,20 @@ export function creerEnvoi({ envoyer, obtenir, modifier, planifier = setTimeout,
 // classeur servi le permet (`Infos.rejouer` = oui). Dans Gestion pendant l'essai,
 // vidé avant J−7 (le Push le refuse ensuite). La même lecture que le Push
 // (`rejouerDemande`, ticket appsheet 02).
+// La remise à zéro du jeu (`bin/jeu.sh reinitialiser`) vide le Worker, pas les téléphones :
+// celui d'un testeur gardait ses points et ses Chances d'essai. `Infos.remise_jeu` (ISO avec
+// son décalage, `2026-11-02T21:10:00+01:00`) dit quand elle a eu lieu ; un téléphone qui garde
+// une validation plus ancienne oublie tout son jeu, comme « Rejouer » (Ma visite reste). Un
+// Visiteur arrivé après n'a rien d'aussi vieux : rien ne change pour lui.
+export function remiseDuJeu(infos) {
+  const ms = Date.parse(String((infos && infos.remise_jeu) || '').trim());
+  return Number.isFinite(ms) ? ms : null;
+}
+export function oublierAvantRemise(jeu, remise) {
+  if (!jeu || remise === null || !(jeu.validations || []).some((v) => Number(v.t) < remise)) return jeu;
+  return etatJeuInitial();
+}
+
 export function rejouerOuvert(infos) {
   return Boolean(infos) && rejouerDemande(infos.rejouer);
 }

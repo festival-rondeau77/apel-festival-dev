@@ -1063,6 +1063,8 @@ function installerTables(tables, version, source, { heure = Date.now(), silencie
   etat.source = source;
   etat.derniereMaj = heure;
   etat.modele = construireModele(tables);
+  const jeuGarde = Passeport.oublierAvantRemise(etat.visite.jeu, Passeport.remiseDuJeu(etat.modele.infos));
+  if (jeuGarde !== etat.visite.jeu) { etat.visite = { ...etat.visite, jeu: jeuGarde }; stockageVisite.sauver(etat.visite); }
   definirTraductions(dictionnaireDepuis(tables));
   for (const a of etat.modele.avertissements) console.warn('[festival] donnée à vérifier dans le tableur :', a);
   afficherBandeau(etat.modele.infos.bandeau || ''); // le bandeau vit dans Infos : valable pour toute source, pas seulement l'état du script
