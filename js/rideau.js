@@ -10,10 +10,11 @@
 // (#/carte/…, #/programme) — le scan d'une Carte ouvre une vue web sans localStorage partagé.
 // Après l'heure, teaser.html renvoie à l'appli.
 (function (fenetre) {
-  // Samedi 7 novembre 2026 à 9 h, heure de Paris (+01:00 : heure d'hiver depuis le 25 octobre).
-  // Décision de l'utilisateur du 2026-10-14. Une valeur ISO avec son décalage : le téléphone
-  // d'un testeur réglé ailleurs bascule au même instant.
-  var OUVERTURE = '2026-11-07T09:00:00+01:00';
+  // Lundi 2 novembre 2026 à 21 h, heure de Paris (+01:00 : heure d'hiver depuis le 25 octobre) :
+  // l'utilisateur a avancé l'ouverture ce soir-là (« on ouvre maintenant et pas le 7 »), le samedi
+  // 7 novembre à 9 h (décision du 2026-10-14) n'est plus. Une valeur ISO avec son décalage : le
+  // téléphone d'un testeur réglé ailleurs bascule au même instant.
+  var OUVERTURE = '2026-11-02T21:00:00+01:00';
   var CLE_TESTEUR = 'festival.testeur';
   var LOCAL = ['localhost', '127.0.0.1', '[::1]'];
 
