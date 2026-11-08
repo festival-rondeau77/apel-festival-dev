@@ -270,6 +270,16 @@ function empreinte32(s) {
   return h >>> 0;
 }
 
+// Les Types dont un scan peut avoir une heure limite (`actif_a`, lu dans `params.jusqua`).
+const AVEC_HEURE_LIMITE = ['scan-exposant', 'scan-stand', 'hors-domaines'];
+
+// L'heure limite d'un défi par scan est-elle passée à l'instant `ms` ? Bornes comprises,
+// à la seconde, à l'heure de Paris, comme le mystère. Sans heure limite : jamais.
+export function heureLimitePassee(defi, ms) {
+  const j = defi && defi.params && defi.params.jusqua;
+  return Number.isInteger(j) && Number.isFinite(ms) && Math.floor(minutesAParis(ms) * 60) / 60 > j;
+}
+
 // Où en est l'annonce d'un défi (Type à `annonce`) à l'instant `ms` : 'a-venir' (pas
 // d'heure d'annonce, ou pas encore), 'ouverte' (jusqu'à `actif_a` compris, à la
 // seconde), 'close'. À l'heure de Paris, sans la date (ADR-0020).
@@ -466,6 +476,15 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
     if (type.sansPoints && points !== 0) { ecarter(`un instant gagnant ne rapporte pas de points : 0 ou vide, et non ${points}`); continue; }
     const { params, motif } = type.lireParams(l);
     if (motif) { ecarter(motif); continue; }
+    // L'heure limite d'un défi par scan (`actif_a`) : « Paroles d'ancien » ne se gagne
+    // plus quand les anciens élèves sont partis (11:30). Vide : toute la matinée. Le
+    // mystère et les instants gagnants lisent `actif_a` eux-mêmes (leur annonce).
+    if (!type.annonce && !(!Array.isArray(l.actif_a) && texte(l.actif_a) === '')) {
+      if (!AVEC_HEURE_LIMITE.includes(normaliser(l.type_preuve))) { ecarter('actif_a : une heure limite seulement pour un défi par scan'); continue; }
+      const jusqua = lireHeure(l.actif_a);
+      if (jusqua === null) { ecarter(`actif_a illisible : « ${texte(l.actif_a)} » (l’heure limite, 11:30 ; vide = toute la matinée)`); continue; }
+      params.jusqua = jusqua;
+    }
     const different = texte(l.different_de);
     if (different) {
       if (different === id) { ecarter('different_de : le défi lui-même'); continue; }
@@ -568,6 +587,7 @@ export function proposable(defi, exposant) {
 // lié, domaine déjà croisé… Le téléphone l'estime, le Worker le juge.
 export function motifIci(defi, contexte) {
   const ctx = { scans: [], ...contexte };
+  if (heureLimitePassee(defi, ctx.heure)) return 'heure limite passée';
   return motifDifferentDe(defi, ctx) || TYPES_PREUVE[defi.type_preuve].motif(defi, ctx);
 }
 

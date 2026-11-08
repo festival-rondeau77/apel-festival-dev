@@ -438,7 +438,7 @@ const ETAT_DEFI = { valide: 'Validé', attente: 'En attente', refuse: 'Refusé',
 // dans sa ligne de Mes défis. « Refusé » accuserait ; le Visiteur est juste arrivé tard.
 function heureManquee(defi) {
   if (defi.type_preuve === 'votes-evenement') return t('le vote « avant » fermait à %s', heure(fenetresDe(defi).avantJusqua));
-  return t('l’heure limite était %s', heure(defi.params.actif_a));
+  return t('l’heure limite était %s', heure(Number.isInteger(defi.params.jusqua) ? defi.params.jusqua : defi.params.actif_a));
 }
 // « Validé » ici ; gagné sur un autre stand, on dit lequel : sur la fiche d'une
 // 2e école, « Validé » laissait croire qu'on venait de le valider là.
@@ -559,6 +559,7 @@ function commentProuver(etat, d) {
     const s = standAttribue(d, etat.appareil);
     texte = s ? t('QR de ton stand : %s, jusqu’à %s', nomDuStand(etat, s), heure(d.params.actif_a)) : t('Révélé en cours de matinée');
   } else if (d.type_preuve === 'questionnaire') texte = t('Répondre au questionnaire de satisfaction');
+  if (Number.isInteger(d.params.jusqua)) texte = `${texte}, ${t('jusqu’à %s', heure(d.params.jusqua))}`;
   return d.params.different_de ? `${texte}, ${t('pas le même que pour le défi %s', d.params.different_de)}` : texte;
 }
 

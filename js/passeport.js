@@ -13,7 +13,7 @@
 // statut : attente | ok | deja | refus | vote (un vote compté, sans point encore).
 import { lireGain, afficherCode } from './gains.js';
 import { rejouerDemande } from './donnees.js';
-import { proposable, motifIci, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, avecPoints, MOMENTS_VOTE, DELAI_TIRAGE_INSTANT, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
+import { proposable, motifIci, heureLimitePassee, chancesDe, momentDuVote, fenetresDe, minutesAParis, phaseAnnonce, standAttribue, parAnnonce, avecPoints, MOMENTS_VOTE, DELAI_TIRAGE_INSTANT, OBJECTIF_PAR_DEFAUT, CHANCES_BADGE_PAR_DEFAUT } from './defis.js';
 
 const STATUTS = ['attente', 'ok', 'deja', 'refus', 'vote'];
 // Ce que le Worker ajoute à une validation traitée (son 3e élément).
@@ -127,7 +127,11 @@ function statutDuDefi(defi, etat, maintenant = null) {
     if (defi.params.a_venir) return 'a-venir';
     return maintenant !== null && phaseAnnonce(defi, maintenant) === 'close' ? 'manque' : 'a-faire';
   }
-  if (defi.type_preuve !== 'votes-evenement') return statutDefi(etat, defi.id, essaisDe(defi));
+  if (defi.type_preuve !== 'votes-evenement') {
+    // Un défi par scan à heure limite (`actif_a`), passée sans scan : manqué.
+    const s = statutDefi(etat, defi.id, essaisDe(defi));
+    return s === 'a-faire' && maintenant !== null && heureLimitePassee(defi, maintenant) ? 'manque' : s;
+  }
   const { statut } = etatDesVotes(defi, etat, maintenant);
   return { valide: 'valide', attente: 'attente', ferme: 'manque' }[statut] || 'a-faire';
 }
