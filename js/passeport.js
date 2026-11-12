@@ -287,7 +287,8 @@ export function jauge(jeu, etat) {
 }
 
 // Un gain encore à remettre à `maintenant` (ms) : ni remis, ni un Lot flash dont le délai
-// est passé (grand-defi 08 : un remplaçant est tiré). Sans `maintenant`, seul `remis` compte.
+// est passé (grand-defi 08 : un remplaçant est tiré, ou, sans délai, le lot est perdu : ADR-0030).
+// Sans `maintenant`, seul `remis` compte.
 export const gainEnCours = (g, maintenant = null) => !g.remis && !(maintenant !== null && Number.isFinite(g.echeance) && maintenant > g.echeance);
 
 // Faut-il demander ses gains au Worker (`?action=gain`, grand-defi 07) ? Quand l'état

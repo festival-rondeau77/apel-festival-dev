@@ -460,6 +460,7 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
   if (motifDelai) jeu.invalides.push({ id: 'delai_lot_flash', motif: motifDelai });
   if (motifMax) jeu.invalides.push({ id: 'lots_flash_max', motif: motifMax });
   if (heureLue === null && texte(infos.heure_tirage)) jeu.invalides.push({ id: 'heure_tirage', motif: `heure_tirage illisible : « ${texte(infos.heure_tirage)} » (13 h, 13:00)` });
+  if (heureFin === null && texte(infos.heure_fin)) jeu.invalides.push({ id: 'heure_fin', motif: `heure_fin illisible : « ${texte(infos.heure_fin)} » (13:30, 13 h 30) : elle borne le retrait des Lots flash` });
   const entetes = Array.isArray(tableDefis) && Array.isArray(tableDefis[0]) ? tableDefis[0].map((e) => normaliser(e).replace(/-/g, '_')) : [];
   // gviz rend la PREMIÈRE feuille quand l'onglet demandé n'existe pas : sans ces
   // en-têtes, ce n'est pas l'onglet Défis, et il n'y a pas de jeu.

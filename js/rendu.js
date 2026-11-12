@@ -512,9 +512,10 @@ function ecranGagne(etat) {
   const maintenant = maintenantMs(etat);
   const lot = (g) => {
     if (g.remis) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ok">${h(t('Lot remis · %s', heure(Math.floor(minutesAParis(g.remis)))))}</p></section>`;
-    // Un Lot flash (grand-defi 08) : venir tout de suite, avant l'échéance ; passé ce délai,
-    // un autre gagnant est tiré. Pas de mail : il se retire sur place.
-    if (g.sorte === 'flash' && !gainEnCours(g, maintenant)) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ferme">${h(t('Délai dépassé : le lot est remis en jeu.'))}</p></section>`;
+    // Un Lot flash (grand-defi 08) : venir avant l'échéance ; ensuite il ne se retire plus (un
+    // autre gagnant est tiré, ou, sans délai, il est perdu : ADR-0030). Pas de mail : il se
+    // retire sur place.
+    if (g.sorte === 'flash' && !gainEnCours(g, maintenant)) return `<section class="gagne remis"><p class="lot">${h(nomDuLot(g))}</p><p class="verdict ferme">${h(t('Délai dépassé : ce lot ne peut plus être retiré.'))}</p></section>`;
     const mail = messageAbsent(g, { email: i.contact_email, festival: i.nom || undefined });
     const minutes = Number.isFinite(g.echeance) ? Math.max(1, Math.ceil((g.echeance - maintenant) / 60_000)) : null;
     const delai = g.sorte !== 'flash' ? ''
