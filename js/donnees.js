@@ -163,6 +163,12 @@ export function cleExposant(type, nom) {
   return `${slugType(type)}:${normaliser(nom)}`;
 }
 
+// L'établissement d'un Exposant, pour `different_de` : deux fiches de même type et de
+// même nom (une école avec une salle dans deux villages) sont un seul établissement.
+export function etablissementsDe(exposants) {
+  return new Map(exposants.map((e) => [e.cle, `${e.typeSlug}:${normaliser(e.nom)}`]));
+}
+
 export function cleEvenement(titre, debut) {
   return `${normaliser(titre)}@${debut === null || debut === undefined ? '' : debut}`;
 }

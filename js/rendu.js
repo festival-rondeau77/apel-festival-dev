@@ -4,7 +4,7 @@
 // le français comme clé et comme secours. La langue courante est posée depuis
 // `etat.langue` à l'entrée de chaque fonction publique, pour que le rendu reste
 // une fonction de l'état et rien d'autre.
-import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone, ficheDe } from './donnees.js';
+import { VILLAGES, DOMAINES, TYPES_EXPOSANT, FORMATS, NIVEAUX, heureEnMinutes, contient, normaliser, publicInclut, etagesDeZone, ficheDe, etablissementsDe } from './donnees.js';
 import { contient as visiteContient, matinee, suggestions, questionsPour, texteAlerte, alertesNonVues, compte, finDe, noteDuCarnet } from './visite.js';
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
@@ -539,6 +539,7 @@ function ecranGagne(etat) {
 }
 
 const domainesDans = (modele) => (cle) => { const e = modele.exposants.find((x) => x.cle === cle); return e ? e.domaines : []; };
+const etablissementsDans = (modele) => { const m = etablissementsDe(modele.exposants); return (cle) => m.get(cle) || cle; };
 
 // Comment se prouve un défi, écrit d'après ses réglages (ADR-0015 : la règle
 // affichée ne peut pas mentir).
@@ -569,7 +570,7 @@ function commentProuver(etat, d) {
 // touchant un choix : il part par son numéro, jamais comme un texte.
 function defisDeLaFiche(etat, ex, secret) {
   if (!secret) return '';
-  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele), appareil: etat.appareil, maintenant: maintenantMs(etat) })
+  const ici = defisIci(etat.grandDefi, (etat.visite && etat.visite.jeu) || { validations: [], passeport: null }, ex.cle, { domainesDe: domainesDans(etat.modele), etablissementDe: etablissementsDans(etat.modele), appareil: etat.appareil, maintenant: maintenantMs(etat) })
     // Le Groupe des anciens élèves n'a pas de Domaine : « Sors de ta zone de confort » ne s'y
     // gagne jamais, inutile de l'afficher « Pas pour ce stand » (ADR-0028).
     .filter(({ defi }) => !(ex.groupe && defi.type_preuve === 'hors-domaines'));

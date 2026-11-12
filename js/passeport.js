@@ -205,7 +205,7 @@ export function questionIci(jeu, etat, id, { jeton = '' } = {}) {
 // du défi 1 pour le défi 2, un domaine déjà croisé pour le défi 9, un autre stand
 // que le sien, ou l'heure limite, pour le mystère (`appareil` : ce Passeport ;
 // `maintenant`, ms).
-export function defisIci(jeu, etat, exposant, { domainesDe = () => [], appareil = '', maintenant = null } = {}) {
+export function defisIci(jeu, etat, exposant, { domainesDe = () => [], etablissementDe, appareil = '', maintenant = null } = {}) {
   if (!jeu || !jeu.actif) return [];
   const scans = etat.validations.filter((v) => (v.statut === 'ok' || v.statut === 'attente') && v.exposant).map((v) => ({ defi: v.defi, exposant: v.exposant }));
   return jeu.defis.filter((d) => proposable(d, exposant)).map((defi) => {
@@ -213,7 +213,7 @@ export function defisIci(jeu, etat, exposant, { domainesDe = () => [], appareil 
     const refuseIci = etat.validations.some((v) => v.defi === defi.id && v.exposant === exposant && v.statut === 'refus');
     const gagnee = etat.validations.find((v) => v.defi === defi.id && v.statut === 'ok');
     const libre = statut === 'a-faire' || (statut === 'refuse' && !refuseIci);
-    const raison = libre ? motifIci(defi, { jeu, exposant, scans, domainesDe, appareil, heure: maintenant }) : '';
+    const raison = libre ? motifIci(defi, { jeu, exposant, scans, domainesDe, etablissementDe, appareil, heure: maintenant }) : '';
     return { defi, statut, validable: libre && !raison, raison, chez: gagnee ? gagnee.exposant || null : null };
   });
 }

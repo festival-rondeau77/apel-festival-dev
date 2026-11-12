@@ -350,11 +350,14 @@ export function standCorrespond(stand, exposant) {
 }
 
 // « différent du défi X » (défi 2 : une autre école que celle du défi 1) : un même
-// exposant ne sert pas aux deux, dans un sens comme dans l'autre.
-function motifDifferentDe(defi, { jeu, exposant, scans }) {
+// exposant ne sert pas aux deux, dans un sens comme dans l'autre. Deux fiches d'un même
+// établissement (UNILASALLE, une salle par village : même type, même nom) comptent pour
+// un : `etablissementDe(clé)` les rapproche (etablissementsDe, donnees.js).
+function motifDifferentDe(defi, { jeu, exposant, scans, etablissementDe = (cle) => cle }) {
   const lies = new Set(defi.params.different_de ? [defi.params.different_de] : []);
   for (const d of jeu.defis) if (d.params.different_de === defi.id) lies.add(d.id);
-  const pris = scans.find((s) => lies.has(s.defi) && s.exposant === exposant);
+  const ici = etablissementDe(exposant);
+  const pris = scans.find((s) => lies.has(s.defi) && (s.exposant === exposant || etablissementDe(s.exposant) === ici));
   return pris ? `même exposant que le défi ${pris.defi}` : '';
 }
 
@@ -603,7 +606,8 @@ export function motifIci(defi, contexte) {
 // la paire `ok` ; les deux portent leur `moment`.
 // Le défi mystère (`scan-attribue`) : `appareil`, le Passeport qui envoie ; jugé à `heure`.
 // Un instant gagnant (`instant`) : statut `ok` et motif `juste` | `faux`, jugé à `heure`.
-export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map(), appareil = '' }) {
+// `etablissementDe(clé)` : deux fiches d'un même établissement comptent pour un (different_de).
+export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(scans.map((s) => s.defi)), domainesDe = null, etablissementDe, reponses = new Map(), ratees = new Map(), heure = v.t, votes = new Map(), appareil = '' }) {
   const refus = (motif) => ({ statut: 'refus', motif, choix: null });
   if (!jeu.actif) return refus('jeu coupé');
   const defi = jeu.defis.find((d) => d.id === v.defi && d.actif);
@@ -634,7 +638,7 @@ export function juger(v, { jeu, exposant = null, scans = [], faits = new Set(sca
   if (!exposant) return refus('secret inconnu');
   if (!proposable(defi, exposant)) return refus({ 'scan-stand': 'pas le stand du défi', 'scan-attribue': 'pas un stand du défi' }[defi.type_preuve] || 'exposant d’un autre type');
   if (faits.has(defi.id)) return { statut: 'deja', motif: '', choix: null };
-  const motif = motifIci(defi, { jeu, exposant, scans, domainesDe, appareil, heure });
+  const motif = motifIci(defi, { jeu, exposant, scans, domainesDe, etablissementDe, appareil, heure });
   if (motif) return refus(motif);
   const n = v.preuve.choix;
   const choix = Number.isInteger(n) && n >= 0 && n < defi.choix.length ? n : null;
