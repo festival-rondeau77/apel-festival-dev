@@ -416,12 +416,14 @@ function lireGrandsLots(valeur) {
 }
 
 // `delai_lot_flash` (grand-defi 08) : les minutes qu'a le gagnant d'un instant pour venir
-// à l'accueil. Vide : jusqu'à l'heure du tirage (`heure_tirage`, 13 h).
+// à l'accueil ; passé ce délai, un remplaçant est tiré. Vide (ADR-0030) : jusqu'à la fin du
+// festival (`heure_fin`, à défaut l'heure du tirage), et un lot non retiré est perdu, sans
+// remplaçant.
 function lireDelaiFlash(valeur) {
   const brut = texte(valeur);
   if (!brut) return { delai: null };
   const n = Number(brut);
-  if (!Number.isInteger(n) || n < 1 || n > 240) return { delai: null, motif: `delai_lot_flash illisible : « ${brut} » (minutes, de 1 à 240 ; vide = jusqu’à l’heure du tirage)` };
+  if (!Number.isInteger(n) || n < 1 || n > 240) return { delai: null, motif: `delai_lot_flash illisible : « ${brut} » (minutes, de 1 à 240 ; vide = jusqu’à la fin du festival, sans remplaçant)` };
   return { delai: n };
 }
 
@@ -446,10 +448,12 @@ export function lireJeu(tableDefis, tableInfos, { exposants = null, evenements =
   const { delai: delaiFlash, motif: motifDelai } = lireDelaiFlash(infos.delai_lot_flash);
   const { max: lotsFlashMax, motif: motifMax } = lireLotsFlashMax(infos.lots_flash_max);
   // L'heure du grand tirage, texte libre pour la règle (« 13 h ») : illisible, 13 h.
-  // Elle borne aussi l'attente d'un Lot flash sans délai : illisible, elle est signalée.
   const heureLue = lireHeure(infos.heure_tirage);
   const heureTirage = heureLue ?? HEURE_TIRAGE_PAR_DEFAUT;
-  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, grands_lots: grandsLots, delai_lot_flash: delaiFlash, lots_flash_max: lotsFlashMax, heure_tirage: heureTirage, defis: [], invalides: [] };
+  // La fin du festival (`heure_fin`, « 13:30 ») borne l'attente d'un Lot flash sans délai
+  // (ADR-0030) ; absente ou illisible : null, et c'est l'heure du tirage qui la borne.
+  const heureFin = lireHeure(infos.heure_fin);
+  const jeu = { actif: oui(infos.grand_defi), objectif: paliers[0], paliers, chances_badge: chancesBadge, grands_lots: grandsLots, delai_lot_flash: delaiFlash, lots_flash_max: lotsFlashMax, heure_tirage: heureTirage, heure_fin: heureFin, defis: [], invalides: [] };
   if (motifPaliers) jeu.invalides.push({ id: 'paliers', motif: motifPaliers });
   if (motifBadge) jeu.invalides.push({ id: 'chances_badge', motif: motifBadge });
   if (motifLots) jeu.invalides.push({ id: 'grands_lots', motif: motifLots });
