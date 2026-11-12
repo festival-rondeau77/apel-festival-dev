@@ -9,7 +9,7 @@
 //   Pages le garde dix minutes, et `addAll` y aurait repris un ancien app.js ;
 // - le cache d'une version n'est plus réécrit par le réseau en cours de route : seul un
 //   fichier absent de la liste y entre.
-const VERSION = '2026.11.08-3d678a8';
+const VERSION = '2026.11.12-38427ae';
 const CACHE_APPLI = `festival-appli-${VERSION}`;
 const CACHE_DONNEES = 'festival-donnees';
 const FICHIERS = [
