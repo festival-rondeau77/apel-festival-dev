@@ -9,7 +9,7 @@ import { contient as visiteContient, matinee, suggestions, questionsPour, texteA
 import { construireScene, contenuZone, contenuSalle, rechercherSurPlan, sallesDeVisite, salleParNom, phraseGuidage, etagesPresents, planDeLEtage, etageDeSalle } from './plan.js';
 import { icone } from './icones.js';
 import { jauge, defisIci, mesDefis, rejouerOuvert, questionIci, voteIci, instantIci, annoncesEnCours, gainsARemettre, gainEnCours, messageAbsent, etatJeuInitial } from './passeport.js';
-import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis, fenetresDe } from './defis.js';
+import { standCorrespond, standAttribue, paliersDe, chancesBadgeDe, minutesAParis, fenetresDe, avecPoints, pointsDe, chancesDe } from './defis.js';
 import { afficherCode, urlRemise } from './gains.js';
 import { encoderQR, qrEnSvg } from './qr.js';
 import { t, tn, tt, heure, locale, langue, definirLangue, languesProposees, NOMS_LANGUES } from './i18n.js';
@@ -360,6 +360,11 @@ function ecranRegle(etat) {
   const i = etat.modele.infos || {};
   const paliers = paliersDe(jeu);
   const bonus = chancesBadgeDe(jeu);
+  // « Tous les défis » dit le total de Chances de qui a tout fait (ses Paliers et le badge),
+  // compté comme au Tirage : « 4 chances », pas « +2 ». Sous le premier Palier même en
+  // faisant tout (un jeu d'essai), il ne reste que le bonus à dire.
+  const tous = (jeu.defis || []).filter((d) => d.actif !== false && avecPoints(d)).map((d) => d.id);
+  const toutFait = chancesDe(pointsDe(tous, jeu), tous, jeu).chances;
   const heure = String(i.heure_tirage || '').trim();
   const reglement = i.reglement_jeu_url || i.reglement_url;
   // Le tableur traduit la cellule `lots` entière (revue du 16) : traduire d'abord, couper ensuite.
@@ -371,7 +376,7 @@ function ecranRegle(etat) {
       <li class="idee">${icone('visite', 28)}<div>
         <p>${h(t('Plus tu marques de points, plus tu as de chances de gagner !'))} ${h(heure ? t('Marque au moins %s points pour participer au tirage au sort de %s.', paliers[0], heure) : t('Marque au moins %s points pour participer au tirage au sort.', paliers[0]))}</p>
         <ul class="paliers">${paliers.map((p, k) => `<li><strong>${h(p)}</strong> <span>${h(tn('%s chance', '%s chances', k + 1))}</span></li>`).join('')}${bonus
-          ? `<li><strong>${h(t('Tous les défis'))}</strong> <span>${h(tn('+%s chance', '+%s chances', bonus))}</span></li>` : ''}</ul>
+          ? `<li><strong>${h(t('Tous les défis'))}</strong> <span>${h(toutFait > 0 ? tn('%s chance', '%s chances', toutFait) : tn('+%s chance', '+%s chances', bonus))}</span></li>` : ''}</ul>
       </div></li>
       <li class="idee">${icone('cloche', 28)}<div><p>${h(t('Reste vigilant ! Plus de chances de gagner avec les Instants Gagnants, le Défi Mystère et toutes les annonces.'))}</p></div></li>
     </ol>
